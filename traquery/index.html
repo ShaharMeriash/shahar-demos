@@ -1,0 +1,1583 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>TraQuery — Interactive Demo</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Rajdhani:wght@500;600;700&family=Inter:wght@400;500;600&display=swap');
+:root{
+  --app:#0B1710;--card:#13251B;--card2:#1A2F23;--line:#27402F;
+  --ink:#F2F6F3;--t2:#A7B8AD;--t3:#8A9C90;
+  --forest:#4FB584;--forest-l:#6FCB9F;--gold:#C9A34E;--gold-d:#BD8C3D;
+  --bright:#3CCC08;--red:#E27A6E;
+  --fd:'Rajdhani',sans-serif;--fb:'Inter',sans-serif;
+  --mono:ui-monospace,Menlo,monospace;
+}
+*{margin:0;padding:0;box-sizing:border-box}
+::selection{background:#4FB584;color:#0B1710}
+body{background:var(--app);color:var(--ink);font-family:var(--fb);font-size:14px;min-height:100vh;-webkit-font-smoothing:antialiased;-moz-osx-font-smoothing:grayscale}
+.demo-strip{background:#16293A;border-bottom:1px solid var(--line);padding:7px 32px;display:flex;justify-content:space-between;align-items:center;font-size:12.5px;color:#7BBBDE}
+.demo-strip a{color:var(--ink);text-decoration:none;font-weight:600}
+header{display:flex;align-items:center;gap:14px;padding:14px 32px;border-bottom:1px solid var(--line);flex-wrap:wrap}
+.dot{width:9px;height:9px;border-radius:50%;background:var(--bright);flex-shrink:0}
+.wordmark{font-family:var(--fd);font-weight:600;font-size:26px;letter-spacing:-.01em;color:var(--forest-l)}
+.slabel{font-family:var(--fd);font-weight:600;font-size:11px;letter-spacing:.2em;text-transform:uppercase;color:var(--gold)}
+header .right{margin-left:auto;display:flex;align-items:center;gap:10px;font-size:12px;color:var(--t2);flex-wrap:wrap}
+.avatar{width:26px;height:26px;border-radius:50%;background:var(--card2);border:1px solid var(--line);display:flex;align-items:center;justify-content:center;font-family:var(--fd);font-weight:700;font-size:12px;color:var(--gold)}
+nav.tabs{display:flex;gap:8px;padding:16px 32px 2px;overflow-x:auto}
+nav.tabs button{font-family:var(--fd);font-weight:600;font-size:12.5px;letter-spacing:.08em;text-transform:uppercase;background:var(--card);border:1px solid var(--line);border-radius:2px;color:var(--t3);padding:7px 16px;cursor:pointer;white-space:nowrap}
+nav.tabs button:hover{color:var(--forest)}
+nav.tabs button.on{background:rgba(79,181,132,.18);border-color:rgba(79,181,132,.5);color:var(--forest)}
+main{padding:18px 32px 60px}
+.controls{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px;align-items:center}
+.chiprow{display:flex;gap:6px;overflow-x:auto;align-items:center;padding-bottom:2px}
+.chip{font-size:12px;padding:4px 10px;border-radius:2px;border:1px solid var(--line);background:var(--card2);color:var(--t2);cursor:pointer;font-family:var(--fb);white-space:nowrap;flex-shrink:0}
+.chip.on{background:rgba(79,181,132,.2);border-color:rgba(79,181,132,.4);color:var(--forest)}
+.chip.dim{font-family:var(--fd);text-transform:uppercase;letter-spacing:.06em;font-weight:600}
+.chip.off{opacity:.4;cursor:not-allowed}
+.abtn{font-size:11.5px;padding:3px 9px;border-radius:2px;border:0;background:var(--card2);color:var(--t2);cursor:pointer;font-family:var(--fb);white-space:nowrap}
+.abtn:hover{color:var(--ink)}
+.abtn.confirm{background:rgba(79,181,132,.2);color:var(--forest)}
+.abtn.danger{background:rgba(226,122,110,.15);color:var(--red)}
+.kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;margin-bottom:18px}
+.kpi{background:var(--card);border:1px solid var(--line);border-radius:2px;padding:13px 15px}
+.kpi.hl{border-color:rgba(79,181,132,.5);background:rgba(79,181,132,.06)}
+.kpi .l{font-family:var(--fd);font-weight:600;font-size:10px;letter-spacing:.2em;text-transform:uppercase;color:var(--t2);margin-bottom:5px}
+.kpi .v{font-family:var(--fd);font-weight:700;font-size:30px;line-height:1;color:var(--ink);font-variant-numeric:tabular-nums}
+.kpi .d{font-size:11px;margin-top:5px;font-family:var(--fb)}
+.up{color:var(--forest)} .down{color:var(--red)}
+.card{background:var(--card);border:1px solid var(--line);border-radius:2px;margin-bottom:18px}
+.card .h{padding:11px 15px;border-bottom:1px solid var(--line);display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.card .h .t{font-family:var(--fd);font-weight:600;font-size:11px;letter-spacing:.2em;text-transform:uppercase;color:var(--gold)}
+.card .b{padding:14px 15px}
+.slab{font-family:var(--fd);font-weight:600;font-size:10px;letter-spacing:.2em;text-transform:uppercase;color:var(--gold)}
+svg text{font-family:var(--fd);font-size:11px;fill:var(--t2)}
+table{width:100%;border-collapse:collapse;font-size:12.5px}
+th{font-family:var(--fd);font-weight:600;font-size:10.5px;letter-spacing:.12em;text-transform:uppercase;color:var(--t2);text-align:left;padding:8px 10px;border-bottom:1px solid var(--line);cursor:pointer;white-space:nowrap;background:var(--card)}
+th.num,td.num{text-align:right;font-family:var(--mono);font-variant-numeric:tabular-nums;font-size:11.5px}
+th.on{color:var(--forest)}
+td{padding:7px 10px;border-bottom:1px solid rgba(39,64,47,.55)}
+tr:hover td{background:rgba(26,47,35,.4)}
+tr.total td{font-weight:600;border-top:1px solid var(--line);color:var(--ink);background:rgba(201,163,78,.06)}
+tr.testrow td{background:rgba(201,163,78,.05)}
+.pos{color:var(--forest);font-weight:600} .neg{color:var(--red);font-weight:600}
+.gold{color:var(--gold-d)}
+.tbl-wrap{overflow-x:auto}
+.click-detail{background:var(--card2);font-size:12px;padding:12px 16px}
+.click-detail b{font-family:var(--fd);text-transform:uppercase;letter-spacing:.1em;font-size:10px;color:var(--t2);display:block;margin-top:8px}
+.click-detail code{color:var(--forest-l);font-size:11px;word-break:break-all;font-family:var(--mono)}
+.kv{display:flex;gap:8px;min-width:0;font-size:12px;padding:1px 0}
+.kv .k{color:var(--t3);flex-shrink:0;width:118px}
+.kv .v{color:var(--t2);word-break:break-all}
+.badge{font-size:10.5px;padding:1px 7px;border-radius:2px;font-family:var(--fd);font-weight:600;letter-spacing:.06em;text-transform:uppercase;white-space:nowrap}
+.badge.ok{background:rgba(79,181,132,.15);color:var(--forest)}
+.badge.no{background:rgba(226,122,110,.15);color:var(--red)}
+.badge.amber{background:rgba(201,163,78,.18);color:#E0B968}
+.badge.blue{background:rgba(95,168,211,.15);color:#7BBBDE}
+.badge.purple{background:rgba(180,138,214,.15);color:#B48AD6}
+.badge.gray{background:var(--card2);color:var(--t3)}
+.note{font-size:11.5px;color:var(--t3);padding:8px 15px}
+.trunc{font-size:11px;color:#E0B968;background:rgba(201,163,78,.08);border-top:1px solid var(--line);padding:7px 15px}
+.inp{background:var(--card2);border:1px solid var(--line);border-radius:2px;padding:5px 8px;font-size:12px;color:var(--ink);font-family:var(--fb);outline:none}
+.inp:focus{border-color:var(--forest)}
+.inp.mono{font-family:var(--mono);font-size:11px}
+.inp::placeholder{color:var(--t3)}
+select.inp{cursor:pointer}
+input[type="date"].inp{color-scheme:dark}
+.fin{width:100%;min-width:70px;background:rgba(26,47,35,.7);border:1px solid var(--line);border-radius:2px;padding:2px 6px;font-size:11px;color:var(--t2);outline:none;font-family:var(--fb)}
+.fin:focus{border-color:var(--forest)}
+.fin.num{text-align:right;font-family:var(--mono)}
+.sect{background:var(--card);border:1px solid var(--line);border-radius:2px;margin-bottom:18px}
+.sect .sh{padding:11px 15px;border-bottom:1px solid var(--line)}
+.sect .sh .st{font-weight:600;color:var(--ink);font-size:13.5px}
+.sect .sh .ss{font-size:11.5px;color:var(--t3);margin-left:10px}
+.sect .sb{padding:12px 15px;display:flex;flex-direction:column;gap:8px}
+.hrow{background:rgba(26,47,35,.5);border:1px solid rgba(39,64,47,.6);border-radius:2px}
+.hrow .hr-head{display:flex;align-items:center;gap:8px;padding:8px 10px;flex-wrap:wrap}
+.hrow .hr-body{border-top:1px solid var(--line);padding:10px;background:rgba(11,23,16,.5)}
+.tag{width:16px;height:16px;border-radius:2px;display:inline-flex;align-items:center;justify-content:center;font-family:var(--fd);font-weight:700;font-size:10px;flex-shrink:0}
+.tag.a{background:rgba(95,168,211,.2);color:#7BBBDE}
+.tag.o{background:rgba(224,185,104,.18);color:#E0B968}
+.tag.p{background:rgba(180,138,214,.18);color:#B48AD6}
+.pid{font-family:var(--mono);font-weight:700;font-size:13px;color:#4FB5A8;background:rgba(79,181,168,.1);border:1px solid rgba(79,181,168,.25);border-radius:2px;padding:1px 7px}
+.urlchip{font-size:11px;font-family:var(--mono);padding:2px 8px;border-radius:2px;background:var(--card2);border:0;color:#7BBBDE;cursor:pointer;white-space:nowrap}
+.urlchip:hover{color:#A8D4EE}
+.urlchip.green{color:var(--forest)}
+.exp{background:none;border:0;color:var(--t3);cursor:pointer;font-size:11px;width:16px;flex-shrink:0}
+.drawer{position:fixed;inset:0;z-index:60}
+.drawer .ov{position:absolute;inset:0;background:rgba(0,0,0,.6)}
+.drawer .panel{position:absolute;right:0;top:0;height:100%;width:100%;max-width:780px;background:var(--app);border-left:1px solid var(--line);overflow-y:auto;box-shadow:-12px 0 40px rgba(0,0,0,.5)}
+.drawer .phead{position:sticky;top:0;z-index:5;background:var(--card);border-bottom:1px solid var(--line);padding:12px 18px;display:flex;align-items:center;justify-content:space-between;gap:10px}
+.drawer .pbody{padding:16px 18px;display:flex;flex-direction:column;gap:16px}
+.viewas{background:rgba(146,94,14,.22);border-bottom:1px solid rgba(190,130,40,.4);padding:8px 20px;display:flex;align-items:center;gap:12px;flex-wrap:wrap;font-size:12px;color:#F2CE85}
+.viewas button{margin-left:auto;background:rgba(190,130,40,.25);border:0;color:#F2CE85;font-size:11.5px;padding:4px 10px;border-radius:2px;cursor:pointer}
+.popwrap{position:relative}
+.popover{position:absolute;right:0;top:32px;z-index:45;background:var(--card);border:1px solid var(--line);border-radius:2px;padding:10px 12px;width:200px;box-shadow:0 10px 30px rgba(0,0,0,.55)}
+.popover label{display:flex;align-items:center;gap:8px;font-size:12px;color:var(--t2);padding:3px 0;cursor:pointer}
+.popover input[type=checkbox]{accent-color:var(--forest)}
+input[type=checkbox]{accent-color:var(--forest)}
+.lbl{display:flex;align-items:center;gap:6px;font-size:12px;color:var(--t2);cursor:pointer;white-space:nowrap}
+#toasts{position:fixed;right:16px;bottom:16px;z-index:99;display:flex;flex-direction:column;gap:8px;max-width:340px}
+.toast{background:var(--card);border:1px solid rgba(79,181,132,.4);border-left:3px solid var(--forest);border-radius:2px;padding:9px 13px;font-size:12.5px;color:var(--ink);box-shadow:0 8px 24px rgba(0,0,0,.5);animation:tin .18s ease-out}
+@keyframes tin{from{transform:translateY(8px);opacity:0}to{transform:none;opacity:1}}
+.panelbox{background:var(--card);border:1px solid var(--line);border-radius:2px;margin-bottom:14px}
+.panelbox .ph{display:flex;align-items:center;gap:8px;padding:10px 14px;border-bottom:1px solid var(--line);flex-wrap:wrap}
+.legend{display:flex;gap:14px;flex-wrap:wrap;font-size:11px;color:var(--t2);padding:8px 4px 0}
+.legend .sw{display:inline-block;width:10px;height:10px;border-radius:2px;margin-right:5px;vertical-align:-1px}
+.geo-grid{display:grid;grid-template-columns:3.2rem 1fr 1fr;gap:6px 10px;align-items:center;max-width:420px}
+.geo-grid .gh{font-family:var(--fd);font-size:9.5px;letter-spacing:.15em;text-transform:uppercase;color:var(--t3)}
+@media(max-width:700px){.kpi .v{font-size:21px} main{padding:14px 12px 60px} .kv .k{width:92px}}
+</style>
+</head>
+<body>
+<div class="demo-strip"><span>◈ Interactive demo — all data is generated sample data</span><a href="../">← Portfolio</a></div>
+<header id="hdr"></header>
+<div id="banner"></div>
+<nav class="tabs" id="tabs"></nav>
+<main id="main"></main>
+<div id="drawer"></div>
+<div id="toasts"></div>
+<script>
+"use strict";
+// ═══════════════ seeded RNG ═══════════════
+let seed = 42;
+const rnd = () => (seed = (seed*1103515245+12345)%2147483648)/2147483648;
+const pick = a => a[Math.floor(rnd()*a.length)];
+const $ = s => document.querySelector(s);
+const pad2 = n => String(n).padStart(2,"0");
+
+// ═══════════════ catalog (Hierarchy DB, editable in-memory) ═══════════════
+const GEOS = ["US","CA","AU","DE","UK"];
+let DB = {
+  advertisers: [
+    { id:1, name:"Northstar Affiliates", postback_key:"nk_7f3ad2c1", param_map:{click_id:"cid", sub_id:"s1"}, offers:[
+      { id:11, name:"Aurora Slots", event_name:"ftd", default_revenue:90, offer_url:"https://aurora-slots.example/lp?cid={click_id}&s1={sub_id}",
+        revenues:[{country:"US",revenue:120},{country:"CA",revenue:95},{country:"AU",revenue:110},{country:"DE",revenue:80},{country:"UK",revenue:100}] },
+      { id:12, name:"Lumen Casino", event_name:"qftd", default_revenue:120, offer_url:"https://lumen.example/welcome?cid={click_id}&s1={sub_id}",
+        revenues:[{country:"US",revenue:150},{country:"CA",revenue:120},{country:"AU",revenue:135},{country:"DE",revenue:100},{country:"UK",revenue:125}] },
+    ]},
+    { id:2, name:"Meridian Partners", postback_key:"nk_b81e44f0", param_map:{click_id:"clickref"}, offers:[
+      { id:21, name:"FinReach CFD", event_name:"reg", default_revenue:250, offer_url:"https://finreach.example/open-account?ref={click_id}",
+        revenues:[{country:"US",revenue:280},{country:"CA",revenue:240},{country:"AU",revenue:260},{country:"DE",revenue:220},{country:"UK",revenue:250}] },
+      { id:22, name:"BetPeak Sports", event_name:"ftd", default_revenue:75, offer_url:"https://betpeak.example/join?cid={click_id}&s1={sub_id}&s3={sub3}",
+        revenues:[{country:"US",revenue:90},{country:"CA",revenue:70},{country:"AU",revenue:85},{country:"DE",revenue:60},{country:"UK",revenue:80}] },
+    ]},
+  ],
+  publishers: [
+    { id:1, name:"Northwind Media", click_host:"pathlane.net", postback_url:"https://northwind-media.example/s2s?cid={sub_id}&sum={payout}&ev={event}", param_map:{sub_id:"clickid", gclid:"gclid"} },
+    { id:2, name:"Clickforge",      click_host:"pathlane.net", postback_url:"https://trk.clickforge.example/pb?subid={sub_id}&payout={payout}",       param_map:{sub_id:"subid", sub3:"creative"} },
+    { id:3, name:"AdVista Group",   click_host:"pathlane.net", postback_url:"",                                                                        param_map:{sub_id:"avid"} },
+  ],
+  products: [],
+  event_names: [
+    { id:1, name:"Registration",  param:"reg"  },
+    { id:2, name:"First deposit", param:"ftd"  },
+    { id:3, name:"Qualified FTD", param:"qftd" },
+  ],
+};
+// 20% margin rounded down — nearest $5 at $100+, whole dollar under $100, one decimal under $10
+function defPayout(rev){ const p = rev*0.8; if (p>=100) return Math.floor(p/5)*5; if (p>=10) return Math.floor(p); return Math.floor(p*10)/10; }
+function offerById(id){ for (const a of DB.advertisers) for (const o of a.offers) if (o.id===id) return o; return null; }
+function advOfOffer(id){ for (const a of DB.advertisers) if (a.offers.some(o=>o.id===id)) return a; return null; }
+function pubById(id){ return DB.publishers.find(p=>p.id===id) || null; }
+(function seedProducts(){
+  const defs = [[41,11,1],[42,11,2],[43,12,1],[44,12,3],[45,21,2],[46,21,3],[47,22,1],[48,22,2]];
+  DB.products = defs.map(([id,off,pub])=>({ id, offer_id:off, publisher_id:pub,
+    payouts:(offerById(off).revenues||[]).map(r=>({country:r.country, payout:defPayout(r.revenue)})) }));
+})();
+
+// ═══════════════ users & permissions (Admin) ═══════════════
+let USERS = [
+  { uid:"u1", email:"demo@vane-labs.com",             access:"granted", role:"admin",  type:"internal",   can_edit:true,  can_test:true,  see_rev:true,  see_pay:true },
+  { uid:"u2", email:"ops@vane-labs.com",              access:"granted", role:"member", type:"internal",   can_edit:true,  can_test:true,  see_rev:true,  see_pay:true },
+  { uid:"u3", email:"anna@northwindmedia.com",        access:"granted", role:"member", type:"publisher",  can_edit:false, can_test:false, see_rev:false, see_pay:true },
+  { uid:"u4", email:"rep@northstar-affiliates.com",   access:"granted", role:"member", type:"advertiser", can_edit:false, can_test:true,  see_rev:true,  see_pay:false },
+  { uid:"u5", email:"newhire@vane-labs.com",          access:"pending", role:"member", type:"internal",   can_edit:false, can_test:false, see_rev:true,  see_pay:true },
+];
+let INVITES = [ { email:"partner@clickforge.io", type:"publisher", can_edit:false, can_test:false, see_rev:false, see_pay:true, sent:false } ];
+let viewAs = null;              // uid or null
+function curUser(){ return USERS.find(u=>u.uid===(viewAs||"u1")); }
+function P(){
+  const u = curUser();
+  const admin = u.role==="admin";
+  return {
+    admin, type:u.type,
+    canEdit: admin || u.can_edit,
+    canTest: admin || u.can_test,
+    rev: admin || u.see_rev,
+    pay: admin || u.see_pay,
+    seesVisitor: u.type==="internal" && (admin || u.can_edit),
+  };
+}
+// A publisher account is not shown the demand side's identity.
+function maskAdv(name){
+  if (P().type!=="publisher") return name;
+  const i = DB.advertisers.findIndex(a=>a.name===name);
+  return "Advertiser " + (i>=0 ? "ABCDEFGH"[i] : "•");
+}
+
+// ═══════════════ dates & timezone ═══════════════
+const TZS = [
+  ["Australia/Perth","GMT+8 — Perth"],["UTC","UTC"],["Europe/London","GMT+1 — London"],
+  ["Europe/Paris","GMT+2 — Paris / Berlin"],["Asia/Jerusalem","GMT+3 — Israel"],["Asia/Dubai","GMT+4 — Dubai"],
+  ["Asia/Singapore","GMT+8 — Singapore"],["Asia/Tokyo","GMT+9 — Tokyo"],
+  ["America/New_York","GMT-5 — New York"],["America/Los_Angeles","GMT-8 — Los Angeles"],
+];
+let tz = "Australia/Perth";
+const fmtDT   = ms => new Date(ms).toLocaleString("en-GB",{timeZone:tz,day:"2-digit",month:"2-digit",hour:"2-digit",minute:"2-digit"});
+const fmtDTs  = ms => new Date(ms).toLocaleString("en-GB",{timeZone:tz,day:"2-digit",month:"2-digit",hour:"2-digit",minute:"2-digit",second:"2-digit"});
+const fmtDay  = d => { const m=d.match(/^(\d{4})-(\d{2})-(\d{2})/); return m?`${m[3]}/${m[2]}/${m[1]}`:d; };
+const dstrOf  = dt => `${dt.getFullYear()}-${pad2(dt.getMonth()+1)}-${pad2(dt.getDate())}`;
+const PRESETS = [["today","Today"],["yesterday","Yesterday"],["7d","Last 7d"],["30d","Last 30d"],["mtd","This month"],["lastmonth","Last month"]];
+function rangeFor(p){
+  const t=new Date(), y=t.getFullYear(), m=t.getMonth(), d=t.getDate(), mk=(yy,mm,dd)=>new Date(yy,mm,dd);
+  switch(p){
+    case "yesterday": { const x=dstrOf(mk(y,m,d-1)); return {from:x,to:x}; }
+    case "7d":        return {from:dstrOf(mk(y,m,d-6)),  to:dstrOf(mk(y,m,d))};
+    case "30d":       return {from:dstrOf(mk(y,m,d-29)), to:dstrOf(mk(y,m,d))};
+    case "mtd":       return {from:dstrOf(mk(y,m,1)),    to:dstrOf(mk(y,m,d))};
+    case "lastmonth": return {from:dstrOf(mk(y,m-1,1)),  to:dstrOf(mk(y,m,0))};
+    default:          { const x=dstrOf(mk(y,m,d)); return {from:x,to:x}; }
+  }
+}
+function previousRange(from,to){
+  const f=new Date(from+"T00:00:00"), t=new Date(to+"T00:00:00");
+  const days=Math.round((t-f)/864e5)+1;
+  const pt=new Date(f.getTime()-864e5), pf=new Date(pt.getTime()-(days-1)*864e5);
+  return {from:dstrOf(pf), to:dstrOf(pt)};
+}
+function spanDays(r){ return Math.round((new Date(r.to+"T00:00:00")-new Date(r.from+"T00:00:00"))/864e5)+1; }
+
+// ═══════════════ fact generation: hour × product × geo ═══════════════
+const DAYS = 30;
+let FACTS = [], CLICKS = [], EVENTS = [], REJECTS = [];
+const HOURW = [...Array(24)].map((_,h)=> 0.35 + 0.65*Math.exp(-Math.pow(((h+24-19)%24>12?24-((h+24-19)%24):(h+24-19)%24),2)/40));
+const HOURSUM = HOURW.reduce((a,b)=>a+b,0);
+function geoRev(off,g){ const r=(off.revenues||[]).find(x=>x.country===g); return r?r.revenue:(off.default_revenue||50); }
+function geoPay(pr,g){ const p=(pr.payouts||[]).find(x=>x.country===g); return p?p.payout:defPayout(geoRev(offerById(pr.offer_id),g)); }
+function genFacts(){
+  FACTS = [];
+  const now = new Date();
+  for (let back=0; back<DAYS; back++){
+    const dt=new Date(now.getFullYear(),now.getMonth(),now.getDate()-back);
+    const day=dstrOf(dt), wknd=[0,6].includes(dt.getDay())?1.25:1;
+    for (const pr of DB.products){
+      const off=offerById(pr.offer_id); if(!off) continue;
+      const offW = {11:1.7,12:1.1,21:0.55,22:1.3}[off.id]||1;
+      for (const g of GEOS){
+        const geoW = g==="US"?1.6:g==="UK"?1.15:1;
+        const daily = (18+rnd()*70) * offW * geoW * wknd;
+        const cr = {11:0.024,12:0.018,21:0.009,22:0.028}[off.id]||0.02;
+        for (let h=0; h<24; h++){
+          const clicks = Math.round(daily*HOURW[h]/HOURSUM*(0.7+rnd()*0.6));
+          if (!clicks) continue;
+          const exp_ = clicks*cr*(0.7+rnd()*0.6);
+          const conv = Math.floor(exp_) + (rnd() < exp_%1 ? 1 : 0);
+          const revenue = conv * geoRev(off,g) * (0.92+rnd()*0.16);
+          const payout  = conv * geoPay(pr,g);
+          FACTS.push({day, hour:h, prod:pr.id, off:off.id, pub:pr.publisher_id, geo:g, clicks, conv, revenue, payout});
+        }
+      }
+    }
+  }
+}
+// ═══════════════ click & event log generation ═══════════════
+const UAS = [
+  "Mozilla/5.0 (iPhone; CPU iPhone OS 17_5 like Mac OS X) AppleWebKit/605.1.15 Mobile/15E148",
+  "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/126.0 Safari/537.36",
+  "Mozilla/5.0 (Linux; Android 14; Pixel 8) AppleWebKit/537.36 Chrome/126.0 Mobile Safari/537.36",
+  "Mozilla/5.0 (Macintosh; Intel Mac OS X 14_5) AppleWebKit/605.1.15 Version/17.5 Safari/605.1.15",
+];
+const REFS = ["https://www.facebook.com/","https://t.co/x9dQ2","https://news.clickforge.example/top-offers","https://www.google.com/", null, null];
+const hex = n => [...Array(n)].map(()=>Math.floor(rnd()*16).toString(16)).join("");
+function genClicks(){
+  CLICKS = [];
+  const now = Date.now();
+  for (let i=0;i<150;i++){
+    const pr = pick(DB.products), off = offerById(pr.offer_id), pub = pubById(pr.publisher_id), adv = advOfOffer(pr.offer_id);
+    const g = pick(GEOS);
+    const t = now - rnd()*3*864e5;
+    const id = "c"+hex(15);
+    const sub = "fb_"+Math.floor(1000+rnd()*9000);
+    const sub3 = pick(["creative_a","creative_b","story_v2","banner_728",null]);
+    const gclid = rnd()<0.3 ? "EAIaIQ"+hex(12) : null;
+    const bot = rnd()<0.06;
+    const test = false;
+    const conv = !bot && rnd()<0.22;
+    const params = {product:String(pr.id), sub_id:sub};
+    if (sub3) params.sub3 = sub3;
+    if (gclid) params.gclid = gclid;
+    const qs = Object.entries(params).map(([k,v])=>k+"="+v).join("&");
+    const request_url  = `https://${pub.click_host}/click?${qs}`;
+    const redirect_url = (off.offer_url||"https://advertiser.example/lp?cid={click_id}")
+      .replace("{click_id}",id).replace("{sub_id}",sub).replace("{sub3}",sub3||"");
+    const rev = conv ? geoRev(off,g)*(0.92+rnd()*0.16) : null;
+    const pay = conv ? geoPay(pr,g) : null;
+    const hasPb = !!(pub.postback_url||"").trim();
+    const pbFail = conv && hasPb && rnd()<0.08;
+    CLICKS.push({
+      id, t, prod:pr.id, offName:off.name, advName:adv.name, pubName:pub.name, geo:g,
+      ip:`203.0.113.${10+Math.floor(rnd()*200)}`, ua:pick(UAS), referer:pick(REFS),
+      bot, test, gclid, sub_id:sub, sub3, sub4:null, sub5:rnd()<0.15?"aud_"+Math.floor(rnd()*90):null, sub6:null, sub7:null,
+      request_url, redirect_url, params,
+      conv, event: conv?off.event_name:null, conv_at: conv? t+rnd()*3600e3*5 : null,
+      revenue:rev, payout:pay,
+      pb_sent: conv && hasPb && !pbFail, pb_attempts: conv ? (hasPb ? (pbFail?3:1) : 0) : 0,
+    });
+  }
+  CLICKS.sort((a,b)=>b.t-a.t);
+}
+function eventFromClick(c){
+  return { id:"e"+hex(12), t:c.conv_at, event:c.event, offName:c.offName, advName:c.advName, pubName:c.pubName,
+    geo:c.geo, click_id:c.id, gclid:c.gclid, sub_id:c.sub_id, sub3:c.sub3, sub4:c.sub4, sub5:c.sub5, sub6:c.sub6, sub7:c.sub7,
+    revenue:c.revenue, payout:c.payout, referrer:c.referer, google: !!c.gclid, is_test:false };
+}
+function genEvents(){
+  EVENTS = CLICKS.filter(c=>c.conv).map(eventFromClick);
+  EVENTS.sort((a,b)=>b.t-a.t);
+}
+function genRejects(){
+  const now = Date.now();
+  REJECTS = [
+    { ts:now-42*60e3,   endpoint:"postback", reason:"unknown click_id", key:"nk_7f3a…", raw:"click_id=abc-not-a-real-id&event=ftd&payout=72" },
+    { ts:now-3*3600e3,  endpoint:"postback", reason:"bad key",          key:"nk_9x11…", raw:"click_id=c4be2210af31&key=nk_9x11wrong&event=ftd" },
+    { ts:now-7*3600e3,  endpoint:"click",    reason:"unknown product",  key:null,       raw:"product=99&sub_id=fb_4417" },
+    { ts:now-26*3600e3, endpoint:"postback", reason:"duplicate event",  key:"nk_7f3a…", raw:"click_id=c09a8e1d22b7&event=ftd" },
+    { ts:now-31*3600e3, endpoint:"click",    reason:"missing sub_id",   key:null,       raw:"product=43" },
+  ];
+}
+function genAll(){ seed = Math.floor(Math.random()*1e6)||42; genFacts(); genClicks(); genEvents(); genRejects(); }
+genAll();
+
+// ═══════════════ metrics & aggregation ═══════════════
+const METRICS = [
+  ["clicks","Clicks","int"],["conversions","Conversions","int"],["cr","CR","pct"],
+  ["revenue","Revenue","money"],["payout","Payout","money"],["margin","Margin","money"],["epc","EPC","money"],
+];
+const ALL_DIMS = [["offer","Offer"],["hour","Hour"],["publisher","Publisher"],["advertiser","Advertiser"],["country","Country"],["event","Event"],["day","Day"]];
+const COLORS = ["#4FB584","#C9A34E","#5FA8D3","#B48AD6","#E27A6E","#6FCB9F","#E0B968","#4FB5A8"];
+function visMetrics(){
+  const p = P();
+  return METRICS.filter(m =>
+    (m[0]!=="revenue"||p.rev) && (m[0]!=="payout"||p.pay) &&
+    (m[0]!=="margin"||(p.rev&&p.pay)) && (m[0]!=="epc"||p.rev));
+}
+function visDims(){
+  const p = P();
+  return ALL_DIMS.filter(d => (d[0]!=="publisher"||p.type!=="advertiser") && (d[0]!=="advertiser"||p.type!=="publisher"));
+}
+function fM(v,kind){
+  if (kind==="money") return "$"+v.toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2});
+  if (kind==="pct")   return v.toFixed(1)+"%";
+  return Math.round(v).toLocaleString();
+}
+let hAdvF="", hPubF="";   // hierarchy filter bar — scopes every dashboard number
+function factsIn(r){
+  const o2a=new Map();
+  for(const a of DB.advertisers) for(const o of a.offers) o2a.set(o.id,a.id);
+  return FACTS.filter(f=> f.day>=r.from && f.day<=r.to
+    && (!hAdvF || o2a.get(f.off)===+hAdvF)
+    && (!hPubF || f.pub===+hPubF));
+}
+function totalsOf(rows){
+  const t = {clicks:0,conversions:0,revenue:0,payout:0};
+  for (const f of rows){ t.clicks+=f.clicks; t.conversions+=f.conv; t.revenue+=f.revenue; t.payout+=f.payout; }
+  return derive(t);
+}
+function derive(t){
+  t.margin = t.revenue-t.payout;
+  t.cr  = t.clicks ? t.conversions/t.clicks*100 : 0;
+  t.epc = t.clicks ? t.revenue/t.clicks : 0;
+  return t;
+}
+function dimLabelOf(f,d){
+  switch(d){
+    case "offer":      return offerById(f.off)?.name ?? ("offer #"+f.off);
+    case "hour":       return pad2(f.hour)+":00";
+    case "publisher":  return pubById(f.pub)?.name ?? ("pub #"+f.pub);
+    case "advertiser": return maskAdv(advOfOffer(f.off)?.name ?? "—");
+    case "country":    return f.geo;
+    case "event":      return offerById(f.off)?.event_name ?? "—";
+    case "day":        return f.day;
+  }
+}
+// ">100", "<5", "=10", ">=2.5" — bare number means equals (2-dp so money behaves)
+function matchesNumeric(v,expr){
+  const m = expr.trim().match(/^(>=|<=|>|<|=)?\s*(-?\d+(?:\.\d+)?)$/);
+  if (!m) return true;
+  const n = parseFloat(m[2]);
+  switch(m[1]||"="){
+    case ">": return v>n; case "<": return v<n; case ">=": return v>=n; case "<=": return v<=n;
+    default:  return Math.round(v*100)===Math.round(n*100);
+  }
+}
+function csvDownload(name, head, rows){
+  const cell = v => { const s = v==null?"":String(v); const safe = /^[=+\-@]/.test(s)?"'"+s:s; return '"'+safe.replace(/"/g,'""')+'"'; };
+  const lines = [head.map(cell).join(",")];
+  for (const r of rows) lines.push(r.map(cell).join(","));
+  const blob = new Blob([lines.join("\n")],{type:"text/csv;charset=utf-8"});
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob); a.download = name; a.click();
+  URL.revokeObjectURL(a.href);
+}
+function toast(msg){
+  const el = document.createElement("div");
+  el.className = "toast"; el.textContent = msg;
+  $("#toasts").appendChild(el);
+  setTimeout(()=>{ el.style.transition="opacity .3s"; el.style.opacity="0"; setTimeout(()=>el.remove(),320); }, 3200);
+}
+function copyText(txt,msg){
+  (navigator.clipboard ? navigator.clipboard.writeText(txt) : Promise.reject()).then(
+    ()=>toast(msg||"✓ copied"), ()=>toast("copy blocked — "+txt.slice(0,40)+"…"));
+}
+const esc = s => String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/"/g,"&quot;");
+
+// ═══════════════ UI state ═══════════════
+let tab = "dashboard";
+// dashboard
+let preset="7d", range=rangeFor("7d"), compare=true, metric="revenue", split="none", grain="day";
+let dims=["offer"], sortKey="revenue", sortAsc=false, colFilters={};
+let VIEWS = [
+  { id:1, name:"Daily ops", is_default:1, email_to:"demo@vane-labs.com", send_hour:9,
+    config:{preset:"7d",compare:true,metric:"revenue",split:"none",grain:"day",dims:["offer"],sortKey:"revenue",sortAsc:false,colFilters:{}} },
+  { id:2, name:"US casino", is_default:0, email_to:null, send_hour:null,
+    config:{preset:"30d",compare:false,metric:"margin",split:"offer",grain:"day",dims:["offer","country"],sortKey:"margin",sortAsc:false,colFilters:{dim1:"US"}} },
+];
+let selView="", saveName="", schedEmails=["demo@vane-labs.com"], schedHour=9, nextViewId=3;
+// events
+let evPreset="7d", evRange=rangeFor("7d"), evFilter="", evColFilters={}, evSortK=null, evSortAsc=true;
+let colSelOpen=false, expandedEv=null, testOpen=false, rejectsOpen=false, testProd=41, TESTLOG=[];
+const EV_COLS = [
+  ["t","Time"],["event","Event"],["offer","Offer"],["country","Country"],["source","Publisher"],
+  ["click_id","Click ID"],["gclid","gclid"],["sub_id","Sub ID"],["sub3","Sub3"],["sub4","Sub4"],
+  ["sub5","Sub5"],["sub6","Sub6"],["sub7","Sub7"],["revenue","Revenue"],["payout","Payout"],
+  ["referrer","Referrer"],["google","Google"],
+];
+const EV_DEFAULT = ["t","event","offer","country","source","click_id","revenue","payout"];
+let evCols=[...EV_DEFAULT];
+// clicks
+let ckPreset="7d", ckConvOnly=false, ckBots=false, ckSearch="", openClick=null;
+// hierarchy
+let hOpenAdv={}, hAdvParams={}, hPubParams={}, editOffer=null, addOfferFor=null, addAdvOpen=false, prodOpen={}, npOffer="", npPub="";
+// admin
+let adminOpen=false, openUid=null, composerOpen=false;
+let inv={email:"",type:"internal",can_edit:false,can_test:false,see_rev:true,see_pay:true};
+
+// ═══════════════ dashboard: compute ═══════════════
+function sanitizeScope(){
+  const mets=visMetrics(), dimsA=visDims();
+  if(!mets.some(m=>m[0]===metric)) metric=mets[0][0];
+  if(sortKey!=="label" && !mets.some(m=>m[0]===sortKey)) sortKey=mets[0][0];
+  dims=dims.filter(d=>dimsA.some(x=>x[0]===d)); if(!dims.length) dims=["offer"];
+  if(split!=="none" && !dimsA.some(d=>d[0]===split)) split="none";
+  const canH = P().canEdit || P().admin;
+  if(tab==="hierarchy" && !canH) tab="dashboard";
+}
+function computeBreakdown(){
+  const mets=visMetrics();
+  const groups=new Map();
+  for(const f of factsIn(range)){
+    const labels=dims.map(d=>dimLabelOf(f,d));
+    const k=labels.join("¦");
+    let g=groups.get(k); if(!g){ g={labels,clicks:0,conversions:0,revenue:0,payout:0}; groups.set(k,g); }
+    g.clicks+=f.clicks; g.conversions+=f.conv; g.revenue+=f.revenue; g.payout+=f.payout;
+  }
+  let rows=[...groups.values()].map(g=>derive(g));
+  const active=Object.entries(colFilters).filter(([,v])=>v&&v.trim());
+  const anyF=active.length>0;
+  if(anyF) rows=rows.filter(r=>active.every(([c,ex])=> c.startsWith("dim")
+    ? (r.labels[+c.slice(3)]||"").toLowerCase().includes(ex.trim().toLowerCase())
+    : matchesNumeric(r[c],ex)));
+  rows.sort((a,b)=>{
+    const av=sortKey==="label"?a.labels.join(" "):a[sortKey], bv=sortKey==="label"?b.labels.join(" "):b[sortKey];
+    const c=typeof av==="string"?av.localeCompare(bv):av-bv;
+    return sortAsc?c:-c;
+  });
+  const truncated=rows.length>1000; if(truncated) rows=rows.slice(0,1000);
+  const tot=derive(rows.reduce((a,r)=>({clicks:a.clicks+r.clicks,conversions:a.conversions+r.conversions,revenue:a.revenue+r.revenue,payout:a.payout+r.payout}),{clicks:0,conversions:0,revenue:0,payout:0}));
+  return {mets,rows,tot,truncated,anyF};
+}
+function computeChart(){
+  const ok=spanDays(range)<=7, g=ok?grain:"day";
+  const rows=factsIn(range);
+  const keyF = g==="hour" ? f=>f.day+" "+pad2(f.hour)+":00" : f=>f.day;
+  const sName = f => split==="none" ? "current" : dimLabelOf(f,split);
+  const map=new Map();
+  for(const f of rows){
+    const k=keyF(f); let e=map.get(k); if(!e){ e=new Map(); map.set(k,e); }
+    const s=sName(f); let t=e.get(s); if(!t){ t={clicks:0,conversions:0,revenue:0,payout:0}; e.set(s,t); }
+    t.clicks+=f.clicks; t.conversions+=f.conv; t.revenue+=f.revenue; t.payout+=f.payout;
+  }
+  const keys=[...map.keys()].sort();
+  const splitNames = split==="none" ? ["current"] : [...new Set(rows.map(sName))].sort().slice(0,8);
+  const data=keys.map(k=>({key:k, vals:splitNames.map(s=>{ const t=map.get(k).get(s); return t?derive({...t})[metric]:0; })}));
+  let prevVals=null;
+  if(compare && split==="none"){
+    const pr=previousRange(range.from,range.to), pmap=new Map();
+    for(const f of factsIn(pr)){
+      const k=keyF(f); let t=pmap.get(k); if(!t){ t={clicks:0,conversions:0,revenue:0,payout:0}; pmap.set(k,t); }
+      t.clicks+=f.clicks; t.conversions+=f.conv; t.revenue+=f.revenue; t.payout+=f.payout;
+    }
+    const pkeys=[...pmap.keys()].sort();
+    prevVals=keys.map((_,i)=>{ const t=pmap.get(pkeys[i]); return t?derive({...t})[metric]:0; });
+  }
+  return {g,ok,keys,splitNames,data,prevVals};
+}
+function fmtAxis(v,kind){
+  if(kind==="pct") return v.toFixed(0)+"%";
+  const num = v>=1000 ? (v/1000).toFixed(v<10000?1:0)+"k" : String(Math.round(v));
+  return kind==="money" ? "$"+num : num;
+}
+function xLabel(key,g){
+  if(g==="hour") return range.from===range.to ? key.slice(11,16) : key.slice(8,10)+"/"+key.slice(5,7)+" "+key.slice(11,16);
+  return key.slice(8,10)+"/"+key.slice(5,7);
+}
+function chartSvg(ch){
+  const kind=METRICS.find(m=>m[0]===metric)[2];
+  if(!ch.data.length) return '<div style="height:200px;display:flex;align-items:center;justify-content:center;color:var(--t3);font-size:13px">No data in this range</div>';
+  const W=980,H=240,PL=48,PR=10,PT=8,PB=26;
+  const totals=ch.data.map(d=>d.vals.reduce((a,b)=>a+b,0));
+  const max=Math.max(...totals,...(ch.prevVals||[0]),1e-9)*1.08;
+  const n=ch.data.length;
+  const x=i=>PL+(W-PL-PR)*(i+0.5)/n, y=v=>H-PB-(H-PT-PB)*v/max;
+  const bw=Math.min(38,(W-PL-PR)/n*0.6);
+  let bars="";
+  ch.data.forEach((d,i)=>{ let acc=0;
+    d.vals.forEach((v,si)=>{ if(v<=0) return;
+      const y1=y(acc+v), y0=y(acc);
+      bars+=`<rect x="${(x(i)-bw/2).toFixed(1)}" y="${y1.toFixed(1)}" width="${bw.toFixed(1)}" height="${Math.max(.5,y0-y1).toFixed(1)}" fill="${ch.splitNames.length>1?COLORS[si%8]:"#4FB584"}"/>`;
+      acc+=v; });
+  });
+  const prev = ch.prevVals ? `<path d="${ch.prevVals.map((v,i)=>(i?"L":"M")+x(i).toFixed(1)+","+y(v).toFixed(1)).join("")}" fill="none" stroke="#C9A34E" stroke-width="2" stroke-dasharray="6 4"/>` : "";
+  const grid=[0,.25,.5,.75,1].map(pp=>`<line x1="${PL}" x2="${W-PR}" y1="${y(max*pp).toFixed(1)}" y2="${y(max*pp).toFixed(1)}" stroke="#27402F"/><text x="${PL-6}" y="${(y(max*pp)+4).toFixed(1)}" text-anchor="end">${fmtAxis(max*pp,kind)}</text>`).join("");
+  const step=Math.ceil(n/10);
+  const labels=ch.data.map((d,i)=> i%step ? "" : `<text x="${x(i).toFixed(1)}" y="${H-8}" text-anchor="middle">${xLabel(d.key,ch.g)}</text>`).join("");
+  return `<svg viewBox="0 0 ${W} ${H}" style="min-width:640px;width:100%">${grid}${bars}${prev}${labels}</svg>`;
+}
+
+// ═══════════════ dashboard: handlers ═══════════════
+function setTab(t){ tab=t; render(); }
+function setPreset(p){ preset=p; range=rangeFor(p); render(); }
+function setFrom(v){ if(v){ preset="custom"; range={...range,from:v}; render(); } }
+function setTo(v){ if(v){ preset="custom"; range={...range,to:v}; render(); } }
+function setCompare(c){ compare=c; render(); }
+function setMetric(m){ metric=m; render(); }
+function setGrain(g){ grain=g; render(); }
+function setSplit(v){ split=v; render(); }
+function toggleDim(k){
+  colFilters={};
+  if(dims.includes(k)){ if(dims.length>1) dims=dims.filter(x=>x!==k); }
+  else if(dims.length<4) dims.push(k);
+  render();
+}
+function setSort(k){ if(sortKey===k) sortAsc=!sortAsc; else { sortKey=k; sortAsc=(k==="label"); } render(); }
+function setCF(k,v){ colFilters[k]=v; render(); }
+function clearCF(){ colFilters={}; render(); }
+function exportBreakdown(){
+  const {mets,rows}=computeBreakdown();
+  csvDownload(`traquery-${dims.join("-")}-${range.from}_${range.to}.csv`,
+    [...dims.map(d=>ALL_DIMS.find(x=>x[0]===d)[1]), ...mets.map(m=>m[1])],
+    rows.map(r=>[...r.labels.map((l,i)=>dims[i]==="day"?fmtDay(l):l), ...mets.map(m=>r[m[0]].toFixed(m[2]==="int"?0:2))]));
+  toast("✓ CSV downloaded — "+rows.length+" rows");
+}
+// saved views
+function currentConfig(){ return {preset, range:{...range}, compare, metric, split, grain, dims:[...dims], sortKey, sortAsc, colFilters:{...colFilters}}; }
+function applyConfig(c){
+  if(c.preset && c.preset!=="custom"){ preset=c.preset; range=rangeFor(c.preset); }
+  else if(c.range){ preset="custom"; range={...c.range}; }
+  if(c.compare!==undefined) compare=c.compare;
+  if(c.metric) metric=c.metric;
+  split=c.split||"none"; grain=c.grain||"day";
+  if(c.dims&&c.dims.length) dims=[...c.dims];
+  if(c.sortKey) sortKey=c.sortKey;
+  if(c.sortAsc!==undefined) sortAsc=c.sortAsc;
+  colFilters={...(c.colFilters||{})};
+  sanitizeScope();
+}
+function selectView(id){
+  if(selView===id){ selView=""; render(); return; }
+  selView=id;
+  const v=VIEWS.find(x=>x.id===id);
+  if(v){ applyConfig(v.config); schedEmails=v.email_to?v.email_to.split(","):["demo@vane-labs.com"]; schedHour=v.send_hour??9; }
+  render();
+}
+function toggleDefault(){
+  const v=VIEWS.find(x=>x.id===selView); if(!v) return;
+  const was=v.is_default===1;
+  VIEWS.forEach(x=>x.is_default=0);
+  v.is_default=was?0:1;
+  toast(was?"✓ No default view":"✓ Default view — the dashboard opens on it");
+  render();
+}
+function updateView(){
+  const v=VIEWS.find(x=>x.id===selView); if(!v) return;
+  v.config=currentConfig();
+  toast("✓ Report updated to current view"); render();
+}
+function deleteView(){
+  const v=VIEWS.find(x=>x.id===selView); if(!v) return;
+  if(!confirm(`Delete saved report "${v.name}"? Its daily email (if any) stops too.`)) return;
+  VIEWS=VIEWS.filter(x=>x.id!==selView); selView=""; render();
+}
+function saveNewView(){
+  const name=saveName.trim(); if(!name){ toast("Give the view a name first"); return; }
+  const id=nextViewId++;
+  VIEWS.push({id,name,is_default:0,email_to:null,send_hour:null,config:currentConfig()});
+  saveName=""; selView=id; schedEmails=["demo@vane-labs.com"]; schedHour=9;
+  toast("✓ Saved"); render();
+}
+function setSched(i,v){ schedEmails[i]=v; }
+function addSched(){ if(schedEmails.length<3){ schedEmails.push(""); render(); } }
+function rmSched(i){ schedEmails.splice(i,1); render(); }
+function emailDaily(){
+  const v=VIEWS.find(x=>x.id===selView); if(!v) return;
+  const rec=schedEmails.map(e=>e.trim()).filter(e=>e.includes("@"));
+  if(!rec.length){ toast("Add at least one valid recipient"); return; }
+  v.email_to=rec.join(","); v.send_hour=schedHour;
+  toast(`✓ Daily email to ${rec.length} recipient${rec.length===1?"":"s"} at ${pad2(schedHour)}:00 (${tz}) — production renders the view and sends it on schedule`);
+  render();
+}
+function schedOff(){
+  const v=VIEWS.find(x=>x.id===selView); if(!v) return;
+  v.email_to=null; v.send_hour=null;
+  toast("✓ Daily email off"); render();
+}
+
+// ═══════════════ dashboard: page ═══════════════
+function deltaHtml(now,before){
+  if(!compare) return "";
+  if(!before) return "";
+  const p=(now-before)/Math.abs(before)*100, up=p>=0;
+  return `<div class="d ${up?"up":"down"}">${up?"▲":"▼"} ${Math.abs(p).toFixed(1)}% vs previous</div>`;
+}
+function pageDashboard(){
+  sanitizeScope();
+  const mets=visMetrics(), dimsA=visDims();
+  const cur=totalsOf(factsIn(range));
+  const prv=totalsOf(factsIn(previousRange(range.from,range.to)));
+  const ch=computeChart();
+  const bd=computeBreakdown();
+  const selVObj=VIEWS.find(x=>x.id===selView);
+  const schedOn=!!(selVObj&&selVObj.email_to&&selVObj.send_hour!=null);
+  const kind=METRICS.find(m=>m[0]===metric)[2];
+
+  const viewChips=VIEWS.map(v=>`<span class="chip ${selView===v.id?"on":""}" title="${v.is_default===1?"default view — the dashboard opens on it":"apply this saved view"}" onclick="selectView(${v.id})">${v.is_default===1?"★ ":""}${esc(v.name)}${v.email_to&&v.send_hour!=null?" · ✉"+pad2(v.send_hour)+":00":""}</span>`).join("");
+  const viewActions = selView==="" ? "" : `
+    <button class="abtn" title="the default view loads automatically when the dashboard opens" onclick="toggleDefault()">${selVObj&&selVObj.is_default===1?"★ Default":"☆ Make default"}</button>
+    <button class="abtn" onclick="updateView()">Update to current view</button>
+    <button class="abtn danger" onclick="deleteView()">Delete</button>
+    <span style="width:1px;height:16px;background:var(--line)"></span>
+    ${schedEmails.map((em,i)=>`<span style="display:inline-flex;align-items:center;gap:2px">
+      <input id="sched-${i}" class="inp" style="width:158px" type="email" value="${esc(em)}" placeholder="${i===0?"demo@vane-labs.com":"extra recipient"}" oninput="setSched(${i},this.value)">
+      ${schedEmails.length>1?`<button class="abtn" title="remove recipient" onclick="rmSched(${i})">✕</button>`:""}</span>`).join("")}
+    ${schedEmails.length<3?`<button class="abtn" title="add up to two extra recipients" onclick="addSched()">+ recipient</button>`:""}
+    <select class="inp" onchange="schedHour=+this.value">${[...Array(24)].map((_,h)=>`<option value="${h}" ${schedHour===h?"selected":""}>${pad2(h)}:00</option>`).join("")}</select>
+    <span style="font-size:11px;color:var(--t3)">${tz}</span>
+    <button class="abtn confirm" onclick="emailDaily()">${schedOn?"Update daily email":"Email daily"}</button>
+    ${schedOn?`<button class="abtn" onclick="schedOff()">Turn off</button>`:""}`;
+
+  return `
+  <div class="card"><div class="b" style="padding:10px 15px">
+    <div class="controls" style="margin-bottom:8px">
+      <span class="chiprow">${PRESETS.map(([k,l])=>`<span class="chip ${preset===k?"on":""}" onclick="setPreset('${k}')">${l}</span>`).join("")}<span class="chip ${preset==="custom"?"on":""}" onclick="preset='custom';render()">Custom</span></span>
+      <input type="date" class="inp" value="${range.from}" onchange="setFrom(this.value)">
+      <span style="font-size:11px;color:var(--t3)">to</span>
+      <input type="date" class="inp" value="${range.to}" onchange="setTo(this.value)">
+      <label class="lbl"><input type="checkbox" ${compare?"checked":""} onchange="setCompare(this.checked)"> Compare to previous</label>
+      <span style="margin-left:auto;display:flex;gap:8px;flex-wrap:wrap">
+        ${P().type!=="publisher"?`<select class="inp" onchange="hAdvF=this.value;render()">
+          <option value="">All Advertisers</option>
+          ${DB.advertisers.map(a=>`<option value="${a.id}" ${String(hAdvF)===String(a.id)?"selected":""}>${esc(maskAdv(a.name))}</option>`).join("")}
+        </select>`:""}
+        ${P().type!=="advertiser"?`<select class="inp" onchange="hPubF=this.value;render()">
+          <option value="">All Publishers</option>
+          ${DB.publishers.map(pb=>`<option value="${pb.id}" ${String(hPubF)===String(pb.id)?"selected":""}>${esc(pb.name)}</option>`).join("")}
+        </select>`:""}
+      </span>
+    </div>
+    <div class="controls" style="margin:0;padding-top:8px;border-top:1px solid rgba(39,64,47,.6)">
+      <span class="slab">Views</span>
+      ${viewChips}
+      ${VIEWS.length===0?`<span style="font-size:11px;color:var(--t3)">none saved yet — set up the view below, then save it</span>`:""}
+      ${viewActions}
+      <input id="f-savename" class="inp" style="width:150px;margin-left:auto" placeholder="Save current as…" value="${esc(saveName)}" oninput="saveName=this.value" onkeydown="if(event.key==='Enter')saveNewView()">
+      <button class="abtn confirm" onclick="saveNewView()">Save</button>
+    </div>
+  </div></div>
+
+  <div class="kpis">
+    ${mets.filter(m=>m[0]!=="epc").map(m=>`
+    <div class="kpi ${m[0]==="margin"?"hl":""}">
+      <div class="l">${m[1]}</div>
+      <div class="v" style="${m[0]==="margin"?"color:var(--forest)":m[0]==="payout"?"color:var(--gold-d)":""}">${fM(cur[m[0]],m[2])}</div>
+      ${deltaHtml(cur[m[0]],prv[m[0]])}
+    </div>`).join("")}
+  </div>
+
+  <div class="card">
+    <div class="h"><span class="t">Metric</span>
+      <span class="chiprow">${mets.map(m=>`<span class="chip ${metric===m[0]?"on":""}" onclick="setMetric('${m[0]}')">${m[1]}</span>`).join("")}</span>
+      <span style="margin-left:auto;display:flex;gap:6px;align-items:center;flex-wrap:wrap">
+        <span class="chip ${ch.g==="day"?"on":""}" onclick="setGrain('day')">Daily</span>
+        <span class="chip ${ch.g==="hour"?"on":""} ${!ch.ok?"off":""}" title="${!ch.ok?"hourly needs a range of 7 days or less":""}" onclick="${ch.ok?"setGrain('hour')":""}">Hourly</span>
+        <span style="width:1px;height:16px;background:var(--line)"></span>
+        <span style="font-size:11.5px;color:var(--t3)">Split by</span>
+        <select class="inp" onchange="setSplit(this.value)">
+          <option value="none">Nothing</option>
+          ${dimsA.filter(d=>d[0]!=="day"&&d[0]!=="hour").map(d=>`<option value="${d[0]}" ${split===d[0]?"selected":""}>${d[1]}</option>`).join("")}
+        </select>
+      </span>
+    </div>
+    <div class="b" style="overflow-x:auto">${chartSvg(ch)}
+      <div class="legend">${split==="none"
+        ? `<span><span class="sw" style="background:#4FB584"></span>${METRICS.find(m=>m[0]===metric)[1]} — this period</span>${compare?`<span><span style="display:inline-block;width:18px;border-top:2px dashed var(--gold);vertical-align:3px;margin-right:5px"></span>Previous period</span>`:""}`
+        : ch.splitNames.map((s,i)=>`<span><span class="sw" style="background:${COLORS[i%8]}"></span>${esc(s)}</span>`).join("")}
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="h"><span class="t">Break down by</span>
+      <span class="chiprow">${dimsA.map(([k,l])=>`<span class="chip dim ${dims.includes(k)?"on":""}" title="toggle — several at once make one row per combination" onclick="toggleDim('${k}')">${dims.includes(k)?(dims.indexOf(k)+1)+" · ":""}${l}</span>`).join("")}</span>
+      ${bd.anyF?`<button class="abtn" onclick="clearCF()">✕ Clear filters</button>`:""}
+      <button class="abtn" style="margin-left:auto" onclick="exportBreakdown()">⬇ Export CSV</button>
+    </div>
+    <div class="tbl-wrap"><table>
+      <tr>
+        ${dims.map((d,i)=>`<th class="${sortKey==="label"&&i===0?"on":""}" onclick="setSort('label')">${ALL_DIMS.find(x=>x[0]===d)[1]}${sortKey==="label"&&i===0?(sortAsc?" ↑":" ↓"):""}</th>`).join("")}
+        ${bd.mets.map(m=>`<th class="num ${sortKey===m[0]?"on":""}" onclick="setSort('${m[0]}')">${m[1]}${sortKey===m[0]?(sortAsc?" ↑":" ↓"):""}</th>`).join("")}
+      </tr>
+      <tr>
+        ${dims.map((d,i)=>`<td style="padding:4px 6px"><input id="cf-dim${i}" class="fin" placeholder="contains…" value="${esc(colFilters["dim"+i]||"")}" oninput="setCF('dim${i}',this.value)"></td>`).join("")}
+        ${bd.mets.map(m=>`<td style="padding:4px 6px"><input id="cf-${m[0]}" class="fin num" placeholder="&gt; &lt; =" value="${esc(colFilters[m[0]]||"")}" oninput="setCF('${m[0]}',this.value)"></td>`).join("")}
+      </tr>
+      ${bd.rows.slice(0,400).map(r=>`<tr>
+        ${r.labels.map((l,i)=>`<td>${dims[i]==="day"?fmtDay(l):esc(l)}</td>`).join("")}
+        ${bd.mets.map(m=>{ const v=r[m[0]];
+          const cls=m[0]==="margin"?(v>=0?"pos":"neg"):m[0]==="payout"?"gold":"";
+          return `<td class="num ${cls}">${fM(v,m[2])}</td>`; }).join("")}
+      </tr>`).join("")}
+      ${bd.rows.length?`<tr class="total">
+        <td colspan="${dims.length}">Total · ${bd.rows.length.toLocaleString()} rows${bd.anyF?" (filtered)":""}</td>
+        ${bd.mets.map(m=>`<td class="num ${m[0]==="margin"?"pos":m[0]==="payout"?"gold":""}">${fM(bd.tot[m[0]],m[2])}</td>`).join("")}
+      </tr>`:""}
+    </table></div>
+    ${bd.truncated?`<div class="trunc">Showing the top 1,000 combinations — narrow the range or dimensions to see everything.</div>`:""}
+    ${!bd.rows.length?`<div class="note" style="text-align:center;padding:24px">${bd.anyF?"No rows match the column filters.":"No rows in this range."}</div>`:""}
+    ${bd.rows.length>400?`<div class="note">Rendering the top 400 of ${bd.rows.length.toLocaleString()} rows — the CSV export carries all of them.</div>`:""}
+  </div>`;
+}
+// ═══════════════ events: helpers & handlers ═══════════════
+function evForbidden(){
+  const p=P(), out=[];
+  if(!p.rev) out.push("revenue");
+  if(!p.pay) out.push("payout");
+  if(p.type==="advertiser") out.push("source");
+  if(!p.seesVisitor) out.push("referrer");
+  return out;
+}
+function evVal(ev,k){
+  switch(k){
+    case "t": return ev.t;
+    case "event": return ev.event;
+    case "offer": return ev.offName;
+    case "country": return ev.geo;
+    case "source": return ev.pubName;
+    case "google": return ev.google?"sent":"pending";
+    default: return ev[k];
+  }
+}
+function evDayOf(ev){ return dstrOf(new Date(ev.t)); }
+function eventsShown(){
+  let rows=EVENTS.filter(e=>{ const d=evDayOf(e); return d>=evRange.from && d<=evRange.to; });
+  const f=evFilter.trim().toLowerCase();
+  if(f) rows=rows.filter(e=>(e.event||"").toLowerCase().includes(f));
+  const active=Object.entries(evColFilters).filter(([,v])=>v&&v.trim());
+  if(active.length) rows=rows.filter(e=>active.every(([k,v])=>{
+    const raw=evVal(e,k); if(raw==null) return false;
+    const s=k==="t"?fmtDTs(raw):String(raw);
+    return s.toLowerCase().includes(v.trim().toLowerCase());
+  }));
+  if(evSortK){
+    rows=[...rows].sort((a,b)=>{
+      const av=evVal(a,evSortK), bv=evVal(b,evSortK);
+      if(av==null&&bv==null) return 0; if(av==null) return 1; if(bv==null) return -1;
+      const c=typeof av==="number"&&typeof bv==="number"?av-bv:String(av).localeCompare(String(bv));
+      return evSortAsc?c:-c;
+    });
+  }
+  return rows;
+}
+function setEvPreset(p){ evPreset=p; evRange=rangeFor(p); render(); }
+function setEvFrom(v){ if(v){ evPreset="custom"; evRange={...evRange,from:v}; render(); } }
+function setEvTo(v){ if(v){ evPreset="custom"; evRange={...evRange,to:v}; render(); } }
+function setEvFilter(v){ evFilter=v; render(); }
+function setEvCF(k,v){ evColFilters[k]=v; render(); }
+function evSort(k){ if(evSortK===k) evSortAsc=!evSortAsc; else { evSortK=k; evSortAsc=true; } render(); }
+function toggleEvCol(k){
+  evCols = evCols.includes(k) ? evCols.filter(x=>x!==k)
+    : EV_COLS.map(c=>c[0]).filter(c=>evCols.includes(c)||c===k);
+  render();
+}
+function resetEvCols(){ evCols=[...EV_DEFAULT]; render(); }
+function toggleColSel(){ colSelOpen=!colSelOpen; render(); }
+function toggleEv(id){ expandedEv=expandedEv===id?null:id; render(); }
+function markTest(id){
+  const ev=EVENTS.find(e=>e.id===id); if(!ev) return;
+  ev.is_test=!ev.is_test;
+  toast(ev.is_test?"✓ Marked as TEST — excluded from dashboard and P&L figures":"✓ Counted again in dashboard and P&L figures");
+  render();
+}
+function fireTest(){
+  const pr=DB.products.find(p=>p.id===testProd)||DB.products[0]; if(!pr){ toast("No products — add one in Hierarchy"); return; }
+  const off=offerById(pr.offer_id), pub=pubById(pr.publisher_id), adv=advOfOffer(pr.offer_id);
+  const id="c"+hex(15), g="US";
+  EVENTS.unshift({ id:"e"+hex(12), t:Date.now(), event:off.event_name||"conv", offName:off.name, advName:adv.name, pubName:pub.name,
+    geo:g, click_id:id, gclid:null, sub_id:"test-"+hex(4), sub3:"test-site", sub4:null, sub5:null, sub6:null, sub7:null,
+    revenue:geoRev(off,g), payout:geoPay(pr,g), referrer:null, google:false, is_test:true });
+  TESTLOG.unshift({ ts:Date.now(), label:`${off.name} @ ${pub.name}`, clickId:id, ok:true, detail:"200 ok — stored (TEST)", ms:Math.round(60+Math.random()*180) });
+  toast("⚡ Test conversion fired — flagged TEST, excluded from dashboard & P&L figures");
+  render();
+}
+function evCell(ev,k){
+  switch(k){
+    case "t": return `<span style="font-family:var(--mono);font-size:11px;color:var(--t2);white-space:nowrap" title="${new Date(ev.t).toISOString()}">${fmtDT(ev.t)}</span>`;
+    case "event": return `<span class="badge ok">${esc(ev.event)}</span>${ev.is_test?' <span class="badge amber" title="Excluded from dashboard and P&L figures">TEST</span>':""}`;
+    case "offer": return `<span title="${esc(maskAdv(ev.advName))}">${esc(ev.offName)}</span>`;
+    case "country": return `<span style="font-family:var(--mono);font-size:11px">${ev.geo}</span>`;
+    case "source": return `<span style="color:var(--forest-l)">${esc(ev.pubName)}</span>`;
+    case "click_id": return ev.click_id?`<span class="urlchip" title="${esc(ev.click_id)} — click to copy" onclick="event.stopPropagation();copyText('${ev.click_id}')">${ev.click_id.slice(0,14)}…</span>`:"—";
+    case "gclid": return ev.gclid?`<span class="urlchip" title="click to copy" onclick="event.stopPropagation();copyText('${ev.gclid}')">${ev.gclid.slice(0,14)}…</span>`:"—";
+    case "revenue": return ev.revenue!=null?`<span class="num" style="font-family:var(--mono);font-size:11.5px">$${ev.revenue.toFixed(2)}</span>`:"—";
+    case "payout": return ev.payout!=null?`<span class="gold" style="font-family:var(--mono);font-size:11.5px">$${ev.payout.toFixed(2)}</span>`:"—";
+    case "referrer": { if(!ev.referrer) return "—"; let h=ev.referrer; try{ h=new URL(ev.referrer).host||h; }catch(e){} return `<span title="${esc(ev.referrer)}">${esc(h)}</span>`; }
+    case "google": return ev.google?`<span class="badge ok">sent</span>`:`<span class="badge amber">pending</span>`;
+    default: { const v=ev[k]; return v?`<span style="font-family:var(--mono);font-size:11px">${esc(v)}</span>`:"—"; }
+  }
+}
+function exportEvents(){
+  const forb=evForbidden();
+  const cols=EV_COLS.filter(c=>evCols.includes(c[0])&&!forb.includes(c[0]));
+  const rows=eventsShown();
+  csvDownload(`traquery-events-${dstrOf(new Date())}.csv`, cols.map(c=>c[1]),
+    rows.map(e=>cols.map(c=>c[0]==="t"?new Date(e.t).toISOString():(evVal(e,c[0])??""))));
+  toast("✓ CSV downloaded — "+rows.length+" rows");
+}
+function pageEvents(){
+  const p=P(), forb=evForbidden();
+  const cols=EV_COLS.filter(c=>evCols.includes(c[0])&&!forb.includes(c[0]));
+  const pickable=EV_COLS.filter(c=>!forb.includes(c[0]));
+  const rows=eventsShown();
+  const totalPay=p.pay?rows.reduce((a,e)=>a+(e.payout||0),0):0;
+
+  const testPanel = !p.canTest ? "" : (!testOpen
+    ? `<button class="abtn" onclick="testOpen=true;render()">⚡ Test Event</button>`
+    : `<div class="panelbox" style="width:100%">
+        <div class="ph"><span style="font-weight:600;font-size:13px">⚡ Test Event</span>
+          <span style="font-size:11px;color:var(--t3)">fires the real loop in production: /click mints a click_id, then /postback fires with the advertiser's key — flagged TEST, never counted in P&amp;L</span>
+          <button class="abtn" style="margin-left:auto" onclick="testOpen=false;render()">✕</button></div>
+        <div class="b" style="padding:12px 14px">
+          <div class="controls" style="margin-bottom:${TESTLOG.length?"10px":"0"}">
+            <select class="inp" style="min-width:240px" onchange="testProd=+this.value">
+              ${DB.products.map(pr=>{ const o=offerById(pr.offer_id),pb=pubById(pr.publisher_id);
+                return `<option value="${pr.id}" ${testProd===pr.id?"selected":""}>${esc(o?o.name:"?")} @ ${esc(pb?pb.name:"?")}</option>`; }).join("")}
+            </select>
+            ${(()=>{ const o=offerById((DB.products.find(x=>x.id===testProd)||{}).offer_id); return o&&o.event_name?`<span class="badge ok" style="font-family:var(--mono)">${o.event_name}</span>`:""; })()}
+            <button class="abtn confirm" onclick="fireTest()">▶ Fire click + conversion</button>
+          </div>
+          ${TESTLOG.length?`<div class="tbl-wrap"><table>
+            <tr><th>Time</th><th>Product</th><th>Click ID</th><th>Result</th><th class="num">ms</th></tr>
+            ${TESTLOG.slice(0,6).map(l=>`<tr>
+              <td style="font-family:var(--mono);font-size:11px">${fmtDTs(l.ts)}</td><td>${esc(l.label)}</td>
+              <td style="font-family:var(--mono);font-size:11px">${l.clickId.slice(0,14)}…</td>
+              <td><span class="${l.ok?"pos":"neg"}">${l.ok?"✓":"✗"} ${esc(l.detail)}</span></td>
+              <td class="num">${l.ms}</td></tr>`).join("")}
+          </table></div>`:""}
+        </div></div>`);
+
+  const rejectsPanel = !p.canEdit ? "" : (!rejectsOpen
+    ? `<button class="abtn" onclick="rejectsOpen=true;render()">🔍 Integration debugger</button>`
+    : `<div class="panelbox" style="width:100%">
+        <div class="ph"><span style="font-weight:600;font-size:13px">🔍 Integration debugger</span>
+          <span style="font-size:11px;color:var(--t3)">rejected postbacks &amp; clicks — last 100</span>
+          <button class="abtn" style="margin-left:auto" onclick="rejectsOpen=false;render()">✕</button></div>
+        <div class="tbl-wrap"><table>
+          <tr><th>Time</th><th>Endpoint</th><th>Reason</th><th>Key</th><th>Params received</th></tr>
+          ${REJECTS.map(r=>`<tr>
+            <td style="font-family:var(--mono);font-size:11px;white-space:nowrap">${fmtDTs(r.ts)}</td>
+            <td><span class="badge ${r.endpoint==="postback"?"blue":"purple"}">${r.endpoint}</span></td>
+            <td style="color:var(--red)">${esc(r.reason)}</td>
+            <td style="font-family:var(--mono);font-size:11px;color:var(--t3)">${r.key||"—"}</td>
+            <td style="font-family:var(--mono);font-size:11px;color:var(--t3);word-break:break-all">${esc(r.raw)}</td></tr>`).join("")}
+        </table></div></div>`);
+
+  return `
+  <div class="controls" style="justify-content:flex-end">${testPanel}${rejectsPanel}</div>
+  <div class="controls">
+    <span class="chiprow">${PRESETS.map(([k,l])=>`<span class="chip ${evPreset===k?"on":""}" onclick="setEvPreset('${k}')">${l}</span>`).join("")}<span class="chip ${evPreset==="custom"?"on":""}" onclick="evPreset='custom';render()">Custom</span></span>
+    <input id="f-evfilter" class="inp" style="width:180px" placeholder="Filter by event type…" value="${esc(evFilter)}" oninput="setEvFilter(this.value)">
+    <input type="date" class="inp" value="${evRange.from}" onchange="setEvFrom(this.value)">
+    <span style="font-size:11px;color:var(--t3)">to</span>
+    <input type="date" class="inp" value="${evRange.to}" onchange="setEvTo(this.value)">
+    <span class="popwrap" style="margin-left:auto">
+      <button class="abtn colselbtn" onclick="toggleColSel()">Columns <span style="color:var(--t3)">${cols.length}/${pickable.length}</span></button>
+      ${colSelOpen?`<div class="popover colsel">
+        <div style="display:flex;justify-content:space-between;margin-bottom:6px">
+          <span class="slab">Columns</span>
+          <button class="abtn" style="padding:1px 6px" onclick="resetEvCols()">Reset</button></div>
+        ${pickable.map(c=>`<label><input type="checkbox" ${evCols.includes(c[0])?"checked":""} onchange="toggleEvCol('${c[0]}')"> ${c[1]}</label>`).join("")}
+      </div>`:""}
+    </span>
+  </div>
+  <div class="card">
+    <div class="tbl-wrap"><table>
+      <tr>${cols.map(c=>`<th class="${evSortK===c[0]?"on":""}" onclick="evSort('${c[0]}')">${c[1]}${evSortK===c[0]?(evSortAsc?" ↑":" ↓"):' <span style="color:var(--t3)">↕</span>'}</th>`).join("")}<th style="width:24px"></th></tr>
+      <tr>${cols.map(c=>`<td style="padding:4px 6px"><input id="ef-${c[0]}" class="fin" placeholder="filter…" value="${esc(evColFilters[c[0]]||"")}" oninput="setEvCF('${c[0]}',this.value)"></td>`).join("")}<td></td></tr>
+      ${rows.slice(0,60).map(e=>`
+        <tr class="${e.is_test?"testrow":""}" style="cursor:pointer" onclick="toggleEv('${e.id}')">
+          ${cols.map(c=>`<td>${evCell(e,c[0])}</td>`).join("")}
+          <td style="color:var(--t3);font-size:11px">${expandedEv===e.id?"▲":"▼"}</td></tr>
+        ${expandedEv===e.id?`<tr><td colspan="${cols.length+1}" class="click-detail">
+          <div style="display:flex;gap:16px;flex-wrap:wrap;align-items:center">
+            <span><span style="color:var(--t3)">Offer · </span>${esc(maskAdv(e.advName))} / <strong>${esc(e.offName)}</strong></span>
+            <span style="color:var(--t3)">ID ${e.id.slice(0,9)}…</span>
+            <span style="color:var(--t3)">${fmtDTs(e.t)}</span>
+            ${p.canEdit?`<button class="abtn ${e.is_test?"danger":""}" style="margin-left:auto" onclick="event.stopPropagation();markTest('${e.id}')">${e.is_test?"Marked as test — count it":"Mark as test"}</button>`:""}
+          </div>
+          <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(110px,1fr));gap:6px;margin-top:10px">
+            ${["sub3","sub4","sub5","sub6","sub7"].map(k=>`<div style="background:var(--card);border-radius:2px;padding:6px 9px">
+              <b style="margin-top:0">${k}</b><span style="font-family:var(--mono);font-size:11px">${e[k]?esc(e[k]):"—"}</span></div>`).join("")}
+          </div>
+          <div style="margin-top:8px;font-size:11.5px;display:flex;gap:14px;flex-wrap:wrap">
+            <span style="color:var(--t3)">Google</span>
+            <span class="${e.google?"pos":""}" style="${e.google?"":"color:var(--t3)"}">${e.google?"✓ conversion sent":"— not sent (no gclid)"}</span>
+            ${e.gclid?`<span style="color:var(--t3);font-family:var(--mono)">gclid: ${esc(e.gclid)}</span>`:""}
+          </div>
+        </td></tr>`:""}`).join("")}
+    </table></div>
+    ${!rows.length?`<div class="note" style="text-align:center;padding:24px">No events match the current filters.</div>`:""}
+    <div class="note" style="display:flex;gap:14px;flex-wrap:wrap;align-items:center">
+      <span>${rows.length.toLocaleString()} event${rows.length===1?"":"s"}</span>
+      ${totalPay>0?`<span class="pos" style="font-family:var(--mono)">Σ $${totalPay.toFixed(2)}</span>`:""}
+      <span>polling every 15s in production</span>
+      <button class="abtn" style="margin-left:auto" onclick="exportEvents()">⬇ Export CSV</button>
+    </div>
+  </div>`;
+}
+
+// ═══════════════ clicks ═══════════════
+function setCkPreset(p){ ckPreset=p; render(); }
+function clicksShown(){
+  const r=rangeFor(ckPreset);
+  let rows=CLICKS.filter(c=>{ const d=dstrOf(new Date(c.t)); return d>=r.from&&d<=r.to; });
+  if(ckConvOnly) rows=rows.filter(c=>c.conv);
+  if(!ckBots) rows=rows.filter(c=>!c.bot);
+  const s=ckSearch.trim().toLowerCase();
+  if(s) rows=rows.filter(c=>[c.id,c.geo,c.ip,c.sub_id,c.gclid,c.offName,c.pubName,c.redirect_url,c.request_url,c.event].some(v=>(v??"").toString().toLowerCase().includes(s)));
+  return rows;
+}
+function pbChip(c){
+  if(!c.conv) return `<span style="color:var(--t3)">—</span>`;
+  if(c.pb_sent) return `<span class="badge ok">fired</span>`;
+  if(c.pb_attempts) return `<span class="badge no" title="${c.pb_attempts} attempts">failed</span>`;
+  return `<span class="badge gray" title="publisher has no postback URL configured">none</span>`;
+}
+function pageClicks(){
+  const p=P();
+  const rows=clicksShown();
+  const showPub=p.type!=="advertiser";
+  const nCols=6+(showPub?1:0)+(p.rev?1:0)+(p.pay?1:0)+1;
+  return `
+  <div class="controls">
+    <span class="chiprow">${[["today","Today"],["yesterday","Yesterday"],["7d","Last 7d"]].map(([k,l])=>`<span class="chip ${ckPreset===k?"on":""}" onclick="setCkPreset('${k}')">${l}</span>`).join("")}</span>
+    <input id="f-cksearch" class="inp" style="width:220px" placeholder="search click id, sub, country, URL…" value="${esc(ckSearch)}" oninput="ckSearch=this.value;render()">
+    <span class="chip ${ckConvOnly?"on":""}" onclick="ckConvOnly=!ckConvOnly;render()">Converted only</span>
+    <label class="lbl"><input type="checkbox" ${ckBots?"checked":""} onchange="ckBots=this.checked;render()"> Include bots</label>
+    <span style="margin-left:auto;font-size:11.5px;color:var(--t3)">${rows.length.toLocaleString()} clicks</span>
+  </div>
+  <div class="card">
+    <div class="tbl-wrap"><table>
+      <tr><th>Time</th><th>Click ID</th><th>Geo</th><th>Offer</th>${showPub?"<th>Publisher</th>":""}<th>Sub ID</th><th>Conversion</th>${p.rev?'<th class="num">Revenue</th>':""}${p.pay?'<th class="num">Payout</th>':""}<th>Postback</th></tr>
+      ${rows.slice(0,60).map((c,i)=>`
+      <tr style="cursor:pointer;${c.test?"opacity:.6":""}" onclick="openClick=openClick==='${c.id}'?null:'${c.id}';render()">
+        <td style="white-space:nowrap"><span style="color:var(--t3);font-size:10px">${openClick===c.id?"▼":"▶"}</span> <span style="font-family:var(--mono);font-size:11px">${fmtDT(c.t)}</span></td>
+        <td style="font-family:var(--mono);font-size:11px">${c.id.slice(0,12)}…</td>
+        <td style="font-family:var(--mono);font-size:11px">${c.geo}</td>
+        <td>${esc(c.offName)}</td>
+        ${showPub?`<td>${esc(c.pubName)}</td>`:""}
+        <td style="font-family:var(--mono);font-size:11px">${esc(c.sub_id)}</td>
+        <td>${c.bot?'<span class="badge no">bot</span>':c.conv?`<span class="badge ok">✓ ${c.event}</span>`:'<span style="color:var(--t3)">—</span>'}</td>
+        ${p.rev?`<td class="num">${c.revenue!=null?"$"+c.revenue.toFixed(2):"—"}</td>`:""}
+        ${p.pay?`<td class="num gold">${c.payout!=null?"$"+c.payout.toFixed(2):"—"}</td>`:""}
+        <td>${pbChip(c)}</td>
+      </tr>
+      ${openClick===c.id?`<tr><td colspan="${nCols}" class="click-detail">
+        <b style="margin-top:0">Click ID</b><code>${c.id}</code>
+        <b>Raw request URL</b><code>${esc(c.request_url)}</code>
+        <b>Redirected to</b><code>${esc(c.redirect_url)}</code>
+        <b>Inbound parameters</b>
+        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:4px;margin-top:2px">
+          ${Object.entries(c.params).map(([k,v])=>`<div style="background:var(--card);border-radius:2px;padding:3px 8px;display:flex;gap:8px;min-width:0"><span style="color:var(--t3)">${k}</span><code style="overflow:hidden;text-overflow:ellipsis">${esc(v)}</code></div>`).join("")}
+        </div>
+        <b>Sub IDs</b>
+        <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:2px">
+          ${[["sub_id",c.sub_id],["sub3",c.sub3],["sub4",c.sub4],["sub5",c.sub5],["sub6",c.sub6],["sub7",c.sub7]].filter(([,v])=>v).map(([k,v])=>`<span style="background:var(--card);border-radius:2px;padding:3px 8px;font-family:var(--mono);font-size:11px"><span style="color:var(--t3)">${k}=</span>${esc(v)}</span>`).join("")}
+        </div>
+        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:4px 28px;margin-top:6px">
+          <div><b>Request</b>
+            <div class="kv"><span class="k">Country</span><span class="v">${c.geo}</span></div>
+            ${p.seesVisitor?`<div class="kv"><span class="k">IP</span><span class="v" style="font-family:var(--mono)">${c.ip}</span></div>
+            <div class="kv"><span class="k">User agent</span><span class="v" style="font-family:var(--mono);font-size:11px">${esc(c.ua)}</span></div>
+            <div class="kv"><span class="k">Referer</span><span class="v">${c.referer?esc(c.referer):"—"}</span></div>`:`<div class="kv"><span class="k">IP / UA / referer</span><span class="v" style="color:var(--t3)">internal accounts only</span></div>`}
+            <div class="kv"><span class="k">Bot</span><span class="v">${c.bot?"yes — excluded from figures":"no"}</span></div>
+            <div class="kv"><span class="k">Test</span><span class="v">${c.test?"yes — excluded from books":"no"}</span></div>
+            ${c.gclid?`<div class="kv"><span class="k">gclid</span><span class="v" style="font-family:var(--mono)">${esc(c.gclid)}</span></div>`:""}
+          </div>
+          <div><b>Outcome</b>
+            ${c.conv?`
+            <div class="kv"><span class="k">Event</span><span class="v pos">${c.event}</span></div>
+            <div class="kv"><span class="k">Converted at</span><span class="v">${fmtDTs(c.conv_at)}</span></div>
+            ${p.rev?`<div class="kv"><span class="k">Revenue</span><span class="v">$${c.revenue.toFixed(2)}</span></div>`:""}
+            ${p.pay?`<div class="kv"><span class="k">Payout</span><span class="v gold">$${c.payout.toFixed(2)}</span></div>`:""}
+            <div class="kv"><span class="k">Publisher postback</span><span class="v">${c.pb_sent?`sent after ${c.pb_attempts} attempt${c.pb_attempts===1?"":"s"}`:c.pb_attempts?`not sent — ${c.pb_attempts} attempt(s) failed`:"not sent — publisher has no postback URL"}</span></div>`
+            :`<span style="color:var(--t3)">No conversion recorded against this click.</span>`}
+          </div>
+        </div>
+      </td></tr>`:""}`).join("")}
+    </table></div>
+    ${!rows.length?`<div class="note" style="text-align:center;padding:24px">No clicks in this range.</div>`:""}
+    <div class="note">Click any row for the full forensic detail — inbound params, redirect chain, postback state.${P().seesVisitor?"":" IP, user agent and referrer are internal-accounts-only."}</div>
+  </div>`;
+}
+// ═══════════════ hierarchy: handlers ═══════════════
+function parseGeoAmounts(text){
+  const out=[]; const re=/([A-Za-z]{2})\s*[:\s]\s*\$?(\d+(?:\.\d+)?)/g; let m;
+  while((m=re.exec(text))!==null) out.push({country:m[1].toUpperCase(), amount:parseFloat(m[2])});
+  return out;
+}
+function advPostbackUrl(a){ return `https://api.traquery.tech/postback?click_id={click_id}&key=${a.postback_key}&event={event}&payout={payout}`; }
+function clickUrlFor(pr){
+  const pub=pubById(pr.publisher_id);
+  const keys=pub&&pub.param_map?Object.keys(pub.param_map):[];
+  const qs=(keys.length?keys:["sub_id"]).map(k=>`${k}={${k}}`).join("&");
+  return `https://${pub?pub.click_host:"pathlane.net"}/click?product=${pr.id}&${qs}`;
+}
+function addAdvertiser(){
+  const el=document.getElementById("new-adv-name"); const name=(el&&el.value||"").trim();
+  if(!name){ toast("Advertiser name first"); return; }
+  const id=Math.max(0,...DB.advertisers.map(a=>a.id))+1;
+  DB.advertisers.push({id,name,postback_key:"nk_"+hex(8),param_map:{},offers:[]});
+  addAdvOpen=false; toast("✓ Advertiser created — its postback key is minted"); render();
+}
+function renameAdvertiser(id){
+  const a=DB.advertisers.find(x=>x.id===id); if(!a) return;
+  const name=prompt("Advertiser name", a.name);
+  if(name&&name.trim()){ a.name=name.trim(); toast("✓ Renamed"); render(); }
+}
+function delAdvertiser(id){
+  const a=DB.advertisers.find(x=>x.id===id); if(!a) return;
+  if(!confirm(`Delete advertiser "${a.name}" and all its offers?`)) return;
+  const offIds=a.offers.map(o=>o.id);
+  DB.products=DB.products.filter(p=>!offIds.includes(p.offer_id));
+  DB.advertisers=DB.advertisers.filter(x=>x.id!==id);
+  toast("✓ Deleted"); render();
+}
+function addOffer(advId){
+  const el=document.getElementById("new-offer-name"); const name=(el&&el.value||"").trim();
+  if(!name){ toast("Offer name first"); return; }
+  const a=DB.advertisers.find(x=>x.id===advId); if(!a) return;
+  const id=Math.max(10,...DB.advertisers.flatMap(x=>x.offers.map(o=>o.id)))+1;
+  a.offers.push({id,name,event_name:null,default_revenue:null,offer_url:null,revenues:[]});
+  addOfferFor=null; editOffer=id; toast("✓ Offer created — set its paid event and revenue"); render();
+}
+function saveOffer(id){
+  const o=offerById(id); if(!o) return;
+  const g=id2=>document.getElementById(id2);
+  o.name=(g("eo-name").value||o.name).trim()||o.name;
+  o.event_name=g("eo-event").value||null;
+  const rev=g("eo-rev").value; o.default_revenue=rev!==""?parseFloat(rev):null;
+  o.offer_url=g("eo-url").value.trim()||null;
+  o.revenues=parseGeoAmounts(g("eo-geo").value).map(({country,amount})=>({country,revenue:amount}));
+  editOffer=null; toast("✓ Offer saved"); render();
+}
+function delOffer(id){
+  const o=offerById(id); if(!o) return;
+  if(!confirm(`Delete offer "${o.name}"? Its products and click links stop working.`)) return;
+  for(const a of DB.advertisers) a.offers=a.offers.filter(x=>x.id!==id);
+  DB.products=DB.products.filter(p=>p.offer_id!==id);
+  toast("✓ Deleted"); render();
+}
+function addPub(){
+  const n=document.getElementById("np-name"), u=document.getElementById("np-url");
+  const name=(n&&n.value||"").trim(); if(!name){ toast("Publisher name first"); return; }
+  const id=Math.max(0,...DB.publishers.map(p=>p.id))+1;
+  DB.publishers.push({id,name,click_host:"pathlane.net",postback_url:(u&&u.value||"").trim(),param_map:{sub_id:"clickid"}});
+  toast("✓ Publisher added — its click links resolve on pathlane.net"); render();
+}
+function savePub(id){
+  const p=pubById(id); if(!p) return;
+  const el=document.getElementById("pu-"+id);
+  p.postback_url=(el&&el.value||"").trim();
+  toast("✓ Saved — conversions now fire this s2s URL with the {payout} macro"); render();
+}
+function delPub(id){
+  const p=pubById(id); if(!p) return;
+  if(!confirm(`Delete publisher "${p.name}"? Its products and click links stop working.`)) return;
+  DB.publishers=DB.publishers.filter(x=>x.id!==id);
+  DB.products=DB.products.filter(x=>x.publisher_id!==id);
+  toast("✓ Deleted"); render();
+}
+function addProduct(){
+  if(!npOffer||!npPub){ toast("Pick an offer and a publisher first"); return; }
+  const off=+npOffer, pub=+npPub;
+  if(DB.products.some(p=>p.offer_id===off&&p.publisher_id===pub)){ toast("That offer already runs on this publisher"); return; }
+  const id=Math.max(40,...DB.products.map(p=>p.id))+1;
+  const o=offerById(off);
+  DB.products.push({id,offer_id:off,publisher_id:pub,payouts:(o.revenues||[]).map(r=>({country:r.country,payout:defPayout(r.revenue)}))});
+  npOffer=""; npPub="";
+  toast(`✓ Product #${id} created — payouts defaulted to 20% margin, rounded down`); render();
+}
+function savePayouts(prId){
+  const pr=DB.products.find(p=>p.id===prId); if(!pr) return;
+  const o=offerById(pr.offer_id);
+  const countries=[...new Set([...(o?.revenues||[]).map(r=>r.country),...pr.payouts.map(p=>p.country)])];
+  const out=[];
+  for(const c of countries){
+    const el=document.getElementById(`po-${prId}-${c}`); if(!el) continue;
+    const n=parseFloat(el.value);
+    if(el.value!==""&&Number.isFinite(n)) out.push({country:c,payout:n});
+  }
+  pr.payouts=out; toast("✓ Payouts saved"); render();
+}
+function delProduct(id){
+  const pr=DB.products.find(p=>p.id===id); if(!pr) return;
+  const o=offerById(pr.offer_id), pb=pubById(pr.publisher_id);
+  if(!confirm(`Delete product #${id} (${o?o.name:"?"} @ ${pb?pb.name:"?"})? The click link stops working.`)) return;
+  DB.products=DB.products.filter(p=>p.id!==id);
+  toast("✓ Deleted"); render();
+}
+function addEvName(){
+  const n=document.getElementById("en-new-name"), p=document.getElementById("en-new-param");
+  const name=(n&&n.value||"").trim(), param=(p&&p.value||"").trim();
+  if(!name||!param){ toast("Event needs both a name and a param"); return; }
+  if(DB.event_names.some(e=>e.param===param)){ toast("That param is already registered"); return; }
+  DB.event_names.push({id:Math.max(0,...DB.event_names.map(e=>e.id))+1,name,param});
+  toast("✓ Event registered"); render();
+}
+function saveEvName(id){
+  const ev=DB.event_names.find(e=>e.id===id); if(!ev) return;
+  ev.name=(document.getElementById("en-name-"+id).value||ev.name).trim();
+  ev.param=(document.getElementById("en-param-"+id).value||ev.param).trim();
+  toast("✓ Saved"); render();
+}
+function delEvName(id){
+  const ev=DB.event_names.find(e=>e.id===id); if(!ev) return;
+  if(!confirm(`Delete event "${ev.name}" (${ev.param})? Offers using it keep the param string.`)) return;
+  DB.event_names=DB.event_names.filter(e=>e.id!==id);
+  toast("✓ Deleted"); render();
+}
+function paramMapChips(map){
+  const e=Object.entries(map||{});
+  if(!e.length) return `<span style="font-size:11px;color:var(--t3)">no params mapped</span>`;
+  return e.map(([k,v])=>`<span style="background:var(--card);border-radius:2px;padding:2px 8px;font-family:var(--mono);font-size:11px"><span style="color:var(--t3)">${k}</span> → ${esc(v)}</span>`).join(" ");
+}
+
+// ═══════════════ hierarchy: page ═══════════════
+function offerRowHtml(o){
+  if(editOffer===o.id){
+    const geoTxt=(o.revenues||[]).map(r=>`${r.country}:${r.revenue}`).join("  ");
+    return `<div class="hrow" style="border-color:rgba(79,181,132,.4)"><div class="hr-body" style="border-top:0">
+      <div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:8px">
+        <span style="flex:1;min-width:130px"><span class="slab" style="display:block;margin-bottom:3px">Name</span>
+          <input id="eo-name" class="inp" style="width:100%" value="${esc(o.name)}"></span>
+        <span style="flex:1;min-width:150px"><span class="slab" style="display:block;margin-bottom:3px">Paid event</span>
+          <select id="eo-event" class="inp" style="width:100%">
+            <option value="">— none (every postback paid)</option>
+            ${DB.event_names.map(ev=>`<option value="${ev.param}" ${o.event_name===ev.param?"selected":""}>${ev.param} — ${esc(ev.name)}</option>`).join("")}
+          </select></span>
+        <span style="width:130px"><span class="slab" style="display:block;margin-bottom:3px">Default revenue ($)</span>
+          <input id="eo-rev" class="inp" type="number" step="0.01" style="width:100%" value="${o.default_revenue!=null?o.default_revenue:""}" placeholder="0.00"></span>
+      </div>
+      <span class="slab" style="display:block;margin-bottom:3px">Offer URL <span style="color:var(--t3);text-transform:none;letter-spacing:0">— where clicks redirect · macros: {click_id} {gclid} {sub_id} {sub3}…{sub7}</span></span>
+      <input id="eo-url" class="inp mono" style="width:100%;margin-bottom:8px" value="${esc(o.offer_url||"")}" placeholder="https://advertiser.com/lp?cid={click_id}">
+      <span class="slab" style="display:block;margin-bottom:3px">Geo revenue <span style="color:var(--t3);text-transform:none;letter-spacing:0">— what the advertiser pays you, per country · paste "US:150  GB:200 …"</span></span>
+      <textarea id="eo-geo" class="inp mono" style="width:100%;resize:vertical" rows="2" placeholder="US:150  GB:200  AU:170">${esc(geoTxt)}</textarea>
+      <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:8px">
+        <button class="abtn" onclick="editOffer=null;render()">Cancel</button>
+        <button class="abtn confirm" onclick="saveOffer(${o.id})">Save</button>
+      </div>
+    </div></div>`;
+  }
+  return `<div class="hrow"><div class="hr-head">
+    <span class="tag o">O</span>
+    <span style="flex:1;font-weight:500">${esc(o.name)}</span>
+    <span style="font-size:11px;color:var(--t3)">ID #${o.id}</span>
+    ${o.event_name?`<span class="badge ok" style="font-family:var(--mono)" title="paid event">${o.event_name}</span>`:""}
+    ${(o.revenues||[]).length?`<span class="badge ok" style="font-family:var(--mono)" title="${(o.revenues||[]).map(r=>r.country+":"+r.revenue).join("  ")}">rev ×${o.revenues.length}</span>`:""}
+    <button class="abtn" onclick="editOffer=${o.id};render()">Edit</button>
+    <button class="abtn danger" onclick="delOffer(${o.id})">Delete</button>
+  </div></div>`;
+}
+function pageHierarchy(){
+  const advRows=DB.advertisers.map(a=>{
+    const open=!!hOpenAdv[a.id], params=!!hAdvParams[a.id];
+    const url=advPostbackUrl(a);
+    return `<div class="hrow">
+      <div class="hr-head">
+        <button class="exp" onclick="hOpenAdv[${a.id}]=!hOpenAdv[${a.id}];render()">${open?"▼":"▶"}</button>
+        <span class="tag a">A</span>
+        <span style="flex:1;font-weight:500">${esc(a.name)}</span>
+        <span style="font-size:11px;color:var(--t3)">${a.offers.length} offers</span>
+        <span style="font-size:11px;color:var(--t3)">ID #${a.id}</span>
+        <span class="urlchip green" title="${esc(url)} — click to copy" onclick="copyText('${url.replace(/'/g,"")}','✓ Postback URL copied — give it to the advertiser')">postback URL · key=•••</span>
+        <button class="abtn" onclick="hAdvParams[${a.id}]=!hAdvParams[${a.id}];render()">${params?"Hide params":"Params ("+Object.keys(a.param_map||{}).length+")"}</button>
+        <button class="abtn" onclick="renameAdvertiser(${a.id})">Rename</button>
+        <button class="abtn danger" onclick="delAdvertiser(${a.id})">Delete</button>
+      </div>
+      ${params?`<div class="hr-body">
+        <span class="slab" style="display:block;margin-bottom:5px">Param map — our name → what their postback sends</span>
+        <div style="display:flex;gap:6px;flex-wrap:wrap">${paramMapChips(a.param_map)}</div>
+        <div style="font-size:11px;color:var(--t3);margin-top:6px">offer URL preview → …/their-link?${Object.entries(a.param_map||{}).map(([k,v])=>`${v}={${k}}`).join("&")||"cid={click_id}"}</div>
+      </div>`:""}
+      ${open?`<div class="hr-body" style="display:flex;flex-direction:column;gap:6px">
+        ${a.offers.map(offerRowHtml).join("")}
+        ${addOfferFor===a.id
+          ? `<div style="display:flex;gap:8px"><input id="new-offer-name" class="inp" style="flex:1" placeholder="Offer name" onkeydown="if(event.key==='Enter')addOffer(${a.id})">
+             <button class="abtn confirm" onclick="addOffer(${a.id})">Add</button>
+             <button class="abtn" onclick="addOfferFor=null;render()">Cancel</button></div>`
+          : `<button class="abtn" style="align-self:flex-start" onclick="addOfferFor=${a.id};editOffer=null;render()">+ New Offer</button>`}
+      </div>`:""}
+    </div>`;
+  }).join("");
+
+  const pubRows=DB.publishers.map(p=>{
+    const params=!!hPubParams[p.id];
+    return `<div style="display:flex;flex-direction:column;gap:4px">
+      <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+        <span class="tag p">P</span>
+        <span style="width:140px;font-weight:500">${esc(p.name)}</span>
+        <span style="font-size:11px;color:var(--t3)">ID #${p.id}</span>
+        <span class="urlchip" title="resolved click-domain pool — click links are minted on this host" onclick="copyText('${p.click_host}')">${p.click_host}</span>
+        <input id="pu-${p.id}" class="inp mono" style="flex:1;min-width:220px" value="${esc(p.postback_url||"")}" placeholder="s2s URL — {click_id} {sub_id} {payout} {event} {country}">
+        <button class="abtn" onclick="savePub(${p.id})">Save</button>
+        <button class="abtn" onclick="hPubParams[${p.id}]=!hPubParams[${p.id}];render()">${params?"Hide params":"Params ("+Object.keys(p.param_map||{}).length+")"}</button>
+        <button class="abtn danger" onclick="delPub(${p.id})">Delete</button>
+      </div>
+      ${params?`<div style="margin-left:24px;background:rgba(11,23,16,.5);border:1px solid var(--line);border-radius:2px;padding:8px 10px">
+        <span class="slab" style="display:block;margin-bottom:5px">Param map — our name → what their click link sends</span>
+        <div style="display:flex;gap:6px;flex-wrap:wrap">${paramMapChips(p.param_map)}</div>
+        <div style="font-size:11px;color:var(--t3);margin-top:6px">click URL → …/click?product=&lt;ID&gt;&amp;${Object.entries(p.param_map||{}).map(([k,v])=>`${k}=${v}`).join("&")||"sub_id={sub_id}"}</div>
+      </div>`:""}
+    </div>`;
+  }).join("");
+
+  const prodRows=DB.products.map(pr=>{
+    const o=offerById(pr.offer_id), pb=pubById(pr.publisher_id);
+    const open=!!prodOpen[pr.id];
+    const url=clickUrlFor(pr);
+    const revBy=new Map((o?.revenues||[]).map(r=>[r.country,r.revenue]));
+    const countries=[...new Set([...(o?.revenues||[]).map(r=>r.country),...pr.payouts.map(p=>p.country)])].sort();
+    const payBy=new Map(pr.payouts.map(p=>[p.country,p.payout]));
+    return `<div class="hrow">
+      <div class="hr-head">
+        <span class="pid" title="Product ID — use in the click link">#${pr.id}</span>
+        <span><span style="color:#E0B968">${esc(o?o.name:"offer #"+pr.offer_id)}</span><span style="color:var(--t3)"> @ </span><span style="color:#B48AD6">${esc(pb?pb.name:"pub #"+pr.publisher_id)}</span></span>
+        <span class="badge ok" style="font-family:var(--mono)">payout ×${pr.payouts.length}</span>
+        <span style="flex:1"></span>
+        <span class="urlchip" title="${esc(url)} — click to copy" onclick="copyText('${url.replace(/'/g,"")}','✓ Click URL copied — this is what the publisher places')">click URL</span>
+        <button class="abtn" onclick="prodOpen[${pr.id}]=!prodOpen[${pr.id}];render()">${open?"Hide payouts":"Payouts"}</button>
+        <button class="abtn danger" onclick="delProduct(${pr.id})">Delete</button>
+      </div>
+      ${open?`<div class="hr-body">
+        <div class="geo-grid">
+          <span class="gh">Geo</span><span class="gh">Revenue (advertiser)</span><span class="gh">Payout (publisher)</span>
+          ${countries.map(c=>`
+            <span style="font-family:var(--mono);font-size:12px">${c}</span>
+            <span style="font-family:var(--mono);font-size:12px;color:var(--t3)">${revBy.has(c)?"$"+revBy.get(c):"—"}</span>
+            <input id="po-${pr.id}-${c}" class="inp mono" type="number" step="0.01" style="width:96px;color:var(--forest)" value="${payBy.has(c)?payBy.get(c):""}" placeholder="—">`).join("")}
+        </div>
+        ${countries.length?"":`<span style="font-size:11px;color:var(--t3)">No geo rows — add revenue countries on the offer first.</span>`}
+        <div style="display:flex;justify-content:flex-end;margin-top:8px"><button class="abtn confirm" onclick="savePayouts(${pr.id})">Save payouts</button></div>
+      </div>`:""}
+    </div>`;
+  }).join("");
+
+  const allOffers=DB.advertisers.flatMap(a=>a.offers.map(o=>({...o,advName:a.name})));
+  const evRows=DB.event_names.map(ev=>`
+    <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+      <input id="en-name-${ev.id}" class="inp" style="width:200px" value="${esc(ev.name)}">
+      <input id="en-param-${ev.id}" class="inp mono" style="width:110px;color:var(--forest)" value="${esc(ev.param)}">
+      <button class="abtn" onclick="copyText('${ev.param}','✓ param copied')" title="copy param">copy</button>
+      <button class="abtn" onclick="saveEvName(${ev.id})">Save</button>
+      <button class="abtn danger" onclick="delEvName(${ev.id})">Delete</button>
+    </div>`).join("");
+
+  return `
+  <div class="sect"><div class="sh"><span class="st">Advertisers</span><span class="ss">demand — each has one global postback URL and its offers</span></div>
+    <div class="sb">
+      ${advRows}
+      ${addAdvOpen
+        ? `<div style="display:flex;gap:8px"><input id="new-adv-name" class="inp" style="flex:1" placeholder="Advertiser name" onkeydown="if(event.key==='Enter')addAdvertiser()">
+           <button class="abtn confirm" onclick="addAdvertiser()">Add</button>
+           <button class="abtn" onclick="addAdvOpen=false;render()">Cancel</button></div>`
+        : `<button class="abtn" style="align-self:flex-start" onclick="addAdvOpen=true;render()">+ New Advertiser</button>`}
+    </div>
+  </div>
+  <div class="sect"><div class="sh"><span class="st">Publishers</span><span class="ss">supply — their s2s URL gets the {payout} macro (payout, never revenue)</span></div>
+    <div class="sb">
+      ${pubRows}
+      <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;padding-top:4px">
+        <input id="np-name" class="inp" style="width:160px" placeholder="Publisher name">
+        <input id="np-url" class="inp mono" style="flex:1;min-width:240px" placeholder="https://publisher.com/s2s?cid={sub_id}&payout={payout}">
+        <button class="abtn confirm" onclick="addPub()">+ Add publisher</button>
+      </div>
+    </div>
+  </div>
+  <div class="sect"><div class="sh"><span class="st">Products</span><span class="ss">a unique offer × publisher combination — payout matrix + click link each</span></div>
+    <div class="sb">
+      ${prodRows}
+      <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;padding-top:4px">
+        <select class="inp" style="min-width:200px" onchange="npOffer=this.value">
+          <option value="">Offer…</option>
+          ${DB.advertisers.map(a=>`<optgroup label="${esc(a.name)}">${a.offers.map(o=>`<option value="${o.id}" ${String(npOffer)===String(o.id)?"selected":""}>${esc(o.name)}</option>`).join("")}</optgroup>`).join("")}
+        </select>
+        <select class="inp" style="min-width:160px" onchange="npPub=this.value">
+          <option value="">Publisher…</option>
+          ${DB.publishers.map(p=>`<option value="${p.id}" ${String(npPub)===String(p.id)?"selected":""}>${esc(p.name)}</option>`).join("")}
+        </select>
+        <button class="abtn confirm" onclick="addProduct()">+ Create product</button>
+      </div>
+      <div style="font-size:11px;color:var(--t3)">New products default to 20% margin, rounded down — nearest $5 at $100+, whole dollar under $100, one decimal under $10. Payouts editable per country.</div>
+    </div>
+  </div>
+  <div class="sect"><div class="sh"><span class="st">Event names</span><span class="ss">registry — the param is what the advertiser's event= must send, exactly</span></div>
+    <div class="sb">
+      ${evRows}
+      <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;padding-top:4px">
+        <input id="en-new-name" class="inp" style="width:200px" placeholder="Event name (e.g. Deposit)">
+        <input id="en-new-param" class="inp mono" style="width:110px" placeholder="param (e.g. dep)" onkeydown="if(event.key==='Enter')addEvName()">
+        <button class="abtn confirm" onclick="addEvName()">+ Add event</button>
+      </div>
+    </div>
+  </div>`;
+}
+// ═══════════════ admin drawer ═══════════════
+const MONEY_HINT={ advertiser:"sees revenue only — the demand side of the network",
+  publisher:"sees payout only — the supply side of the network",
+  internal:"sees revenue and payout — both ends of the network" };
+function updUser(uid,patch){
+  const u=USERS.find(x=>x.uid===uid); if(!u) return;
+  Object.assign(u,patch);
+  if(patch.type){ // type sets the money defaults, still toggleable after
+    u.see_rev = patch.type!=="publisher";
+    u.see_pay = patch.type!=="advertiser";
+  }
+  render();
+}
+function delUser(uid){
+  const u=USERS.find(x=>x.uid===uid); if(!u) return;
+  if(!confirm(`Delete ${u.email}?\n\nThis removes the account and its grants. It does not ban the address — signing in again re-creates it as pending with no permissions.`)) return;
+  USERS=USERS.filter(x=>x.uid!==uid);
+  if(viewAs===uid) viewAs=null;
+  render();
+}
+function viewAsUser(uid){
+  viewAs=uid; adminOpen=false; openClick=null; expandedEv=null;
+  hAdvF=""; hPubF="";   // the filter bar re-scopes to what this account may see
+  sanitizeScope();
+  toast("Viewing as "+(USERS.find(u=>u.uid===uid)||{}).email+" — the whole app is now scoped to that account");
+  render();
+}
+function exitViewAs(){ viewAs=null; hAdvF=""; hPubF=""; sanitizeScope(); render(); }
+function saveInvite(){
+  const email=inv.email.trim();
+  if(!email.includes("@")){ toast("Enter a valid email first"); return; }
+  INVITES.push({email, type:inv.type, can_edit:inv.can_edit, can_test:inv.can_test, see_rev:inv.see_rev, see_pay:inv.see_pay, sent:false});
+  composerOpen=false; inv={email:"",type:"internal",can_edit:false,can_test:false,see_rev:true,see_pay:true};
+  toast("✓ Draft saved — Send it from the list when you are happy with it");
+  render();
+}
+function sendInvite(email){
+  const i=INVITES.find(x=>x.email===email); if(!i) return;
+  i.sent=true; toast("✓ Invite email sent — in production the address gets a sign-in link"); render();
+}
+function rmInvite(email){ INVITES=INVITES.filter(x=>x.email!==email); render(); }
+function setInvType(t){
+  inv.type=t; inv.see_rev=t!=="publisher"; inv.see_pay=t!=="advertiser"; render();
+}
+function chip(active,label,handler,title){
+  return `<span class="chip ${active?"on":""}" ${title?`title="${esc(title)}"`:""} onclick="${handler}">${label}</span>`;
+}
+function drawerHtml(){
+  if(!adminOpen) return "";
+  const userRows=USERS.map(u=>{
+    const open=openUid===u.uid, isAdm=u.role==="admin", granted=u.access==="granted";
+    return `<div class="hrow">
+      <div class="hr-head" style="cursor:pointer" onclick="openUid=openUid==='${u.uid}'?null:'${u.uid}';render()">
+        <span style="color:var(--t3);font-size:11px;width:12px">${open?"▼":"▶"}</span>
+        <span style="flex:1;min-width:160px;overflow:hidden;text-overflow:ellipsis">${esc(u.email)}</span>
+        <span class="badge ${granted?"ok":u.access==="pending"?"amber":"no"}">${u.access}</span>
+        ${isAdm?`<span class="badge ok">admin</span>`:""}
+        ${!isAdm&&granted?`<span style="font-size:10.5px;color:var(--t3);font-family:var(--mono)">${u.type} · ${u.can_edit?"edit":"view only"}${u.can_test?" · test":""} · ${[u.see_rev&&"rev",u.see_pay&&"pay"].filter(Boolean).join("+")||"no money"}</span>`:""}
+        <span style="display:flex;gap:4px" onclick="event.stopPropagation()">
+          ${!isAdm&&granted?`<button class="abtn confirm" onclick="viewAsUser('${u.uid}')">View as</button>`:""}
+          <button class="abtn" onclick="openUid=openUid==='${u.uid}'?null:'${u.uid}';render()">${open?"Close":"Edit"}</button>
+          ${granted?`<button class="abtn danger" onclick="updUser('${u.uid}',{access:'pending'})">Revoke</button>`
+                   :`<button class="abtn confirm" onclick="updUser('${u.uid}',{access:'granted'})">Grant</button>`}
+          ${!isAdm?`<button class="abtn danger" onclick="delUser('${u.uid}')">Delete</button>`:""}
+        </span>
+      </div>
+      ${open?`<div class="hr-body" style="display:flex;flex-direction:column;gap:9px">
+        <div class="controls" style="margin:0"><span class="slab">Access</span>
+          ${["granted","pending","denied"].map(a=>chip(u.access===a,a,`updUser('${u.uid}',{access:'${a}'})`,
+            a==="granted"?"can sign in":a==="pending"?"sees the awaiting-approval screen":"blocked — signing in again will not restore it")).join("")}
+        </div>
+        <div class="controls" style="margin:0"><span class="slab">Role</span>
+          ${["member","admin"].map(r=>chip(u.role===r,r,`updUser('${u.uid}',{role:'${r}'})`)).join("")}
+          <span style="font-size:11px;color:var(--t3)">admin can manage users and always sees everything</span>
+        </div>
+        ${!isAdm?`
+        <div class="controls" style="margin:0"><span class="slab">Type</span>
+          ${["advertiser","publisher","internal"].map(t=>chip(u.type===t,t,`updUser('${u.uid}',{type:'${t}'})`,MONEY_HINT[t])).join("")}
+          <span style="font-size:11px;color:var(--t3)">${MONEY_HINT[u.type]}</span>
+        </div>
+        <div class="controls" style="margin:0"><span class="slab">Can</span>
+          ${chip(u.can_edit,(u.can_edit?"✓ ":"")+"Edit",`updUser('${u.uid}',{can_edit:${!u.can_edit}})`,"full access including the Hierarchy tab — create and change advertisers, publishers, offers, products")}
+          ${chip(u.can_test,(u.can_test?"✓ ":"")+"Test conversions",`updUser('${u.uid}',{can_test:${!u.can_test}})`,"fire test conversions — exposes advertiser postback keys")}
+        </div>
+        <div class="controls" style="margin:0"><span class="slab">Sees</span>
+          ${chip(u.see_rev,(u.see_rev?"✓ ":"")+"Revenue",`updUser('${u.uid}',{see_rev:${!u.see_rev}})`,"what the advertiser pays — hidden from the KPIs, chart, tables and CSV when off")}
+          ${chip(u.see_pay,(u.see_pay?"✓ ":"")+"Payout",`updUser('${u.uid}',{see_pay:${!u.see_pay}})`,"what the publisher earns — hidden everywhere when off")}
+          <span style="font-size:11px;color:var(--t3)">redacted server-side in production — not just hidden</span>
+        </div>`:""}
+      </div>`:""}
+    </div>`;
+  }).join("");
+
+  const inviteRows=INVITES.length?`
+    <div style="padding-top:6px">
+      <div style="font-size:11px;color:var(--t3);margin-bottom:4px">Pending invites</div>
+      ${INVITES.map(i=>`<div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;padding:4px 6px">
+        <span style="flex:1;min-width:150px;font-family:var(--mono);font-size:11.5px;color:var(--t2)">${esc(i.email)}</span>
+        <span style="font-size:10.5px;color:var(--t3)">${i.type}${i.can_edit?" · edit":" · view only"}${i.can_test?" · test":""} · ${[i.see_rev&&"rev",i.see_pay&&"pay"].filter(Boolean).join("+")||"no money"}</span>
+        <span class="badge ${i.sent?"ok":"amber"}">${i.sent?"sent":"draft"}</span>
+        <button class="abtn ${i.sent?"":"confirm"}" onclick="sendInvite('${i.email}')">${i.sent?"Resend":"Send"}</button>
+        <button class="abtn" onclick="rmInvite('${i.email}')">Remove</button>
+      </div>`).join("")}
+    </div>`:"";
+
+  const composer=`
+    <div style="border:1px solid rgba(79,181,132,.3);border-radius:2px;margin-top:10px;overflow:hidden">
+      <button style="width:100%;text-align:left;background:rgba(79,181,132,.08);border:0;border-bottom:${composerOpen?"1px solid rgba(79,181,132,.2)":"0"};padding:8px 12px;cursor:pointer;display:flex;justify-content:space-between;align-items:center"
+        onclick="composerOpen=!composerOpen;render()">
+        <span class="slab" style="color:var(--forest)">${composerOpen?"Create account":"+ Create account"}</span>
+        <span style="font-size:10px;color:var(--t3)">${composerOpen?"click to cancel":"compose → save → send"}</span>
+      </button>
+      ${composerOpen?`<div style="padding:10px 12px;display:flex;flex-direction:column;gap:8px;background:rgba(11,23,16,.5)">
+        <div class="controls" style="margin:0"><span class="slab">Type</span>
+          ${["advertiser","publisher","internal"].map(t=>chip(inv.type===t,t,`setInvType('${t}')`,MONEY_HINT[t])).join("")}
+          <span style="font-size:11px;color:var(--t3)">${MONEY_HINT[inv.type]}</span>
+        </div>
+        <div class="controls" style="margin:0"><span class="slab">Can</span>
+          ${chip(inv.can_edit,(inv.can_edit?"✓ ":"")+"Edit",`inv.can_edit=${!inv.can_edit};render()`)}
+          ${chip(inv.can_test,(inv.can_test?"✓ ":"")+"Test conversions",`inv.can_test=${!inv.can_test};render()`)}
+        </div>
+        <div class="controls" style="margin:0"><span class="slab">Sees</span>
+          ${chip(inv.see_rev,(inv.see_rev?"✓ ":"")+"Revenue",`inv.see_rev=${!inv.see_rev};render()`)}
+          ${chip(inv.see_pay,(inv.see_pay?"✓ ":"")+"Payout",`inv.see_pay=${!inv.see_pay};render()`)}
+        </div>
+        <div class="controls" style="margin:0">
+          <input id="f-invemail" class="inp" style="flex:1;min-width:220px" type="email" placeholder="user@example.com" value="${esc(inv.email)}" oninput="inv.email=this.value" onkeydown="if(event.key==='Enter')saveInvite()">
+          <button class="abtn confirm" onclick="saveInvite()">Save draft</button>
+        </div>
+        <div style="font-size:11px;color:var(--t3)">Save draft stores it, emailing no one — Send on the list row is the only action that emails. In production a Preview button opens the exact future view in a new tab before anything is saved.</div>
+      </div>`:""}
+    </div>`;
+
+  return `<div class="drawer">
+    <div class="ov" onclick="adminOpen=false;render()"></div>
+    <div class="panel">
+      <div class="phead">
+        <div><span style="font-weight:600">Administration</span><span style="font-size:11.5px;color:var(--t3);margin-left:10px">users, permissions &amp; alerting</span></div>
+        <button class="abtn" onclick="adminOpen=false;render()">Close ✕</button>
+      </div>
+      <div class="pbody">
+        <div class="sect" style="margin:0"><div class="sh"><span class="st">Users &amp; permissions</span><span class="ss">nothing is granted by default — every capability is explicit</span></div>
+          <div class="sb">${userRows}${inviteRows}${composer}</div>
+        </div>
+        <div class="note" style="padding:0">Tip: hit <b style="display:inline;color:var(--t2)">View as</b> on anna@northwindmedia.com (publisher) — revenue vanishes everywhere and advertiser names mask; the rep@northstar row shows the advertiser side. In production this also drives click-domain pools, fallback URLs and alerting from this drawer.</div>
+      </div>
+    </div>
+  </div>`;
+}
+
+// ═══════════════ shell: header, banner, tabs ═══════════════
+function setTz(v){ tz=v; render(); toast("Times now shown in "+v); }
+function doRefresh(){ genAll(); render(); toast("✓ Data refreshed"); }
+function headerHtml(){
+  const p=P(), u=USERS.find(x=>x.uid==="u1");
+  return `
+  <span class="dot"></span><span class="wordmark">Traquery</span><span class="slabel">Performance Tracking</span>
+  <div class="right">
+    <select class="inp" title="all displayed times shift to this timezone" onchange="setTz(this.value)">${TZS.map(([v])=>`<option value="${v}" ${tz===v?"selected":""}>${v}</option>`).join("")}</select>
+    <span id="clock" style="color:var(--t3);font-family:var(--mono);font-size:11px"></span>
+    <span class="chip" onclick="doRefresh()">Refresh</span>
+    ${p.admin&&!viewAs?`<span class="chip on" onclick="adminOpen=true;render()">Admin</span>`:""}
+    <span style="color:var(--t3);font-size:12px;cursor:pointer" title="analytics consent" onclick="toast('Analytics consent — production lets you switch tracking cookies on or off here')">cookies: on</span>
+    <span class="avatar">D</span><span class="hide-sm">${u.email}</span>
+    <span class="chip" onclick="toast('Demo — production signs out of the Firebase Google session')">Sign out</span>
+  </div>`;
+}
+function bannerHtml(){
+  if(!viewAs) return "";
+  const u=USERS.find(x=>x.uid===viewAs);
+  return `<div class="viewas">
+    <span>Viewing as <strong>${esc(u?u.email:viewAs)}</strong> — everything below is exactly what this account sees.</span>
+    <button onclick="exitViewAs()">Exit view</button>
+  </div>`;
+}
+function tabsHtml(){
+  const canH=P().canEdit||P().admin;
+  const tabs=[["dashboard","Dashboard"],["events","Events"],["clicks","Clicks"],...(canH?[["hierarchy","Hierarchy"]]:[])];
+  return tabs.map(([k,l])=>`<button class="${tab===k?"on":""}" onclick="setTab('${k}')">${l}</button>`).join("");
+}
+
+// ═══════════════ render machinery ═══════════════
+function render(){
+  sanitizeScope();
+  const ae=document.activeElement;
+  const fid=ae&&ae.id, isText=ae&&(ae.tagName==="INPUT"||ae.tagName==="TEXTAREA");
+  let sel=null; if(fid&&isText){ try{ sel=[ae.selectionStart,ae.selectionEnd]; }catch(e){} }
+  $("#hdr").innerHTML=headerHtml();
+  $("#banner").innerHTML=bannerHtml();
+  $("#tabs").innerHTML=tabsHtml();
+  $("#main").innerHTML=({dashboard:pageDashboard,events:pageEvents,clicks:pageClicks,hierarchy:pageHierarchy})[tab]();
+  $("#drawer").innerHTML=drawerHtml();
+  tickClock();
+  if(fid){ const el=document.getElementById(fid);
+    if(el){ el.focus(); if(sel&&el.setSelectionRange){ try{ el.setSelectionRange(sel[0],sel[1]); }catch(e){} } } }
+}
+function tickClock(){
+  const el=$("#clock");
+  if(el) el.textContent="updated "+new Date().toLocaleTimeString("en-GB",{timeZone:tz});
+}
+setInterval(tickClock,1000);
+document.addEventListener("keydown",e=>{
+  if(e.key==="Escape"){
+    if(adminOpen){ adminOpen=false; render(); }
+    else if(colSelOpen){ colSelOpen=false; render(); }
+  }
+});
+document.addEventListener("mousedown",e=>{
+  if(colSelOpen && !e.target.closest(".colsel") && !e.target.closest(".colselbtn")){ colSelOpen=false; render(); }
+});
+// boot: the default saved view loads automatically
+(function(){
+  const def=VIEWS.find(v=>v.is_default===1);
+  if(def){ selView=def.id; applyConfig(def.config); schedEmails=def.email_to?def.email_to.split(","):["demo@vane-labs.com"]; schedHour=def.send_hour??9; }
+  render();
+})();
+</script>
+</body>
+</html>

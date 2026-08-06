@@ -1,0 +1,1275 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Vane Labs CRM — Interactive Demo</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Rajdhani:wght@500;600;700&family=Inter:wght@400;500;600&display=swap');
+:root{
+  --forest:#0A4F32;--forest-deep:#07331F;--gold:#BD8C3D;--gold-d:#887B05;
+  --bg:#FAFAF7;--surface:#fff;--ink:#0E2419;--muted:#4A5752;--t3:#8A9691;
+  --danger:#C0392B;--warning:#E67E22;--info:#2980B9;--purple:#8E44AD;--accent-t:#1f7a00;
+  --rule:rgba(10,79,50,.14);
+  --fd:'Rajdhani',sans-serif;--fb:'Inter',sans-serif;
+}
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:var(--bg);color:var(--ink);font-family:var(--fb);font-size:14px;height:100vh;overflow:hidden;display:flex;flex-direction:column;-webkit-font-smoothing:antialiased;text-rendering:optimizeLegibility}
+::selection{background:var(--forest);color:var(--bg)}
+.demo-strip{background:#EAF3EE;border-bottom:1px solid var(--rule);padding:7px 20px;display:flex;justify-content:space-between;align-items:center;font-size:12.5px;color:var(--forest);gap:12px}
+.demo-strip a{color:var(--ink);text-decoration:none;font-weight:600}
+.rolesel{font-family:var(--fd);font-weight:600;font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--forest);background:var(--surface);border:1px solid var(--rule);border-radius:2px;padding:2px 4px;cursor:pointer}
+.shell{display:flex;flex:1;min-height:0}
+aside{width:230px;background:var(--surface);border-right:1px solid var(--rule);padding:0;flex-shrink:0;display:flex;flex-direction:column;transition:width .2s;overflow:hidden}
+aside.collapsed{width:52px}
+.snav{flex:1;min-height:0;padding:8px 6px;overflow-y:auto;overflow-x:hidden;display:flex;flex-direction:column;gap:1px}
+.sfoot{flex-shrink:0}
+.logo-row{display:flex;align-items:center;gap:10px;padding:16px 14px 13px;border-bottom:1px solid var(--rule)}
+aside.collapsed .logo-row{padding:16px 11px 13px}
+.logo-tile{width:28px;height:28px;background:var(--forest);border-radius:2px;display:flex;align-items:center;justify-content:center;flex-shrink:0}
+.lk .wm{font-family:var(--fd);font-weight:700;font-size:15px;color:var(--gold);letter-spacing:.06em;line-height:1;white-space:nowrap}
+.lk .sub{font-family:var(--fd);font-weight:600;font-size:9px;letter-spacing:.18em;text-transform:uppercase;color:var(--muted);margin-top:1px}
+.ngroup{font-family:var(--fd);font-weight:600;font-size:10px;letter-spacing:.16em;text-transform:uppercase;color:var(--t3);padding:0 10px 5px;margin-top:10px;white-space:nowrap}
+aside.collapsed .ngroup{height:1px;background:rgba(10,79,50,.1);margin:10px 4px 6px;padding:0;overflow:hidden;color:transparent}
+.nitem{display:flex;align-items:center;gap:10px;padding:9px 12px;border-radius:2px;font-family:var(--fd);font-weight:600;font-size:12.5px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);cursor:pointer;border:0;background:none;text-align:left;width:100%;transition:background .15s,color .15s;white-space:nowrap}
+.nitem:hover{background:rgba(10,79,50,.07);color:var(--forest)}
+.nitem.on{background:rgba(10,79,50,.12);color:var(--forest)}
+.nitem svg{flex-shrink:0}
+.nitem .lbl{flex:1;overflow:hidden;text-overflow:ellipsis}
+aside.collapsed .nitem{justify-content:center;padding:9px 0}
+aside.collapsed .nitem .lbl,aside.collapsed .npill{display:none}
+.npill{font-family:var(--fd);font-weight:700;font-size:10px;border-radius:10px;padding:1px 6px}
+.npill.soft{background:rgba(10,79,50,.1);color:var(--forest)}
+.sfoot{border-top:1px solid var(--rule);padding:8px 6px}
+.suser{display:flex;align-items:center;gap:8px;padding:8px 10px;margin-bottom:4px}
+.suser .av{width:26px;height:26px;background:var(--forest);border-radius:50%;display:flex;align-items:center;justify-content:center;color:var(--gold);font-family:var(--fd);font-weight:700;font-size:12px;flex-shrink:0}
+.suser .nm{font-size:12px;font-weight:500;color:var(--ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.suser .rl{display:flex;align-items:center;gap:5px;margin-top:1px}
+.suser .rl span{font-size:10px;color:var(--muted);text-transform:uppercase;font-family:var(--fd);letter-spacing:.1em;font-weight:600}
+aside.collapsed .suser{justify-content:center;padding:8px 0}
+aside.collapsed .suser>div:not(.av){display:none}
+main{flex:1;overflow-y:auto;padding:24px 28px 64px;min-width:0}
+.eyebrow{font-family:var(--fd);font-weight:600;font-size:10px;letter-spacing:.22em;text-transform:uppercase;color:var(--gold-d)}
+h1.pt{font-family:var(--fd);font-weight:600;font-size:26px;letter-spacing:-.01em;color:var(--forest);line-height:1.1;margin:3px 0 0}
+.phead{display:flex;align-items:flex-end;justify-content:space-between;gap:16px;margin-bottom:18px;flex-wrap:wrap}
+.phead .actions{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px;margin-bottom:20px}
+@media(min-width:1150px){.kpis.six{grid-template-columns:repeat(6,1fr)}}
+.kpi{background:var(--surface);border:1px solid var(--rule);border-radius:2px;padding:18px 20px}
+.kpi .l{font-family:var(--fd);font-weight:600;font-size:10px;letter-spacing:.2em;text-transform:uppercase;color:var(--muted);margin-bottom:6px}
+.kpi .v{font-family:var(--fd);font-weight:700;font-size:30px;line-height:1;color:var(--forest)}
+.kpi .s{font-size:12px;color:var(--muted);margin-top:5px}
+.card{background:var(--surface);border:1px solid var(--rule);border-radius:2px;margin-bottom:16px}
+.card .h{padding:11px 16px;border-bottom:1px solid var(--rule);display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.card .h .t{font-family:var(--fd);font-weight:600;font-size:11px;letter-spacing:.2em;text-transform:uppercase;color:var(--gold-d)}
+table{width:100%;border-collapse:collapse;font-size:13.5px}
+th{background:#f5f5f2;font-family:var(--fd);font-weight:600;font-size:10.5px;letter-spacing:.12em;text-transform:uppercase;color:var(--muted);text-align:left;padding:9px 14px;border-bottom:1px solid var(--rule);white-space:nowrap}
+th.sortable{cursor:pointer;user-select:none}
+th.sortable:hover{color:var(--forest)}
+td{padding:10px 14px;border-bottom:1px solid rgba(10,79,50,.08);vertical-align:middle}
+tr:hover td{background:rgba(10,79,50,.025)}
+th.num,td.num{text-align:right;font-family:var(--fd);font-weight:600}
+.tbl-wrap{overflow-x:auto}
+.badge{font-family:var(--fd);font-weight:600;font-size:10px;letter-spacing:.08em;text-transform:uppercase;padding:2px 8px;border-radius:2px;white-space:nowrap}
+.b-forest{background:rgba(10,79,50,.1);color:var(--forest)}
+.b-gold{background:rgba(189,140,61,.14);color:var(--gold-d)}
+.b-accent{background:rgba(60,204,8,.13);color:var(--accent-t)}
+.b-muted{background:rgba(74,87,82,.1);color:var(--muted)}
+.b-danger{background:rgba(192,57,43,.12);color:var(--danger)}
+.b-warning{background:rgba(230,126,34,.14);color:var(--warning)}
+.b-info{background:rgba(41,128,185,.12);color:var(--info)}
+.b-purple{background:rgba(142,68,173,.12);color:var(--purple)}
+.tag-chip{display:inline-flex;align-items:center;font-family:var(--fd);font-weight:600;font-size:11px;letter-spacing:.05em;text-transform:uppercase;background:rgba(10,79,50,.07);color:var(--forest);padding:2px 7px;border-radius:2px;white-space:nowrap}
+/* buttons */
+.btn{display:inline-flex;align-items:center;gap:6px;font-family:var(--fd);font-weight:600;font-size:12px;letter-spacing:.08em;text-transform:uppercase;padding:8px 16px;border-radius:2px;cursor:pointer;border:none;line-height:1;white-space:nowrap;transition:background .15s,color .15s,transform .1s}
+.btn-primary{background:var(--forest);color:#FAFAF7}
+.btn-primary:hover{background:var(--forest-deep);transform:translateY(-1px)}
+.btn-ghost{background:transparent;color:var(--forest);border:1px solid var(--forest)}
+.btn-ghost:hover{background:var(--forest);color:#FAFAF7}
+.btn-sm{padding:5px 10px;font-size:11px}
+.btn-icon{background:transparent;border:1px solid var(--rule);border-radius:2px;color:var(--muted);cursor:pointer;padding:5px 7px;font-size:12px;display:inline-flex;align-items:center;justify-content:center;line-height:1;transition:background .15s,color .15s}
+.btn-icon:hover{background:var(--forest);color:#fff;border-color:var(--forest)}
+.mvb{font-family:var(--fd);font-weight:600;font-size:10px;letter-spacing:.05em;text-transform:uppercase;border:1px solid var(--rule);background:var(--bg);color:var(--muted);padding:2px 8px;border-radius:2px;cursor:pointer}
+.mvb:hover{border-color:var(--forest);color:var(--forest)}
+/* chips (filters) */
+.chips{display:flex;gap:6px;flex-wrap:wrap;align-items:center}
+.chips .cl{font-family:var(--fd);font-weight:600;font-size:9.5px;letter-spacing:.16em;text-transform:uppercase;color:var(--t3);margin-right:2px}
+.chip{font-family:var(--fd);font-weight:600;font-size:11px;letter-spacing:.06em;text-transform:uppercase;padding:4px 11px;border-radius:2px;border:1px solid var(--rule);background:var(--surface);color:var(--muted);cursor:pointer}
+.chip.on{background:var(--forest);border-color:var(--forest);color:#fff}
+/* kanban */
+.kb{display:flex;gap:12px;overflow-x:auto;padding-bottom:8px;align-items:flex-start}
+.kcol{background:#f5f5f2;border:1px solid var(--rule);border-radius:2px;min-width:215px;width:215px;flex-shrink:0}
+.kcol.over{border-color:var(--forest);box-shadow:0 0 0 1px var(--forest) inset}
+.kcol .kh{padding:10px 12px;border-bottom:1px solid var(--rule);display:flex;align-items:center;justify-content:space-between;gap:6px}
+.kcol .kh .sum{font-family:var(--fd);font-weight:600;font-size:11px;color:var(--muted);white-space:nowrap}
+.kcards{padding:9px;display:flex;flex-direction:column;gap:8px;min-height:70px}
+.kcard{background:var(--surface);border:1px solid var(--rule);border-radius:2px;padding:10px 11px;transition:border-color .12s,box-shadow .12s;cursor:pointer}
+.kcard:hover{border-color:var(--forest);box-shadow:0 2px 8px rgba(10,79,50,.1)}
+.kcard .n{font-weight:600;font-size:13px}
+.kcard .p{font-size:11.5px;color:var(--muted);margin:2px 0 6px}
+.kcard .v{font-family:var(--fd);font-weight:700;font-size:15px;color:var(--forest)}
+.kcard .mv{display:flex;gap:6px;margin-top:8px;border-top:1px solid rgba(10,79,50,.08);padding-top:8px;flex-wrap:wrap}
+.kcard[draggable=true]{cursor:grab}
+input.search,select.inp,input.inp,textarea.inp{border:1px solid var(--rule);border-radius:2px;padding:7px 12px;font-family:var(--fb);font-size:13px;background:var(--surface);outline:none;color:var(--ink)}
+input.search{min-width:220px}
+input.search:focus,.inp:focus{border-color:var(--forest)}
+.avatar{width:24px;height:24px;border-radius:50%;background:rgba(189,140,61,.18);color:var(--gold-d);font-family:var(--fd);font-weight:700;font-size:11px;display:inline-flex;align-items:center;justify-content:center;margin-right:8px;vertical-align:middle}
+svg.chart text{font-family:var(--fd);font-size:10.5px;fill:var(--muted)}
+.note{font-size:11.5px;color:var(--t3);padding:9px 16px}
+.two{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+/* modal */
+#modal,#quick{display:none;position:fixed;inset:0;background:rgba(7,51,31,.5);backdrop-filter:blur(4px);z-index:120;justify-content:center}
+#modal{align-items:center;padding:24px}
+#quick{align-items:flex-start;padding:12vh 16px 0}
+.mbox{background:var(--surface);border:1px solid var(--rule);border-radius:4px;width:100%;max-width:640px;max-height:90vh;display:flex;flex-direction:column;box-shadow:0 14px 44px rgba(7,51,31,.25)}
+.mhead{padding:16px 22px 13px;border-bottom:1px solid var(--rule);display:flex;align-items:center;justify-content:space-between;gap:10px}
+.mhead .mt{font-family:var(--fd);font-weight:600;font-size:18px;letter-spacing:.02em;color:var(--forest);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.mbody{padding:18px 22px;overflow-y:auto}
+.mfoot{padding:13px 22px;border-top:1px solid var(--rule);display:flex;justify-content:flex-end;gap:10px}
+.fg{margin-bottom:12px;flex:1;min-width:0}
+.fg .label,.label{display:block;font-family:var(--fd);font-weight:600;font-size:10px;letter-spacing:.16em;text-transform:uppercase;color:var(--muted);margin-bottom:4px}
+.fg .inp{width:100%}
+.frow{display:flex;gap:12px}
+.contact-box{background:#f9f9f7;border:1px solid rgba(10,79,50,.1);border-radius:2px;padding:12px 14px;margin-bottom:10px}
+/* notifications */
+.ncard{opacity:1}
+.ncard.resolved{opacity:.62}
+.diff{font-size:12.5px;color:var(--muted);display:flex;gap:6px;align-items:baseline;padding:2px 0}
+.diff .f{font-weight:600;min-width:110px;color:var(--ink)}
+.diff .old{text-decoration:line-through;opacity:.6}
+.diff .new{color:var(--forest);font-weight:600}
+/* calendar */
+.cal{display:grid;grid-template-columns:repeat(7,1fr)}
+.cal .wd{padding:8px 4px;text-align:center;font-family:var(--fd);font-weight:600;font-size:10.5px;letter-spacing:.12em;text-transform:uppercase;color:var(--muted);border-bottom:1px solid var(--rule)}
+.cal .day{padding:6px;min-height:82px;border-bottom:1px solid rgba(10,79,50,.06);border-right:1px solid rgba(10,79,50,.06);cursor:pointer;background:var(--surface)}
+.cal .day.pad{background:#fafaf9;cursor:default}
+.cal .day.today{background:rgba(10,79,50,.04)}
+.cal .dn{font-family:var(--fd);font-weight:500;font-size:13px;width:22px;height:22px;display:flex;align-items:center;justify-content:center;border-radius:50%;margin-bottom:3px}
+.cal .day.today .dn{background:var(--forest);color:#fff;font-weight:700}
+.ev{font-size:10.5px;font-family:var(--fd);font-weight:600;letter-spacing:.04em;padding:2px 5px;border-radius:2px;margin-bottom:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;cursor:pointer}
+/* notes */
+.ngrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:14px}
+.notecard{background:var(--surface);border:1px solid var(--rule);border-radius:2px;padding:15px 17px;position:relative;cursor:pointer}
+.notecard:hover{border-color:var(--forest)}
+.pin{position:absolute;top:10px;right:10px;color:var(--gold);font-size:13px}
+/* settings chips */
+.setchip{display:inline-flex;align-items:center;gap:6px;padding:4px 10px;background:rgba(10,79,50,.08);border-radius:2px;font-size:12px;font-family:var(--fd);font-weight:600;color:var(--forest);text-transform:uppercase;letter-spacing:.05em}
+.setchip button{background:none;border:none;cursor:pointer;color:inherit;font-size:11px;padding:0;line-height:1}
+/* chart tooltip */
+.chartwrap{position:relative}
+.ctip{position:absolute;pointer-events:none;background:#fff;border:1px solid var(--rule);border-radius:2px;padding:8px 11px;font-size:12px;line-height:1.6;box-shadow:0 4px 14px rgba(7,51,31,.14);display:none;z-index:5;white-space:nowrap}
+.ctip .tl{font-family:var(--fd);font-weight:600;font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);margin-bottom:2px}
+/* quick add */
+.qbox{background:var(--surface);border:1px solid var(--rule);border-radius:8px;width:100%;max-width:520px;box-shadow:0 16px 50px rgba(7,51,31,.3);overflow:hidden}
+.qhead{padding:11px 16px;border-bottom:1px solid var(--rule);display:flex;align-items:center;justify-content:space-between;font-family:var(--fd);font-weight:600;font-size:12px;letter-spacing:.12em;text-transform:uppercase;color:var(--forest)}
+.qbody{padding:14px 16px}
+.qprev{border:1px solid var(--rule);border-radius:2px;background:#f9f9f7;padding:12px 14px;margin-top:10px}
+.fab{position:fixed;right:22px;bottom:22px;width:50px;height:50px;border-radius:50%;border:none;cursor:pointer;background:var(--forest);color:var(--gold);font-size:24px;box-shadow:0 6px 20px rgba(7,51,31,.28);z-index:110;line-height:1}
+/* toast */
+#toast{position:fixed;left:50%;bottom:26px;transform:translateX(-50%) translateY(20px);background:var(--forest-deep);color:#fff;font-size:13px;padding:10px 18px;border-radius:2px;opacity:0;pointer-events:none;transition:.25s;z-index:200;max-width:80vw}
+#toast.on{opacity:1;transform:translateX(-50%) translateY(0)}
+/* role gating */
+body[data-can-edit="false"] .ce{display:none!important}
+.lockwrap{display:flex;align-items:center;justify-content:center;padding:90px 20px}
+.lockwrap h3{font-family:var(--fd);font-weight:600;font-size:18px;color:var(--forest);margin:10px 0 6px}
+@media(max-width:900px){aside{display:none}.two{grid-template-columns:1fr}}
+</style>
+</head>
+<body data-can-edit="true">
+<div class="demo-strip">
+  <span>◈ Interactive demo — all data is fictional sample data</span>
+  <a href="../">← Portfolio</a>
+</div>
+<div class="shell">
+<aside id="side"></aside>
+<main id="main"></main>
+</div>
+<div id="modal" onclick="if(event.target===this)closeModal()"><div class="mbox" id="mboxc"></div></div>
+<div id="quick" onclick="if(event.target===this)closeQuick()"><div class="qbox" id="qboxc"></div></div>
+<button class="fab ce" title="Quick add (⌘K)" onclick="openQuick()">+</button>
+<div id="toast"></div>
+<script>
+/* ============================ helpers ============================ */
+const $=s=>document.querySelector(s), $$=s=>[...document.querySelectorAll(s)];
+const fmt$=n=>(n<0?"-$":"$")+Math.abs(Math.round(n)).toLocaleString();
+const uid=()=>"id"+Math.random().toString(36).slice(2,9);
+const todayISO=()=>{const d=new Date();return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0")};
+const dISO=off=>{const d=new Date();d.setDate(d.getDate()+off);return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0")};
+const mISO=(ago,day)=>{const d=new Date();d.setDate(1);d.setMonth(d.getMonth()-ago);const dim=new Date(d.getFullYear(),d.getMonth()+1,0).getDate();d.setDate(Math.min(day||12,dim));return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0")};
+const fmtDate=iso=>iso?new Date(iso+"T00:00").toLocaleDateString("en-US",{month:"short",day:"numeric",year:"numeric"}):"—";
+const esc=s=>String(s??"").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/"/g,"&quot;");
+let toastT;function toast(m){const t=$("#toast");t.textContent=m;t.classList.add("on");clearTimeout(toastT);toastT=setTimeout(()=>t.classList.remove("on"),2800);}
+
+/* ============================ constants ============================ */
+const STAGES=[
+  ["prospect","Prospect","b-muted","#4A5752"],
+  ["qualified","Qualified","b-forest","#2980B9"],
+  ["proposal","Proposal","b-info","#887B05"],
+  ["negotiation","Negotiation","b-gold","#E67E22"],
+  ["closed-won","Closed Won","b-accent","#0A4F32"],
+  ["closed-lost","Closed Lost","b-danger","#C0392B"]];
+const stageOf=id=>STAGES.find(s=>s[0]===id);
+const typeBadge=t=>({demand:"b-forest",supply:"b-info",product:"b-purple",partner:"b-gold",agency:"b-warning",network:"b-accent"})[t]||"b-muted";
+const statusBadge=s=>({active:"b-accent",inactive:"b-muted",prospect:"b-info",paused:"b-warning",churned:"b-danger",draft:"b-muted",sent:"b-info",signed:"b-gold",paid:"b-accent",overdue:"b-danger",cancelled:"b-danger","closed-won":"b-accent","closed-lost":"b-danger",todo:"b-muted","in-progress":"b-info",done:"b-accent",pending:"b-info",approved:"b-accent",disregarded:"b-muted"})[s]||"b-muted";
+const PRI_COLOR={urgent:"#C0392B",high:"#E67E22",medium:"#2980B9",low:"#4A5752"};
+const PRI_ORDER={urgent:0,high:1,medium:2,low:3};
+const NOTE_COLOR={idea:"#887B05",opportunity:"#0A4F32",research:"#2980B9",meeting:"#8E44AD",general:"#4A5752"};
+const EV_COLOR={meeting:"#0A4F32",deadline:"#C0392B",call:"#2980B9","follow-up":"#BD8C3D",other:"#4A5752"};
+const XSTAT={PAID:"#0A4F32",AUTHORISED:"#2980B9",DRAFT:"#4A5752",VOIDED:"#8E44AD"};
+
+/* ============================ state ============================ */
+let settings={
+  companyName:"Vane Labs",
+  docTypes:["invoice","IO"],
+  partnerTypes:["demand","supply","partner","product","agency","custom"],
+  partnerCategories:["prog","app","lead-gen","consulting","saas"],
+  opportunityTypes:["direct","reseller","upsell","renewal"],
+  revenueCategories:["programmatic","app-monetization","lead-gen","consulting","payroll","hosting","media","other"],
+  tags:["priority","emea","apac","ctv","finance","xero","email-import"],
+  currencies:["USD","EUR","AUD"]};
+
+let partners=[
+  {id:"p1",name:"Northlight DSP",type:"demand",cat:"prog",status:"active",terms:30,website:"northlight.io",tags:["priority","emea"],access:{crm:true,traquery:true},notes:"Largest demand partner. Quarterly QBR cadence; Dana owns commercials.",
+   contacts:[{id:"c1",name:"Dana Ellis",title:"VP Partnerships",email:"dana.ellis@northlight.io",phone:"+44 20 7946 0110",isPrimary:true},{id:"c2",name:"Omar Said",title:"AdOps Lead",email:"omar@northlight.io",phone:"",isPrimary:false}]},
+  {id:"p2",name:"Skyfield Media",type:"supply",cat:"app",status:"active",terms:45,website:"skyfield.tv",tags:["ctv"],access:{crm:false,traquery:true},notes:"CTV-heavy supply. TraQuery reporting access granted.",
+   contacts:[{id:"c3",name:"Tom Reyes",title:"Head of Demand",email:"tom.reyes@skyfield.tv",phone:"+1 310 555 0182",isPrimary:true}]},
+  {id:"p3",name:"Brightpath Leads",type:"partner",cat:"lead-gen",status:"active",terms:30,website:"brightpathleads.com",tags:[],access:{},notes:"",
+   contacts:[{id:"c4",name:"Ana Costa",title:"Managing Director",email:"ana@brightpathleads.com",phone:"",isPrimary:true}]},
+  {id:"p4",name:"Quantus Exchange",type:"demand",cat:"prog",status:"prospect",terms:60,website:"quantus.exchange",tags:["apac"],access:{},notes:"APAC pilot in flight — legal review started.",
+   contacts:[{id:"c5",name:"Liam Ford",title:"BD Director APAC",email:"liam.ford@quantus.exchange",phone:"",isPrimary:true}]},
+  {id:"p5",name:"Veridian Apps",type:"supply",cat:"app",status:"prospect",terms:30,website:"veridianapps.io",tags:[],access:{},notes:"",
+   contacts:[{id:"c6",name:"Mia Chen",title:"Monetization Manager",email:"mia@veridianapps.io",phone:"",isPrimary:true}]},
+  {id:"p6",name:"Helio Consulting",type:"custom",cat:"consulting",status:"paused",terms:14,website:"",tags:[],access:{},notes:"Retainer paused pending overdue invoice.",
+   contacts:[{id:"c7",name:"Sam Porter",title:"Principal",email:"sam@helioconsult.co",phone:"",isPrimary:true}]},
+];
+const P=id=>partners.find(p=>p.id===id);
+
+let opps=[
+  {id:"o1",name:"Northlight Q4 Expansion",pid:"p1",stage:"negotiation",value:120000,prob:60,close:dISO(40),type:"upsell",tags:["priority"],notes:"Pushing for $120k commit; legal has the redlines."},
+  {id:"o2",name:"Skyfield CTV bundle",pid:"p2",stage:"proposal",value:64000,prob:40,close:dISO(25),type:"direct",tags:["ctv"],notes:""},
+  {id:"o3",name:"Quantus APAC pilot",pid:"p4",stage:"qualified",value:38000,prob:25,close:dISO(60),type:"direct",tags:["apac"],notes:""},
+  {id:"o4",name:"Veridian rewarded video",pid:"p5",stage:"prospect",value:25000,prob:10,close:dISO(90),type:"direct",tags:[],notes:""},
+  {id:"o5",name:"Brightpath renewal",pid:"p3",stage:"closed-won",value:48000,prob:100,close:dISO(-12),type:"renewal",tags:[],notes:"Signed for 12 months."},
+  {id:"o6",name:"Helio retainer upsell",pid:"p6",stage:"proposal",value:21000,prob:40,close:dISO(30),type:"upsell",tags:[],notes:""},
+  {id:"o7",name:"Skyfield display test",pid:"p2",stage:"closed-lost",value:15000,prob:0,close:dISO(-20),type:"direct",tags:[],notes:"Lost to incumbent SSP on rev-share."},
+];
+const O=id=>opps.find(o=>o.id===id);
+
+let revenueEntries=[];let _rid=0;
+function seedRE(){
+  const push=(ago,type,amount,cat,desc,pid,tags)=>revenueEntries.push({id:"r"+(++_rid),date:mISO(ago,12),type,amount,currency:"USD",category:cat,description:desc,pid:pid||null,tags:tags||[]});
+  const NL=[22000,26000,30000,34000,31000,41500],SF=[14000,15500,17000,18200,15500,16000],BP=[6000,6500,7000,7300,7000,8000],MED=[12000,13500,15000,16500,14000,16000];
+  for(let i=0;i<6;i++){const m=5-i;
+    push(m,"revenue",NL[i],"programmatic","Northlight DSP — programmatic","p1");
+    push(m,"revenue",SF[i],"app-monetization","Skyfield Media — app monetization","p2",i>=4?["ctv"]:[]);
+    push(m,"revenue",BP[i],"lead-gen","Brightpath Leads — lead-gen share","p3");
+    if(m<=1) push(m,"revenue",m===1?10750:12000,"programmatic","Quantus Exchange — pilot spend","p4",["apac"]);
+    push(m,"revenue",3000,"consulting","Helio Consulting — retainer","p6");
+    push(m,"cost",18000,"payroll","Team payroll");
+    push(m,"cost",3300,"hosting","AWS + infra");
+    push(m,"cost",MED[i],"media","Media buying");
+  }
+}
+seedRE();
+const revenueOf=pid=>revenueEntries.filter(e=>e.pid===pid&&e.type==="revenue").reduce((a,e)=>a+e.amount,0);
+const costOf=pid=>revenueEntries.filter(e=>e.pid===pid&&e.type==="cost").reduce((a,e)=>a+e.amount,0);
+
+let docs=[
+  {id:"d1",num:"INV-40218",type:"invoice",pid:"p1",amount:24500,issue:mISO(1,1),due:mISO(0,1),terms:30,status:"sent",tags:[]},
+  {id:"d2",num:"IO-1092",type:"IO",pid:"p2",amount:64000,issue:mISO(1,18),due:"",terms:45,status:"signed",tags:["ctv"]},
+  {id:"d3",num:"INV-40217",type:"invoice",pid:"p3",amount:12000,issue:mISO(2,24),due:mISO(1,24),terms:30,status:"paid",tags:[]},
+  {id:"d4",num:"INV-40209",type:"invoice",pid:"p6",amount:9000,issue:mISO(2,2),due:mISO(2,16),terms:14,status:"overdue",tags:["finance"]},
+  {id:"d5",num:"IO-1087",type:"IO",pid:"p1",amount:120000,issue:mISO(3,30),due:"",terms:30,status:"draft",tags:[]},
+];
+
+let tasks=[
+  {id:"t1",title:"Send revised IO to Northlight",status:"in-progress",pri:"high",due:dISO(-2),pid:"p1",oid:"o1",desc:"Reflect the $132k commit from the email thread.",tags:["priority"]},
+  {id:"t2",title:"Prepare Skyfield CTV media plan",status:"in-progress",pri:"urgent",due:dISO(-1),pid:"p2",oid:"o2",desc:"",tags:["ctv"]},
+  {id:"t3",title:"Follow up Quantus APAC pilot scope",status:"todo",pri:"medium",due:dISO(3),pid:"p4",oid:"o3",desc:"Confirm legal review timeline with Liam.",tags:["apac"]},
+  {id:"t4",title:"Chase INV-40209 — Helio overdue",status:"todo",pri:"high",due:dISO(1),pid:"p6",oid:null,desc:"",tags:["finance"]},
+  {id:"t5",title:"Book Q3 review with Brightpath",status:"todo",pri:"low",due:dISO(10),pid:"p3",oid:null,desc:"",tags:[]},
+  {id:"t6",title:"Update rate card for supply partners",status:"todo",pri:"medium",due:dISO(7),pid:null,oid:null,desc:"",tags:[]},
+  {id:"t7",title:"Verify Veridian SDK integration docs",status:"todo",pri:"medium",due:dISO(14),pid:"p5",oid:"o4",desc:"",tags:[]},
+  {id:"t8",title:"June invoicing run",status:"done",pri:"medium",due:dISO(-16),pid:null,oid:null,desc:"",tags:["finance"]},
+  {id:"t9",title:"Renew Brightpath contract",status:"done",pri:"high",due:dISO(-12),pid:"p3",oid:"o5",desc:"",tags:[]},
+];
+
+let events=[
+  {id:"e1",title:"Skyfield CTV call",type:"call",date:dISO(2),time:"10:00",pid:"p2"},
+  {id:"e2",title:"INV-40218 due",type:"deadline",date:dISO(5),time:"",pid:"p1"},
+  {id:"e3",title:"Quantus pilot review",type:"meeting",date:dISO(8),time:"14:30",pid:"p4"},
+  {id:"e4",title:"Helio check-in",type:"follow-up",date:dISO(-3),time:"09:00",pid:"p6"},
+  {id:"e5",title:"Northlight QBR",type:"meeting",date:dISO(12),time:"11:00",pid:"p1"},
+];
+
+let notes=[
+  {id:"nt1",title:"TraQuery bundle for supply partners",content:"Offer TraQuery reporting seats as part of supply deals above $10k/mo — Skyfield loved the dashboard; could be a differentiator vs other exchanges.",type:"idea",pinned:true,tags:["ctv"],updated:dISO(-1)},
+  {id:"nt2",title:"Nexgen intro via Dana",content:"Dana offered a warm intro to Nexgen's programmatic team. Potential demand partner for EMEA display. Follow up after Q4 IO signs.",type:"opportunity",pinned:true,tags:["emea"],updated:dISO(-2)},
+  {id:"nt3",title:"CTV measurement vendors",content:"Shortlist: iSpot, Samba, TVSquared. Skyfield uses iSpot — worth aligning before the bundle launches.",type:"research",pinned:false,tags:["ctv"],updated:dISO(-4)},
+  {id:"nt4",title:"Northlight QBR notes",content:"Q3 spend up 34% QoQ. Dana wants weekly pacing reports; Omar to get TraQuery access. Q4 expansion pending legal.",type:"meeting",pinned:false,tags:["priority"],updated:dISO(-6)},
+  {id:"nt5",title:"Renewal playbook",content:"Start renewal conversations 60 days out. Attach usage summary + YoY value delivered. Escalate to principal if no reply in 2 weeks.",type:"general",pinned:false,tags:[],updated:dISO(-9)},
+];
+
+let notifs=[
+  {id:"n1",status:"pending",subject:"Re: Q4 Expansion — signed IO attached",from:"dana.ellis@northlight.io",date:dISO(-1),pid:"p1",oid:"o1",
+   summary:"Dana confirms the Q4 expansion is signed at a higher commit than proposed — $132k vs the $120k on file. Countersigned IO attached; campaigns go live at the start of next month.",
+   patch:{stage:"closed-won",value:132000,close:dISO(7)},contacts:[],io:{amount:132000,netTerms:30,number:"IO-1101"},
+   raw:"From: Dana Ellis <dana.ellis@northlight.io>\nSubject: Re: Q4 Expansion — signed IO attached\n\nHi — good news. Finance approved the higher commit, so we've signed at $132,000 for the quarter (IO-1101 attached, net 30). Kickoff call next week?\n\nDana"},
+  {id:"n2",status:"pending",subject:"Re: CTV bundle — budget update",from:"tom.reyes@skyfield.tv",date:dISO(-2),pid:"p2",oid:"o2",
+   summary:"Tom's team trimmed the CTV bundle budget to $58k and pushed the decision to the end of the month. Priya Nair (Programmatic Lead) is joining the thread and will own evaluation.",
+   patch:{value:58000,close:dISO(21)},contacts:[{name:"Priya Nair",title:"Programmatic Lead",email:"priya@skyfield.tv"}],io:null,
+   raw:"From: Tom Reyes <tom.reyes@skyfield.tv>\nSubject: Re: CTV bundle — budget update\n\nHeads up — Q budget got trimmed, we can do $58k for the bundle. Decision moves to end of month. Adding Priya Nair (Programmatic Lead) who'll run the evaluation.\n\nTom"},
+  {id:"n3",status:"pending",subject:"APAC pilot — legal review started",from:"liam.ford@quantus.exchange",date:dISO(-3),pid:"p4",oid:"o3",
+   summary:"Quantus legal has started reviewing the pilot agreement — Liam suggests moving the deal to negotiation and targets a close in about six weeks.",
+   patch:{stage:"negotiation",close:dISO(45)},contacts:[],io:null,
+   raw:"From: Liam Ford <liam.ford@quantus.exchange>\nSubject: APAC pilot — legal review started\n\nOur legal team picked up the pilot agreement today. Assuming no surprises we should be able to sign in ~6 weeks.\n\nLiam"},
+];
+
+let wise={balances:[{cur:"USD",amount:84210.55,reserved:0},{cur:"EUR",amount:12940.00,reserved:1200},{cur:"AUD",amount:26485.30,reserved:0}],
+  transfers:[
+    {date:dISO(-2),fromV:18000,fromC:"USD",toV:27260,toC:"AUD",ref:"Payroll AUG",status:"outgoing_payment_sent"},
+    {date:dISO(-6),fromV:8400,fromC:"USD",toV:7690,toC:"EUR",ref:"Skyfield rev-share",status:"funds_converted"},
+    {date:dISO(-9),fromV:3300,fromC:"USD",toV:3300,toC:"USD",ref:"AWS invoice",status:"outgoing_payment_sent"},
+    {date:dISO(-13),fromV:12000,fromC:"USD",toV:12000,toC:"USD",ref:"INV-40217 received",status:"incoming_payment_waiting"},
+    {date:dISO(-20),fromV:2100,fromC:"USD",toV:3160,toC:"AUD",ref:"LinkedIn Ads",status:"cancelled"},
+  ]};
+
+let xero={
+  invoices:[
+    {id:"x1",num:"INV-40218",kind:"invoice",contact:"Northlight DSP",date:mISO(1,1),due:mISO(0,1),status:"AUTHORISED",total:24500,dueAmt:24500},
+    {id:"x2",num:"INV-40219",kind:"invoice",contact:"Skyfield Media",date:dISO(-14),due:dISO(16),status:"AUTHORISED",total:8400,dueAmt:8400},
+    {id:"x3",num:"INV-40217",kind:"invoice",contact:"Brightpath Leads",date:mISO(2,24),due:mISO(1,24),status:"PAID",total:12000,dueAmt:0},
+    {id:"x4",num:"INV-40209",kind:"invoice",contact:"Helio Consulting",date:mISO(2,2),due:mISO(2,16),status:"AUTHORISED",total:9000,dueAmt:9000},
+    {id:"x5",num:"BILL-2214",kind:"bill",contact:"Amazon Web Services",date:dISO(-11),due:dISO(-4),status:"PAID",total:3300,dueAmt:0},
+    {id:"x6",num:"BILL-2215",kind:"bill",contact:"LinkedIn Ads",date:dISO(-8),due:dISO(22),status:"AUTHORISED",total:2100,dueAmt:2100},
+  ],
+  contacts:[
+    {name:"Northlight DSP",email:"billing@northlight.io",cust:true,supp:false,status:"ACTIVE"},
+    {name:"Skyfield Media",email:"ap@skyfield.tv",cust:true,supp:false,status:"ACTIVE"},
+    {name:"Brightpath Leads",email:"accounts@brightpathleads.com",cust:true,supp:false,status:"ACTIVE"},
+    {name:"Helio Consulting",email:"sam@helioconsult.co",cust:true,supp:true,status:"ACTIVE"},
+    {name:"Amazon Web Services",email:"",cust:false,supp:true,status:"ACTIVE"},
+    {name:"LinkedIn Ads",email:"",cust:false,supp:true,status:"ACTIVE"},
+  ],
+  imported:{}};
+
+let users=[
+  {email:"shahar@vane-labs.com",role:"admin",source:"env",added:null,lastSeen:"today"},
+  {email:"maya@vane-labs.com",role:"editor",source:"managed",added:mISO(4,3),lastSeen:"yesterday"},
+  {email:"alex.reader@vane-labs.com",role:"viewer",source:"managed",added:mISO(2,20),lastSeen:"6 days ago"},
+];
+
+/* ============================ app state ============================ */
+let page="dash", q="", role="admin";
+let pipeView="board", pipeSort={key:"value",dir:"desc"};
+let pFilter={type:"",cat:"",status:""};
+let revFilter="", revTab="monthly";
+let xeroTab="reconcile";
+let showResolved=false;
+let calY=new Date().getFullYear(), calM=new Date().getMonth();
+const canEdit=()=>role!=="viewer";
+function setRole(r){role=r;document.body.dataset.canEdit=canEdit();render();toast(r==="viewer"?"Viewer role — read-only: create/edit controls hidden, admin pages locked":"Admin role — full access");}
+
+const weighted=()=>opps.filter(o=>!o.stage.startsWith("closed")).reduce((a,o)=>a+o.value*o.prob/100,0);
+const won=()=>opps.filter(o=>o.stage==="closed-won").reduce((a,o)=>a+o.value,0);
+const openOpps=()=>opps.filter(o=>!o.stage.startsWith("closed"));
+const openTasks=()=>tasks.filter(t=>t.status!=="done");
+const overdueTasks=()=>tasks.filter(t=>t.status!=="done"&&t.due&&t.due<todayISO());
+const pendingN=()=>notifs.filter(n=>n.status==="pending");
+function monthlyData(){const m={};revenueEntries.forEach(e=>{const k=e.date.slice(0,7);if(!m[k])m[k]={month:k,revenue:0,cost:0};m[k][e.type==="revenue"?"revenue":"cost"]+=e.amount;});return Object.values(m).sort((a,b)=>a.month.localeCompare(b.month)).map(r=>({...r,profit:r.revenue-r.cost,label:new Date(r.month+"-01T00:00").toLocaleDateString("en-US",{month:"short"}),full:new Date(r.month+"-01T00:00").toLocaleDateString("en-US",{month:"short",year:"numeric"})}));}
+function chartTip(evt,label,rev,cost){
+  const w=evt.target.closest(".chartwrap");const t=w.querySelector(".ctip");
+  t.innerHTML=`<div class="tl">${label}</div><div style="color:var(--forest)">Revenue&ensp;<b style="font-family:var(--fd)">${fmt$(rev)}</b></div><div style="color:var(--danger)">Cost&ensp;<b style="font-family:var(--fd)">${fmt$(cost)}</b></div>`;
+  t.style.display="block";
+  const r=w.getBoundingClientRect();
+  let lx=evt.clientX-r.left+14;
+  if(lx+t.offsetWidth>r.width-8)lx=evt.clientX-r.left-t.offsetWidth-14;
+  t.style.left=lx+"px";t.style.top=Math.max(evt.clientY-r.top-14,4)+"px";
+}
+function hideTip(){document.querySelectorAll(".ctip").forEach(t=>t.style.display="none");}
+function byCategory(type){const c={};revenueEntries.filter(e=>e.type===type).forEach(e=>{c[e.category]=(c[e.category]||0)+e.amount;});return Object.entries(c).map(([name,value])=>({name,value})).sort((a,b)=>b.value-a.value);}
+/* ============================ chrome: nav / render ============================ */
+/* Outline (lucide-style) icon set — stroke inherits currentColor */
+const ICON_PATHS={
+  dashboard:'<rect x="3" y="3" width="7" height="9" rx="1"/><rect x="14" y="3" width="7" height="5" rx="1"/><rect x="14" y="12" width="7" height="9" rx="1"/><rect x="3" y="16" width="7" height="5" rx="1"/>',
+  building:'<path d="M6 22V4a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v18Z"/><path d="M6 12H4a2 2 0 0 0-2 2v8h4"/><path d="M18 9h2a2 2 0 0 1 2 2v11h-4"/><path d="M10 6h4"/><path d="M10 10h4"/><path d="M10 14h4"/><path d="M10 18h4"/>',
+  trending:'<polyline points="22 7 13.5 15.5 8.5 10.5 2 17"/><polyline points="16 7 22 7 22 13"/>',
+  file:'<path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/>',
+  bell:'<path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/>',
+  check:'<polyline points="9 11 12 14 22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/>',
+  calendar:'<rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/>',
+  note:'<path d="M15.5 3H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V8.5L15.5 3Z"/><path d="M15 3v6h6"/>',
+  dollar:'<line x1="12" y1="2" x2="12" y2="22"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/>',
+  landmark:'<line x1="3" y1="22" x2="21" y2="22"/><line x1="6" y1="18" x2="6" y2="11"/><line x1="10" y1="18" x2="10" y2="11"/><line x1="14" y1="18" x2="14" y2="11"/><line x1="18" y1="18" x2="18" y2="11"/><polygon points="12 2 20 7 4 7"/>',
+  wallet:'<path d="M21 12V7H5a2 2 0 0 1 0-4h14v4"/><path d="M3 5v14a2 2 0 0 0 2 2h16v-5"/><path d="M18 12a2 2 0 0 0 0 4h4v-4Z"/>',
+  users:'<path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/>',
+  settings:'<circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09a1.65 1.65 0 0 0-1-1.51 1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09a1.65 1.65 0 0 0 1.51-1 1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33h0a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51h0a1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82v0a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1Z"/>',
+  logout:'<path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/>',
+  chevL:'<polyline points="15 18 9 12 15 6"/>',
+  chevR:'<polyline points="9 18 15 12 9 6"/>'};
+const icon=(n,s=15)=>`<svg width="${s}" height="${s}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${ICON_PATHS[n]}</svg>`;
+/* Real Layout.tsx grouping: Dashboard standalone; Documents lives under Business */
+const NAVG=[
+  ["Business",[["partners","Partners","building"],["pipe","Pipeline","trending"],["docs","Documents","file"]]],
+  ["Work",[["notifications","Notifications","bell"],["tasks","Tasks","check"],["calendar","Calendar","calendar"],["notes","Notes","note"]]],
+  ["Finance",[["revenue","Revenue","dollar"],["xero","Xero","landmark"],["wise","Wise","wallet"]]],
+  ["Admin",[["users","Users","users"],["settings","Settings","settings"]]]];
+const ADMIN_PAGES=["xero","wise","users","settings"];
+let sideCollapsed=false;
+function pill(p){
+  if(p==="pipe"&&openOpps().length)return `<span class="npill soft">${openOpps().length}</span>`;
+  return "";}
+const navBtn=(p,label,ic)=>`<button class="nitem${page===p?" on":""}" ${sideCollapsed?`title="${label}"`:""} onclick="nav('${p}')">${icon(ic)}<span class="lbl">${label}</span>${pill(p)}</button>`;
+function renderSide(){
+  $("#side").className=sideCollapsed?"collapsed":"";
+  $("#side").innerHTML=`
+  <div class="logo-row">
+    <div class="logo-tile"><svg width="14" height="14" viewBox="0 0 24 24" fill="#BD8C3D" stroke="#BD8C3D" stroke-width="1.5"><path d="M13 2 3 14h9l-1 8 10-12h-9l1-8z"/></svg></div>
+    ${sideCollapsed?"":'<div class="lk"><div class="wm">VANE LABS</div><div class="sub">CRM</div></div>'}
+  </div>
+  <nav class="snav">
+    ${navBtn("dash","Dashboard","dashboard")}
+    ${NAVG.map(([g,items])=>`<div class="ngroup">${g}</div>`+items.map(([p,label,ic])=>navBtn(p,label,ic)).join("")).join("")}
+  </nav>
+  <div class="sfoot">
+    <div class="suser">
+      <div class="av">D</div>
+      <div style="flex:1;min-width:0">
+        <div class="nm">demo user</div>
+        <div class="rl"><span>Role</span><select class="rolesel" id="roleSel" onchange="setRole(this.value)"><option value="admin"${role==="admin"?" selected":""}>admin</option><option value="viewer"${role==="viewer"?" selected":""}>viewer</option></select></div>
+      </div>
+    </div>
+    <button class="nitem" ${sideCollapsed?'title="Sign Out"':""} onclick="toast('Demo: production signs out of the Google session here.')">${icon("logout",14)}<span class="lbl">Sign Out</span></button>
+    <button class="nitem" ${sideCollapsed?'title="Expand"':""} onclick="sideCollapsed=!sideCollapsed;renderSide()">${icon(sideCollapsed?"chevR":"chevL",13)}<span class="lbl">Collapse</span></button>
+  </div>`;
+}
+function nav(p){page=p;render();}
+function lock(msg){return `<div class="lockwrap"><div style="text-align:center;color:var(--muted)">
+  <svg width="38" height="38" viewBox="0 0 24 24" fill="none" stroke="#0A4F32" stroke-width="1.6" style="opacity:.35"><path d="M12 2 4 5v6c0 5 3.4 9.4 8 11 4.6-1.6 8-6 8-11V5l-8-3z"/></svg>
+  <h3>Admin Only</h3><p style="font-size:13px;margin:0">${msg}</p></div></div>`;}
+const pageHead=(eyebrow,title,actions="")=>`<div class="phead"><div><div class="eyebrow">${esc(eyebrow)}</div><h1 class="pt">${esc(title)}</h1></div><div class="actions">${actions}</div></div>`;
+
+/* ============================ modal core ============================ */
+let DR=null;
+function openModal(title,body,foot){$("#modal").style.display="flex";$("#mboxc").innerHTML=
+  `<div class="mhead"><span class="mt">${esc(title)}</span><button class="btn-icon" onclick="closeModal()">✕</button></div><div class="mbody">${body}</div>${foot?`<div class="mfoot">${foot}</div>`:""}`;}
+function closeModal(){$("#modal").style.display="none";DR=null;}
+const selOpts=(list,cur)=>list.map(v=>`<option value="${esc(v)}"${v===cur?" selected":""}>${esc(v)}</option>`).join("");
+const partnerOpts=cur=>`<option value="">None</option>`+partners.map(p=>`<option value="${p.id}"${p.id===cur?" selected":""}>${esc(p.name)}</option>`).join("");
+const oppOpts=cur=>`<option value="">None</option>`+opps.map(o=>`<option value="${o.id}"${o.id===cur?" selected":""}>${esc(o.name)}</option>`).join("");
+
+/* ============================ dashboard ============================ */
+function pageDash(){
+  const rev=revenueEntries.filter(e=>e.type==="revenue").reduce((a,e)=>a+e.amount,0);
+  const cost=revenueEntries.filter(e=>e.type==="cost").reduce((a,e)=>a+e.amount,0);
+  const md=monthlyData(), maxV=Math.max(...md.map(m=>m.revenue))*1.12;
+  const W=560,H=170,PD=40;
+  const x=i=>PD+(W-PD-10)*i/Math.max(md.length-1,1), y=v=>H-26-(H-46)*v/maxV;
+  const line=md.map((m,i)=>`${i?"L":"M"}${x(i).toFixed(1)},${y(m.revenue).toFixed(1)}`).join("");
+  const area=line+`L${x(md.length-1).toFixed(1)},${H-26}L${x(0).toFixed(1)},${H-26}Z`;
+  const cline=md.map((m,i)=>`${i?"L":"M"}${x(i).toFixed(1)},${y(m.cost).toFixed(1)}`).join("");
+  const gridV=[0,.25,.5,.75,1].map(f=>Math.round(maxV*f/1000));
+  const urgent=[...openTasks()].sort((a,b)=>PRI_ORDER[a.pri]-PRI_ORDER[b.pri]).slice(0,4);
+  const pinned=notes.filter(n=>n.pinned);
+  return pageHead("Vane Labs CRM","Dashboard",
+    `<button class="btn btn-ghost btn-sm" onclick="nav('revenue')">Revenue Detail</button><button class="btn btn-primary btn-sm" onclick="nav('pipe')">View Pipeline</button>`)+`
+  <div class="kpis six">
+    <div class="kpi"><div class="l">Total Revenue</div><div class="v">${fmt$(rev)}</div><div class="s">All time</div></div>
+    <div class="kpi"><div class="l">Total Cost</div><div class="v" style="color:var(--danger)">${fmt$(cost)}</div><div class="s">All time</div></div>
+    <div class="kpi"><div class="l">Net Profit</div><div class="v">${fmt$(rev-cost)}</div><div class="s">${(100*(rev-cost)/rev).toFixed(1)}% margin</div></div>
+    <div class="kpi"><div class="l">Weighted Pipeline</div><div class="v">${fmt$(weighted())}</div><div class="s">${openOpps().length} open opportunities</div></div>
+    <div class="kpi"><div class="l">Active Partners</div><div class="v">${partners.filter(p=>p.status==="active").length}</div><div class="s">${partners.length} total</div></div>
+    <div class="kpi"><div class="l">Open Tasks</div><div class="v" style="color:${overdueTasks().length?"var(--warning)":"var(--forest)"}">${openTasks().length}</div><div class="s" style="${overdueTasks().length?"color:var(--danger)":""}">${overdueTasks().length?overdueTasks().length+" overdue":"on track"}</div></div>
+  </div>
+  <div class="card"><div style="padding:18px 22px 0;display:flex;align-items:flex-start;justify-content:space-between;gap:12px">
+      <div><div class="eyebrow" style="letter-spacing:.2em">Revenue vs Cost</div>
+        <div style="font-family:var(--fd);font-weight:600;font-size:16px;color:var(--ink);margin-top:2px">Monthly P&amp;L Trend</div></div>
+      <button class="btn btn-ghost btn-sm" onclick="nav('revenue')">Full Report →</button></div>
+    <div class="chartwrap" style="padding:12px 14px;overflow-x:auto"><svg class="chart" viewBox="0 0 ${W} ${H}" style="width:100%;min-width:420px">
+      <defs><linearGradient id="g" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#0A4F32" stop-opacity=".15"/><stop offset="1" stop-color="#0A4F32" stop-opacity="0"/></linearGradient></defs>
+      ${[0,.25,.5,.75,1].map((f,i)=>`<line x1="${PD}" x2="${W-10}" y1="${y(maxV*f).toFixed(1)}" y2="${y(maxV*f).toFixed(1)}" stroke="rgba(10,79,50,.08)" stroke-dasharray="3 3"/><text x="${PD-6}" y="${(y(maxV*f)+4).toFixed(1)}" text-anchor="end">$${gridV[i]}k</text>`).join("")}
+      <path d="${area}" fill="url(#g)"/><path d="${line}" fill="none" stroke="#0A4F32" stroke-width="2.5"/>
+      <path d="${cline}" fill="none" stroke="#C0392B" stroke-width="2" stroke-dasharray="5 4"/>
+      ${md.map((m,i)=>`<text x="${x(i).toFixed(1)}" y="${H-8}" text-anchor="middle">${m.label}</text>`).join("")}
+      ${md.map((m,i)=>{const x0=i===0?PD:(x(i-1)+x(i))/2,x1=i===md.length-1?W-10:(x(i)+x(i+1))/2;
+        return `<rect x="${x0.toFixed(1)}" y="0" width="${(x1-x0).toFixed(1)}" height="${H-24}" fill="transparent" style="cursor:crosshair" onmousemove="chartTip(event,'${m.full}',${m.revenue},${m.cost})" onmouseleave="hideTip()"/>`;}).join("")}
+    </svg><div class="ctip"></div></div></div>
+  <div class="two">
+  <div class="card"><div class="h"><span class="t">Top Opportunities</span><button class="btn btn-ghost btn-sm" style="margin-left:auto" onclick="nav('pipe')">View all</button></div>
+    ${openOpps().sort((a,b)=>b.value-a.value).slice(0,4).map(o=>{const st=stageOf(o.stage);
+      return `<div style="display:flex;align-items:center;gap:10px;padding:10px 16px;border-bottom:1px solid rgba(10,79,50,.08);cursor:pointer" onclick="openOpp('${o.id}')">
+        <div style="flex:1"><div style="font-weight:600;font-size:13px">${esc(o.name)}</div><div style="font-size:11.5px;color:var(--muted)">${esc(P(o.pid)?.name||"—")} · ${o.prob}%</div></div>
+        <span class="badge ${st[2]}">${st[1]}</span>
+        <span style="font-family:var(--fd);font-weight:700;color:var(--forest)">${fmt$(o.value)}</span></div>`;}).join("")}
+  </div>
+  <div class="card"><div class="h"><span class="t">Priority Tasks</span><button class="btn btn-ghost btn-sm" style="margin-left:auto" onclick="nav('tasks')">View all</button></div>
+    ${urgent.map(t=>{const od=t.due&&t.due<todayISO();
+      return `<div style="display:flex;align-items:center;gap:10px;padding:10px 16px;border-bottom:1px solid rgba(10,79,50,.08);cursor:pointer" onclick="nav('tasks')">
+        <div style="flex:1"><div style="font-weight:600;font-size:13px">${esc(t.title)}</div>
+        ${t.due?`<div style="font-size:11.5px;color:${od?"var(--danger)":"var(--muted)"}">${od?"⚠ ":""}Due ${fmtDate(t.due)}${t.pid?` · ${esc(P(t.pid).name)}`:""}</div>`:""}</div>
+        <span style="font-family:var(--fd);font-weight:700;font-size:10.5px;letter-spacing:.1em;text-transform:uppercase;color:${PRI_COLOR[t.pri]}">${t.pri}</span></div>`;}).join("")||'<div class="note">All tasks done!</div>'}
+  </div>
+  </div>
+  ${pinned.length?`<div class="card"><div class="h"><span class="t">Pinned Notes</span><button class="btn btn-ghost btn-sm" style="margin-left:auto" onclick="nav('notes')">All notes</button></div>
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr))">
+    ${pinned.map(n=>`<div style="padding:14px 16px;border-right:1px solid rgba(10,79,50,.08);cursor:pointer" onclick="nav('notes')">
+      <div style="font-weight:600;font-size:13px;margin-bottom:5px">${esc(n.title)}</div>
+      <div style="font-size:12.5px;color:var(--muted);line-height:1.5;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden">${esc(n.content)}</div>
+      <span class="badge b-info" style="margin-top:8px;display:inline-block">${n.type}</span></div>`).join("")}</div></div>`:""}
+  <div class="note" style="padding-left:0">Press ⌘K anywhere — QuickAdd parses free text like "call Nexgen Fri re: IO renewal, high priority" into a structured record.</div>`;
+}
+
+/* ============================ pipeline ============================ */
+let dragId=null;
+function dragOpp(ev,id){if(!canEdit()){ev.preventDefault();return;}dragId=id;ev.dataTransfer.setData("text/plain",id);ev.dataTransfer.effectAllowed="move";}
+function dropOpp(ev,stage,el){ev.preventDefault();el.classList.remove("over");if(!canEdit()||!dragId)return;setStage(dragId,stage);dragId=null;}
+function setStage(id,st){const o=O(id);if(o.stage===st)return render();o.stage=st;if(st==="closed-won")o.prob=100;if(st==="closed-lost")o.prob=0;render();toast(`${o.name} → ${stageOf(st)[1]}`);}
+function movePipe(id,dir){const o=O(id);const i=STAGES.findIndex(s=>s[0]===o.stage);setStage(id,STAGES[Math.min(Math.max(i+dir,0),STAGES.length-1)][0]);}
+function sortPipe(key){pipeSort=pipeSort.key===key?{key,dir:pipeSort.dir==="asc"?"desc":"asc"}:{key,dir:"asc"};render();}
+function pagePipe(){
+  const head=pageHead("Opportunities","Pipeline",`
+    <span style="text-align:right;margin-right:6px"><span class="eyebrow">Weighted Pipeline</span><div style="font-family:var(--fd);font-weight:700;font-size:17px;color:var(--forest)">${fmt$(weighted())}</div></span>
+    <span style="text-align:right;margin-right:6px"><span class="eyebrow">Closed Won</span><div style="font-family:var(--fd);font-weight:700;font-size:17px;color:var(--accent-t)">${fmt$(won())}</div></span>
+    <span style="display:inline-flex;border:1px solid var(--rule);border-radius:2px;overflow:hidden">
+      <button class="btn btn-sm" style="border:0;border-radius:0;${pipeView==="board"?"background:var(--forest);color:#fff":"background:transparent;color:var(--muted)"}" onclick="pipeView='board';render()">Board</button>
+      <button class="btn btn-sm" style="border:0;border-radius:0;${pipeView==="list"?"background:var(--forest);color:#fff":"background:transparent;color:var(--muted)"}" onclick="pipeView='list';render()">List</button></span>
+    <button class="btn btn-primary ce" onclick="newOpp()">+ Add Opportunity</button>`);
+  if(pipeView==="list"){
+    const list=[...opps].sort((a,b)=>{let av=a[pipeSort.key],bv=b[pipeSort.key];if(typeof av==="string")av=av.toLowerCase(),bv=String(bv).toLowerCase();const c=av<bv?-1:av>bv?1:0;return pipeSort.dir==="asc"?c:-c;});
+    const arrow=k=>pipeSort.key===k?(pipeSort.dir==="asc"?" ↑":" ↓"):"";
+    return head+`<div class="card"><div class="tbl-wrap"><table>
+      <tr><th class="sortable" onclick="sortPipe('name')">Name${arrow("name")}</th><th>Partner</th><th>Type</th><th class="sortable" onclick="sortPipe('stage')">Stage${arrow("stage")}</th><th class="num sortable" onclick="sortPipe('value')">Value${arrow("value")}</th><th class="num sortable" onclick="sortPipe('prob')">Prob.${arrow("prob")}</th><th class="sortable" onclick="sortPipe('close')">Close Date${arrow("close")}</th><th>Tags</th><th></th></tr>
+      ${list.map(o=>{const st=stageOf(o.stage);return `<tr>
+        <td style="font-weight:600;cursor:pointer" onclick="openOpp('${o.id}')">${esc(o.name)}</td>
+        <td style="color:var(--muted)">${esc(P(o.pid)?.name||"—")}</td>
+        <td><span class="badge b-muted">${esc(o.type)}</span></td>
+        <td><span class="badge ${st[2]}">${st[1]}</span></td>
+        <td class="num" style="color:var(--forest)">${fmt$(o.value)}</td>
+        <td class="num">${o.prob}%</td><td>${fmtDate(o.close)}</td>
+        <td>${o.tags.map(t=>`<span class="tag-chip">${esc(t)}</span>`).join(" ")||"—"}</td>
+        <td><button class="btn-icon ce" title="Edit" onclick="openOpp('${o.id}')">✎</button></td></tr>`;}).join("")}
+    </table></div></div>`;
+  }
+  return head+`<div class="kb">${STAGES.map(([id,label,cls,color])=>{
+    const list=opps.filter(o=>o.stage===id), sum=list.reduce((a,o)=>a+o.value,0);
+    return `<div class="kcol" ondragover="if(canEdit()){event.preventDefault();this.classList.add('over')}" ondragleave="this.classList.remove('over')" ondrop="dropOpp(event,'${id}',this)">
+      <div class="kh"><span class="badge ${cls}">${label}</span><span class="sum">${sum?fmt$(sum)+" · ":""}${list.length}</span></div>
+      <div class="kcards">${list.map(o=>`<div class="kcard" draggable="${canEdit()}" ondragstart="dragOpp(event,'${o.id}')" onclick="openOpp('${o.id}')">
+        <div class="n">${esc(o.name)}</div><div class="p">${esc(P(o.pid)?.name||"—")} · ${o.prob}%</div><div class="v">${fmt$(o.value)}</div>
+        ${o.close?`<div style="font-size:11px;color:var(--muted);margin-top:4px">Close ${fmtDate(o.close)}</div>`:""}
+        ${o.tags.length?`<div style="display:flex;gap:4px;margin-top:6px;flex-wrap:wrap">${o.tags.slice(0,2).map(t=>`<span class="tag-chip">${esc(t)}</span>`).join("")}</div>`:""}
+        <div class="mv ce" onclick="event.stopPropagation()">
+          ${id!=="prospect"?`<button class="mvb" onclick="movePipe('${o.id}',-1)">←</button>`:""}
+          ${id!=="closed-lost"?`<button class="mvb" onclick="movePipe('${o.id}',1)">→ ${STAGES[STAGES.findIndex(s=>s[0]===id)+1][1].replace("Closed ","")}</button>`:""}
+        </div></div>`).join("")||'<div style="font-size:11.5px;color:var(--t3);text-align:center;padding:12px">Empty</div>'}</div></div>`;
+  }).join("")}</div>
+  <div class="note" style="padding-left:0">Drag cards between columns or use the arrows — weighted pipeline recalculates live. Click a card to open the deal drawer.</div>`;
+}
+function newOpp(){DR={id:null,name:"",pid:"",stage:"prospect",value:0,prob:25,close:"",type:settings.opportunityTypes[0],tags:[],notes:""};modalOpp("Add Opportunity");}
+function openOpp(id){DR=JSON.parse(JSON.stringify(O(id)));modalOpp("Edit — "+DR.name);}
+function modalOpp(title){const dis=canEdit()?"":"disabled";
+  openModal(title,`
+    <div class="fg"><label class="label">Opportunity Name *</label><input class="inp" ${dis} value="${esc(DR.name)}" oninput="DR.name=this.value" placeholder="e.g. TradeDesk Q2 Expansion"></div>
+    <div class="frow">
+      <div class="fg"><label class="label">Partner</label><select class="inp" ${dis} onchange="DR.pid=this.value">${partnerOpts(DR.pid)}</select></div>
+      <div class="fg"><label class="label">Type</label><select class="inp" ${dis} onchange="DR.type=this.value">${selOpts(settings.opportunityTypes,DR.type)}</select></div>
+    </div>
+    <div class="frow">
+      <div class="fg"><label class="label">Stage</label><select class="inp" ${dis} onchange="DR.stage=this.value">${STAGES.map(s=>`<option value="${s[0]}"${s[0]===DR.stage?" selected":""}>${s[0]}</option>`).join("")}</select></div>
+      <div class="fg"><label class="label">Value</label><input class="inp" ${dis} type="number" value="${DR.value}" oninput="DR.value=+this.value"></div>
+      <div class="fg" style="max-width:110px"><label class="label">Probability %</label><input class="inp" ${dis} type="number" min="0" max="100" value="${DR.prob}" oninput="DR.prob=+this.value"></div>
+    </div>
+    <div class="frow">
+      <div class="fg"><label class="label">Expected Close</label><input class="inp" ${dis} type="date" value="${DR.close||""}" oninput="DR.close=this.value"></div>
+      <div class="fg"><label class="label">Tags (comma separated)</label><input class="inp" ${dis} value="${esc(DR.tags.join(", "))}" oninput="DR._tags=this.value"></div>
+    </div>
+    <div class="fg"><label class="label">Internal Notes</label><textarea class="inp" ${dis} rows="3" oninput="DR.notes=this.value">${esc(DR.notes)}</textarea></div>`,
+    `<button class="btn btn-ghost" onclick="closeModal()">Cancel</button><button class="btn btn-primary ce" onclick="saveOpp()">${DR.id?"Save Changes":"Add Opportunity"}</button>`);
+}
+function saveOpp(){
+  if(!DR.name.trim())return toast("Name is required");
+  if(DR._tags!==undefined)DR.tags=DR._tags.split(",").map(s=>s.trim()).filter(Boolean);
+  if(DR.stage==="closed-won")DR.prob=100; if(DR.stage==="closed-lost")DR.prob=0;
+  if(DR.id){Object.assign(O(DR.id),{name:DR.name,pid:DR.pid,stage:DR.stage,value:DR.value,prob:DR.prob,close:DR.close,type:DR.type,tags:DR.tags,notes:DR.notes});toast("Opportunity updated");}
+  else{DR.id=uid();delete DR._tags;opps.push(DR);toast("Opportunity added");}
+  closeModal();render();
+}
+/* ============================ partners ============================ */
+function pFilterSet(k,v){pFilter[k]=pFilter[k]===v?"":v;render();}
+function pagePartners(){
+  const list=partners.filter(p=>
+    (!q||p.name.toLowerCase().includes(q)||p.contacts.some(c=>c.name.toLowerCase().includes(q))||p.tags.some(t=>t.includes(q)))&&
+    (!pFilter.type||p.type===pFilter.type)&&(!pFilter.cat||p.cat===pFilter.cat)&&(!pFilter.status||p.status===pFilter.status));
+  const chips=(label,key,vals)=>`<div class="chips"><span class="cl">${label}</span>${vals.map(v=>`<button class="chip${pFilter[key]===v?" on":""}" onclick="pFilterSet('${key}','${v}')">${v}</button>`).join("")}</div>`;
+  return pageHead("Network","Partners",`<button class="btn btn-primary ce" onclick="newPartner()">+ Add Partner</button>`)+`
+  <div class="card"><div class="h" style="gap:14px">
+    <input class="search" placeholder="Search partners…" value="${esc(q)}" oninput="q=this.value.toLowerCase();render();const e=document.querySelector('input.search');e.focus();e.setSelectionRange(e.value.length,e.value.length)">
+    ${chips("Type","type",settings.partnerTypes)}
+    ${chips("Category","cat",settings.partnerCategories)}
+    ${chips("Status","status",["active","inactive","prospect","paused","churned"])}
+  </div>
+  <div class="tbl-wrap"><table>
+    <tr><th>Partner</th><th>Type</th><th>Category</th><th>Primary Contact</th><th class="num">Net Terms</th><th class="num">Revenue</th><th>Tags</th><th>Status</th></tr>
+    ${list.map(p=>{const pc=p.contacts.find(c=>c.isPrimary)||p.contacts[0];const rv=revenueOf(p.id);
+      return `<tr style="cursor:pointer" onclick="openPartner('${p.id}')"><td><span class="avatar">${esc(p.name[0])}</span><b style="color:var(--forest)">${esc(p.name)}</b>
+        ${p.access?.crm?'<span class="badge b-forest" style="margin-left:6px;font-size:9px;border:1px solid rgba(10,79,50,.25)">CRM</span>':""}
+        ${p.access?.traquery?'<span class="badge b-info" style="margin-left:4px;font-size:9px;border:1px solid rgba(41,128,185,.3)">TQ</span>':""}
+        ${p.website?`<div style="font-size:11.5px;color:var(--muted);margin-left:32px">${esc(p.website)}</div>`:""}</td>
+      <td><span class="badge ${typeBadge(p.type)}">${esc(p.type)}</span></td><td><span class="badge b-muted">${esc(p.cat)}</span></td>
+      <td>${pc?`<div style="font-size:12.5px"><div style="font-weight:600">${esc(pc.name)}</div><div style="color:var(--muted)">${esc(pc.email)}</div></div>`:"—"}</td>
+      <td class="num">Net ${p.terms}</td><td class="num" style="color:var(--forest)">${rv?fmt$(rv):"—"}</td>
+      <td>${p.tags.map(t=>`<span class="tag-chip">${esc(t)}</span>`).join(" ")||"—"}</td>
+      <td><span class="badge ${statusBadge(p.status)}">${esc(p.status)}</span></td></tr>`;}).join("")||'<tr><td colspan="8" class="note" style="text-align:center">No partners found</td></tr>'}
+  </table></div>
+  <div class="note">Revenue is derived from ledger entries on the Revenue page — never hand-typed. Platform-access badges grant CRM / TraQuery logins. Click a row to open the partner record.</div></div>`;
+}
+function newPartner(){DR={id:null,name:"",type:settings.partnerTypes[0],cat:settings.partnerCategories[0],status:"prospect",terms:30,website:"",tags:[],access:{},notes:"",contacts:[]};modalPartner("Add Partner");}
+function openPartner(id){DR=JSON.parse(JSON.stringify(P(id)));modalPartner(DR.name);}
+function mAddContact(){DR.contacts.push({id:uid(),name:"",title:"",email:"",phone:"",isPrimary:DR.contacts.length===0});modalPartner(DR.id?DR.name:"Add Partner");}
+function mDelContact(cid){DR.contacts=DR.contacts.filter(c=>c.id!==cid);modalPartner(DR.id?DR.name:"Add Partner");}
+function mPrimary(cid,on){DR.contacts.forEach(c=>c.isPrimary=on&&c.id===cid);modalPartner(DR.id?DR.name:"Add Partner");}
+function modalPartner(title){const dis=canEdit()?"":"disabled";const rv=DR.id?revenueOf(DR.id):0,cv=DR.id?costOf(DR.id):0;
+  openModal(title,`
+    <div class="frow">
+      <div class="fg"><label class="label">Company Name *</label><input class="inp" ${dis} value="${esc(DR.name)}" oninput="DR.name=this.value"></div>
+      <div class="fg" style="max-width:140px"><label class="label">Status</label><select class="inp" ${dis} onchange="DR.status=this.value">${selOpts(["active","inactive","prospect","paused","churned"],DR.status)}</select></div>
+    </div>
+    <div class="frow">
+      <div class="fg"><label class="label">Type</label><select class="inp" ${dis} onchange="DR.type=this.value">${selOpts(settings.partnerTypes,DR.type)}</select></div>
+      <div class="fg"><label class="label">Category</label><select class="inp" ${dis} onchange="DR.cat=this.value">${selOpts(settings.partnerCategories,DR.cat)}</select></div>
+      <div class="fg" style="max-width:120px"><label class="label">Net Terms</label><input class="inp" ${dis} type="number" value="${DR.terms}" oninput="DR.terms=+this.value"></div>
+    </div>
+    <div class="frow">
+      <div class="fg"><label class="label">Website</label><input class="inp" ${dis} value="${esc(DR.website)}" oninput="DR.website=this.value" placeholder="domain.com"></div>
+      <div class="fg"><label class="label">Tags (comma separated)</label><input class="inp" ${dis} value="${esc(DR.tags.join(", "))}" oninput="DR._tags=this.value"></div>
+    </div>
+    <div class="fg"><label class="label">Platform Access</label>
+      <div class="contact-box" style="display:flex;gap:20px;margin-bottom:0">
+        <label style="display:flex;align-items:center;gap:7px;font-size:13px;cursor:pointer"><input type="checkbox" ${dis} ${DR.access?.crm?"checked":""} onchange="DR.access.crm=this.checked" style="accent-color:#0A4F32">Vane CRM</label>
+        <label style="display:flex;align-items:center;gap:7px;font-size:13px;cursor:pointer"><input type="checkbox" ${dis} ${DR.access?.traquery?"checked":""} onchange="DR.access.traquery=this.checked" style="accent-color:#0A4F32">TraQuery</label>
+      </div></div>
+    ${DR.id?`<div class="fg"><label class="label">Derived Financials</label><div style="font-size:13px;color:var(--muted)">Revenue <b style="color:var(--forest);font-family:var(--fd)">${rv?fmt$(rv):"—"}</b> · Cost <b style="color:var(--danger);font-family:var(--fd)">${cv?fmt$(cv):"—"}</b> — derived from Revenue-page ledger entries, not editable here.</div></div>`:""}
+    <div class="fg"><label class="label">Notes</label><textarea class="inp" ${dis} rows="2" oninput="DR.notes=this.value">${esc(DR.notes)}</textarea></div>
+    <div style="display:flex;align-items:center;justify-content:space-between;margin:6px 0 10px">
+      <span class="label" style="margin:0">Contacts</span>
+      <button class="btn btn-ghost btn-sm ce" onclick="mAddContact()">+ Add Contact</button></div>
+    ${DR.contacts.map(c=>`<div class="contact-box">
+      <div class="frow" style="margin-bottom:8px">
+        <div class="fg" style="margin-bottom:0"><label class="label">Name</label><input class="inp" ${dis} value="${esc(c.name)}" oninput="DR.contacts.find(x=>x.id==='${c.id}').name=this.value"></div>
+        <div class="fg" style="margin-bottom:0"><label class="label">Title</label><input class="inp" ${dis} value="${esc(c.title)}" oninput="DR.contacts.find(x=>x.id==='${c.id}').title=this.value"></div>
+        <button class="btn-icon ce" style="align-self:flex-end" title="Remove contact" onclick="mDelContact('${c.id}')">✕</button>
+      </div>
+      <div class="frow" style="margin-bottom:0">
+        <div class="fg" style="margin-bottom:0"><label class="label">Email</label><input class="inp" ${dis} value="${esc(c.email)}" oninput="DR.contacts.find(x=>x.id==='${c.id}').email=this.value"></div>
+        <div class="fg" style="margin-bottom:0"><label class="label">Phone</label><input class="inp" ${dis} value="${esc(c.phone)}" oninput="DR.contacts.find(x=>x.id==='${c.id}').phone=this.value"></div>
+        <label style="display:flex;align-items:flex-end;gap:6px;font-size:12px;color:var(--muted);padding-bottom:8px;cursor:pointer"><input type="checkbox" ${dis} ${c.isPrimary?"checked":""} onchange="mPrimary('${c.id}',this.checked)" style="accent-color:#0A4F32">Primary</label>
+      </div></div>`).join("")||'<div class="note" style="padding-left:0">No contacts yet.</div>'}`,
+    `<button class="btn btn-ghost" onclick="closeModal()">Close</button><button class="btn btn-primary ce" onclick="savePartner()">${DR.id?"Save Changes":"Add Partner"}</button>`);
+}
+function savePartner(){
+  if(!DR.name.trim())return toast("Company name is required");
+  if(DR._tags!==undefined)DR.tags=DR._tags.split(",").map(s=>s.trim()).filter(Boolean);
+  delete DR._tags;
+  if(DR.id){const i=partners.findIndex(p=>p.id===DR.id);partners[i]=DR;toast("Partner updated");}
+  else{DR.id=uid();partners.push(DR);toast("Partner added");}
+  closeModal();render();
+}
+
+/* ============================ documents ============================ */
+function pageDocs(){
+  return pageHead("Invoices & IOs","Documents")+`
+  <div class="card"><div class="tbl-wrap"><table>
+    <tr><th>Doc #</th><th>Type</th><th>Partner</th><th class="num">Amount</th><th>Issue Date</th><th>Due Date</th><th class="num">Net Terms</th><th>Status</th><th>Tags</th></tr>
+    ${docs.map(d=>`<tr><td><b>${esc(d.num)}</b></td>
+      <td><span class="badge ${d.type==="IO"?"b-gold":"b-forest"}">${esc(d.type)}</span></td>
+      <td>${esc(P(d.pid)?.name||"—")}</td><td class="num">${fmt$(d.amount)}</td>
+      <td>${fmtDate(d.issue)}</td><td>${d.due?fmtDate(d.due):"—"}</td><td class="num">Net ${d.terms}</td>
+      <td><span class="badge ${statusBadge(d.status)}">${esc(d.status)}</span></td>
+      <td>${d.tags.map(t=>`<span class="tag-chip">${esc(t)}</span>`).join(" ")||"—"}</td></tr>`).join("")}
+  </table></div>
+  <div class="note">Line-item editor, auto due-dates from net terms, and Google-Drive-backed file attachments in production. Approving a thread update with a suggested IO creates a draft here.</div></div>`;
+}
+
+/* ============================ tasks ============================ */
+const TASK_COLS=[["todo","To Do","#4A5752"],["in-progress","In Progress","#2980B9"],["done","Done","#1f7a00"]];
+let dragTask=null;
+function tDrag(ev,id){if(!canEdit()){ev.preventDefault();return;}dragTask=id;ev.dataTransfer.setData("text/plain",id);}
+function tDrop(ev,st,el){ev.preventDefault();el.classList.remove("over");if(!canEdit()||!dragTask)return;setTaskStatus(dragTask,st);dragTask=null;}
+function setTaskStatus(id,st){const t=tasks.find(x=>x.id===id);if(t.status===st)return render();t.status=st;render();toast(`"${t.title}" → ${TASK_COLS.find(c=>c[0]===st)[1]}`);}
+function pageTasks(){
+  const counts=Object.fromEntries(TASK_COLS.map(([s])=>[s,tasks.filter(t=>t.status===s).length]));
+  return pageHead("Work","Tasks",
+    TASK_COLS.map(([s,l,c])=>`<span style="text-align:right;margin-right:8px"><span class="eyebrow">${l}</span><div style="font-family:var(--fd);font-weight:700;font-size:17px;color:${c}">${counts[s]}</div></span>`).join("")+
+    `<button class="btn btn-primary ce" onclick="newTask()">+ Add Task</button>`)+`
+  <div class="kb">${TASK_COLS.map(([st,label,color])=>{
+    const list=tasks.filter(t=>t.status===st).sort((a,b)=>PRI_ORDER[a.pri]-PRI_ORDER[b.pri]);
+    return `<div class="kcol" style="min-width:270px;width:270px" ondragover="if(canEdit()){event.preventDefault();this.classList.add('over')}" ondragleave="this.classList.remove('over')" ondrop="tDrop(event,'${st}',this)">
+      <div class="kh"><span style="font-family:var(--fd);font-weight:700;font-size:11.5px;letter-spacing:.12em;text-transform:uppercase;color:${color}">${label}</span><span class="badge ${statusBadge(st)}">${list.length}</span></div>
+      <div class="kcards">${list.map(t=>{const od=t.status!=="done"&&t.due&&t.due<todayISO();
+        return `<div class="kcard" draggable="${canEdit()}" ondragstart="tDrag(event,'${t.id}')" onclick="openTask('${t.id}')" style="${t.status==="done"?"opacity:.65":""}">
+        <div class="n" style="${t.status==="done"?"text-decoration:line-through;color:var(--muted)":""}">${esc(t.title)}</div>
+        <div style="display:flex;gap:8px;align-items:center;margin-top:5px;flex-wrap:wrap">
+          <span style="font-family:var(--fd);font-weight:700;font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:${PRI_COLOR[t.pri]}">${t.pri}</span>
+          ${t.due?`<span style="font-size:11.5px;color:${od?"var(--danger)":"var(--muted)"}">${od?"⚠ ":""}Due ${fmtDate(t.due)}</span>`:""}
+        </div>
+        ${t.pid||t.oid?`<div style="font-size:11.5px;color:var(--muted);margin-top:4px">${t.pid?"↳ "+esc(P(t.pid).name):""}${t.oid?" · "+esc(O(t.oid).name):""}</div>`:""}
+        <div class="mv ce" onclick="event.stopPropagation()">
+          ${st!=="todo"?`<button class="mvb" onclick="setTaskStatus('${t.id}','${st==="done"?"in-progress":"todo"}')">←</button>`:""}
+          ${st!=="done"?`<button class="mvb" onclick="setTaskStatus('${t.id}','${st==="todo"?"in-progress":"done"}')">→ ${st==="todo"?"start":"done"}</button>`:""}
+        </div></div>`;}).join("")||'<div style="font-size:11.5px;color:var(--t3);text-align:center;padding:12px">Empty</div>'}</div></div>`;
+  }).join("")}</div>
+  <div class="note" style="padding-left:0">Drag tasks between columns or use the arrows. Overdue due-dates flag in warning red.</div>`;
+}
+function newTask(){DR={id:null,title:"",status:"todo",pri:"medium",due:"",pid:"",oid:"",desc:"",tags:[]};modalTask("Add Task");}
+function openTask(id){DR=JSON.parse(JSON.stringify(tasks.find(t=>t.id===id)));modalTask("Edit — "+DR.title);}
+function modalTask(title){const dis=canEdit()?"":"disabled";
+  openModal(title,`
+    <div class="fg"><label class="label">Task Title *</label><input class="inp" ${dis} value="${esc(DR.title)}" oninput="DR.title=this.value" placeholder="e.g. Send IO to partner"></div>
+    <div class="frow">
+      <div class="fg"><label class="label">Status</label><select class="inp" ${dis} onchange="DR.status=this.value">${selOpts(["todo","in-progress","done"],DR.status)}</select></div>
+      <div class="fg"><label class="label">Priority</label><select class="inp" ${dis} onchange="DR.pri=this.value">${selOpts(["urgent","high","medium","low"],DR.pri)}</select></div>
+      <div class="fg"><label class="label">Due Date</label><input class="inp" ${dis} type="date" value="${DR.due||""}" oninput="DR.due=this.value"></div>
+    </div>
+    <div class="frow">
+      <div class="fg"><label class="label">Linked Partner</label><select class="inp" ${dis} onchange="DR.pid=this.value">${partnerOpts(DR.pid)}</select></div>
+      <div class="fg"><label class="label">Linked Opportunity</label><select class="inp" ${dis} onchange="DR.oid=this.value">${oppOpts(DR.oid)}</select></div>
+    </div>
+    <div class="fg"><label class="label">Description</label><textarea class="inp" ${dis} rows="3" oninput="DR.desc=this.value">${esc(DR.desc)}</textarea></div>`,
+    `<button class="btn btn-ghost" onclick="closeModal()">Cancel</button><button class="btn btn-primary ce" onclick="saveTask()">${DR.id?"Save Changes":"Add Task"}</button>`);
+}
+function saveTask(){
+  if(!DR.title.trim())return toast("Title is required");
+  DR.pid=DR.pid||null;DR.oid=DR.oid||null;
+  if(DR.id){const i=tasks.findIndex(t=>t.id===DR.id);tasks[i]=DR;toast("Task updated");}
+  else{DR.id=uid();tasks.unshift(DR);toast("Task added");}
+  closeModal();render();
+}
+
+/* ============================ calendar ============================ */
+function calShift(d){calM+=d;if(calM<0){calM=11;calY--;}if(calM>11){calM=0;calY++;}render();}
+function pageCalendar(){
+  const first=new Date(calY,calM,1).getDay(), dim=new Date(calY,calM+1,0).getDate();
+  const today=todayISO();
+  const byDate={};events.forEach(e=>{(byDate[e.date]=byDate[e.date]||[]).push(e);});
+  const upcoming=[...events].filter(e=>e.date>=today).sort((a,b)=>(a.date+a.time).localeCompare(b.date+b.time)).slice(0,8);
+  return pageHead("Schedule","Calendar",`<button class="btn btn-primary ce" onclick="newEvent('${today}')">+ Add Event</button>`)+`
+  <div style="display:grid;grid-template-columns:1fr 260px;gap:16px" class="calwrap">
+  <div class="card" style="margin-bottom:0"><div class="h">
+    <button class="btn-icon" onclick="calShift(-1)">‹</button>
+    <span style="font-family:var(--fd);font-weight:700;font-size:16px;flex:1;text-align:center;letter-spacing:.04em">${new Date(calY,calM).toLocaleDateString("en-US",{month:"long",year:"numeric"})}</span>
+    <button class="btn-icon" onclick="calShift(1)">›</button></div>
+  <div class="cal">
+    ${["Sun","Mon","Tue","Wed","Thu","Fri","Sat"].map(d=>`<div class="wd">${d}</div>`).join("")}
+    ${Array.from({length:first}).map(()=>'<div class="day pad"></div>').join("")}
+    ${Array.from({length:dim}).map((_,i)=>{const day=i+1;
+      const ds=calY+"-"+String(calM+1).padStart(2,"0")+"-"+String(day).padStart(2,"0");
+      const evs=byDate[ds]||[];
+      return `<div class="day${ds===today?" today":""}" onclick="if(canEdit())newEvent('${ds}')">
+        <div class="dn">${day}</div>
+        ${evs.slice(0,3).map(e=>`<div class="ev" style="background:${EV_COLOR[e.type]}18;color:${EV_COLOR[e.type]}" onclick="event.stopPropagation();openEvent('${e.id}')">${esc(e.title)}</div>`).join("")}
+        ${evs.length>3?`<div style="font-size:10px;color:var(--muted);padding-left:5px">+${evs.length-3} more</div>`:""}
+      </div>`;}).join("")}
+  </div>
+  <div class="note">Click a day to add an event; click an event chip to edit it.</div></div>
+  <div class="card" style="margin-bottom:0;align-self:start"><div class="h"><span class="t">Upcoming Events</span></div>
+    ${upcoming.map(e=>`<div style="padding:10px 14px;border-bottom:1px solid rgba(10,79,50,.07);border-left:3px solid ${EV_COLOR[e.type]};cursor:pointer" onclick="openEvent('${e.id}')">
+      <div style="font-weight:600;font-size:12.5px;margin-bottom:3px">${esc(e.title)}</div>
+      <div style="font-size:11.5px;color:var(--muted)">${fmtDate(e.date)}${e.time?" · "+e.time:""}${e.pid?" · "+esc(P(e.pid).name):""}</div></div>`).join("")||'<div class="note">No upcoming events</div>'}
+  </div></div>
+  <style>@media(max-width:900px){.calwrap{grid-template-columns:1fr!important}}</style>`;
+}
+function newEvent(date){DR={id:null,title:"",type:"meeting",date,time:"09:00",pid:""};modalEvent("Add Event");}
+function openEvent(id){DR=JSON.parse(JSON.stringify(events.find(e=>e.id===id)));modalEvent("Edit — "+DR.title);}
+function modalEvent(title){const dis=canEdit()?"":"disabled";
+  openModal(title,`
+    <div class="frow">
+      <div class="fg"><label class="label">Event Title *</label><input class="inp" ${dis} value="${esc(DR.title)}" oninput="DR.title=this.value" placeholder="e.g. Call with TradeDesk"></div>
+      <div class="fg" style="max-width:140px"><label class="label">Type</label><select class="inp" ${dis} onchange="DR.type=this.value">${selOpts(["meeting","deadline","call","follow-up","other"],DR.type)}</select></div>
+    </div>
+    <div class="frow">
+      <div class="fg"><label class="label">Date *</label><input class="inp" ${dis} type="date" value="${DR.date}" oninput="DR.date=this.value"></div>
+      <div class="fg"><label class="label">Time</label><input class="inp" ${dis} type="time" value="${DR.time||""}" oninput="DR.time=this.value"></div>
+      <div class="fg"><label class="label">Linked Partner</label><select class="inp" ${dis} onchange="DR.pid=this.value">${partnerOpts(DR.pid)}</select></div>
+    </div>`,
+    `${DR.id?`<button class="btn btn-ghost ce" style="margin-right:auto;color:var(--danger)" onclick="delEvent()">Delete</button>`:""}<button class="btn btn-ghost" onclick="closeModal()">Cancel</button><button class="btn btn-primary ce" onclick="saveEvent()">${DR.id?"Save Changes":"Add Event"}</button>`);
+}
+function saveEvent(){
+  if(!DR.title.trim()||!DR.date)return toast("Title and date are required");
+  DR.pid=DR.pid||null;
+  if(DR.id){const i=events.findIndex(e=>e.id===DR.id);events[i]=DR;toast("Event updated");}
+  else{DR.id=uid();events.push(DR);toast("Event added");}
+  closeModal();render();
+}
+function delEvent(){events=events.filter(e=>e.id!==DR.id);closeModal();render();toast("Event removed");}
+
+/* ============================ notes ============================ */
+function togglePin(id){const n=notes.find(x=>x.id===id);n.pinned=!n.pinned;n.updated=todayISO();render();toast(n.pinned?"Pinned to Dashboard":"Unpinned");}
+function pageNotes(){
+  const list=[...notes].sort((a,b)=>a.pinned!==b.pinned?(a.pinned?-1:1):b.updated.localeCompare(a.updated));
+  return pageHead("Ideas & Opportunities","Notes",`<button class="btn btn-primary ce" onclick="newNote()">+ New Note</button>`)+`
+  <div class="ngrid">
+    ${list.map(n=>`<div class="notecard" style="border-left:3px solid ${NOTE_COLOR[n.type]}" onclick="openNote('${n.id}')">
+      ${n.pinned?'<span class="pin">📌</span>':""}
+      <span style="font-family:var(--fd);font-weight:600;font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:${NOTE_COLOR[n.type]};background:${NOTE_COLOR[n.type]}14;padding:2px 6px;border-radius:2px">${n.type}</span>
+      <div style="font-weight:600;font-size:14px;margin:8px 0 6px;padding-right:20px">${esc(n.title)}</div>
+      <div style="font-size:13px;color:var(--muted);line-height:1.55;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden;margin-bottom:10px">${esc(n.content)}</div>
+      ${n.tags.length?`<div style="display:flex;gap:4px;flex-wrap:wrap;margin-bottom:10px">${n.tags.map(t=>`<span class="tag-chip">${esc(t)}</span>`).join("")}</div>`:""}
+      <div style="display:flex;align-items:center;justify-content:space-between;padding-top:8px;border-top:1px solid rgba(10,79,50,.08)">
+        <span style="font-size:11.5px;color:var(--muted)">Updated ${fmtDate(n.updated)}</span>
+        <span onclick="event.stopPropagation()">
+          <button class="btn-icon ce" title="${n.pinned?"Unpin":"Pin"}" onclick="togglePin('${n.id}')">📌</button>
+          <button class="btn-icon ce" title="Edit" onclick="openNote('${n.id}')">✎</button>
+          <button class="btn-icon ce" title="Delete" onclick="delNote('${n.id}')">✕</button>
+        </span></div></div>`).join("")}
+  </div>`;
+}
+function newNote(){DR={id:null,title:"",content:"",type:"general",pinned:false,tags:[],updated:todayISO()};modalNote("New Note");}
+function openNote(id){DR=JSON.parse(JSON.stringify(notes.find(n=>n.id===id)));modalNote("Edit — "+DR.title);}
+function modalNote(title){const dis=canEdit()?"":"disabled";
+  openModal(title,`
+    <div class="frow">
+      <div class="fg"><label class="label">Title *</label><input class="inp" ${dis} value="${esc(DR.title)}" oninput="DR.title=this.value"></div>
+      <div class="fg" style="max-width:140px"><label class="label">Type</label><select class="inp" ${dis} onchange="DR.type=this.value">${selOpts(["idea","opportunity","research","meeting","general"],DR.type)}</select></div>
+    </div>
+    <div class="fg"><label class="label">Content</label><textarea class="inp" ${dis} rows="7" style="line-height:1.6" oninput="DR.content=this.value">${esc(DR.content)}</textarea></div>
+    <label style="display:flex;align-items:center;gap:8px;font-size:13px;cursor:pointer"><input type="checkbox" ${dis} ${DR.pinned?"checked":""} onchange="DR.pinned=this.checked" style="accent-color:#0A4F32">📌 Pin to Dashboard</label>`,
+    `<button class="btn btn-ghost" onclick="closeModal()">Cancel</button><button class="btn btn-primary ce" onclick="saveNote()">${DR.id?"Save Changes":"Save Note"}</button>`);
+}
+function saveNote(){
+  if(!DR.title.trim())return toast("Title is required");
+  DR.updated=todayISO();
+  if(DR.id){const i=notes.findIndex(n=>n.id===DR.id);notes[i]=DR;toast("Note updated");}
+  else{DR.id=uid();notes.unshift(DR);toast("Note saved");}
+  closeModal();render();
+}
+function delNote(id){notes=notes.filter(n=>n.id!==id);render();toast("Note deleted");}
+/* ============================ notifications ============================ */
+const patchLabel={stage:"Stage",value:"Value",close:"Expected close"};
+function patchVal(f,v){return f==="value"?fmt$(v):f==="close"?fmtDate(v):f==="stage"?String(v):String(v??"—");}
+function notifCard(n){
+  const o=O(n.oid), p=P(n.pid), pending=n.status==="pending";
+  const diffs=Object.entries(n.patch).map(([f,v])=>{
+    const cur=f==="value"?o.value:f==="close"?o.close:o.stage;
+    return `<div class="diff"><span class="f">${patchLabel[f]}</span><span class="old">${patchVal(f,cur)}</span><span>→</span><span class="new">${patchVal(f,v)}</span></div>`;}).join("");
+  return `<div class="card ncard${pending?"":" resolved"}">
+    <div class="h" style="justify-content:space-between">
+      <div><div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap"><b style="font-size:13.5px">${esc(n.subject)}</b><span class="badge ${statusBadge(n.status)}">${n.status}</span></div>
+      <div style="font-size:12px;color:var(--muted);margin-top:3px">${esc(n.from)} · ↳ ${esc(p?.name||"—")}${o?" · "+esc(o.name):""} · ${fmtDate(n.date)}</div></div>
+    </div>
+    <div style="padding:13px 16px">
+      <p style="font-size:13px;line-height:1.5;margin:0">${esc(n.summary)}</p>
+      ${diffs?`<div style="margin-top:12px"><span class="eyebrow">Suggested update</span><div style="margin-top:4px">${diffs}</div></div>`:""}
+      ${n.contacts.length?`<div style="margin-top:10px;font-size:12.5px;color:var(--muted)"><span class="eyebrow">New contacts</span> ${n.contacts.map(c=>esc(c.name)+(c.title?" — "+esc(c.title):"")+(c.email?" ("+esc(c.email)+")":"")).join(", ")}</div>`:""}
+      ${n.io?`<div style="margin-top:10px;font-size:12.5px;color:var(--muted)"><span class="eyebrow">Suggested IO</span> ${fmt$(n.io.amount)} · net ${n.io.netTerms}${n.io.number?" · "+esc(n.io.number):""}</div>`:""}
+      <button class="btn-icon" style="margin-top:10px;font-size:11.5px" onclick="const r=this.nextElementSibling;const on=r.style.display!=='none';r.style.display=on?'none':'block';this.textContent=on?'▾ View email':'▴ Hide email'">▾ View email</button>
+      <pre style="display:none;margin-top:8px;padding:10px;background:rgba(10,79,50,.04);border-radius:2px;font-size:11.5px;color:var(--muted);white-space:pre-wrap;font-family:inherit">${esc(n.raw)}</pre>
+      ${pending?`<div style="display:flex;gap:8px;margin-top:14px" class="ce">
+        <button class="btn btn-primary" onclick="approveN('${n.id}')">✓ Approve</button>
+        <button class="btn btn-ghost" onclick="customizeN('${n.id}')">✎ Customize</button>
+        <button class="btn btn-ghost" onclick="disregardN('${n.id}')">✕ Disregard</button></div>`
+      :`<div style="margin-top:12px;font-size:12px;color:var(--muted)">${n.status==="approved"?"Approved":"Disregarded"}${n.resolvedBy?" by "+n.resolvedBy:""}${n.resolvedAt?" · "+fmtDate(n.resolvedAt):""}</div>`}
+    </div></div>`;
+}
+function pageNotifications(){
+  const pending=pendingN(), resolved=notifs.filter(n=>n.status!=="pending");
+  return pageHead("Work","Notifications",
+    `<label style="display:flex;align-items:center;gap:6px;font-size:13px;color:var(--muted);cursor:pointer"><input type="checkbox" ${showResolved?"checked":""} onchange="showResolved=this.checked;render()" style="accent-color:#0A4F32">Show resolved</label>`)+`
+  <div class="note" style="padding:0 0 12px">AI-parsed email-thread updates awaiting review — approving applies the suggested patch to the actual CRM record.</div>
+  ${pending.map(notifCard).join("")||`<div class="lockwrap"><div style="text-align:center;color:var(--muted)"><div style="font-size:30px;opacity:.3">◉</div><h3>All caught up</h3><p style="font-size:13px;margin:0">No pending thread updates to review.</p></div></div>`}
+  ${showResolved&&resolved.length?`<div class="eyebrow" style="margin:20px 0 10px">Resolved</div>`+resolved.map(notifCard).join(""):""}`;
+}
+function applyRes(n,patch,contactsSel,io){
+  const o=O(n.oid);
+  if(patch.stage){o.stage=patch.stage;if(patch.stage==="closed-won")o.prob=100;if(patch.stage==="closed-lost")o.prob=0;}
+  if(patch.value!=null)o.value=+patch.value;
+  if(patch.close)o.close=patch.close;
+  if(contactsSel.length&&n.pid){const p=P(n.pid);contactsSel.forEach(c=>{if(!p.contacts.some(x=>x.email&&x.email===c.email))p.contacts.push({id:uid(),name:c.name,title:c.title,email:c.email,phone:"",isPrimary:false});});}
+  if(io&&n.pid){docs.unshift({id:uid(),num:io.number||"IO-"+Date.now().toString().slice(-6),type:"IO",pid:n.pid,amount:+io.amount,issue:todayISO(),due:"",terms:+io.netTerms,status:"draft",tags:["email-import"]});}
+  n.status="approved";n.resolvedBy="you";n.resolvedAt=todayISO();
+  render();toast(`Applied — ${o.name} updated${io?" · draft IO created in Documents":""}`);
+}
+function approveN(id){const n=notifs.find(x=>x.id===id);applyRes(n,n.patch,n.contacts,n.io);}
+function disregardN(id){const n=notifs.find(x=>x.id===id);n.status="disregarded";n.resolvedBy="you";n.resolvedAt=todayISO();render();toast("Disregarded — no changes applied");}
+function customizeN(id){
+  const n=notifs.find(x=>x.id===id), o=O(n.oid);
+  DR={nid:id,stage:n.patch.stage??o.stage,value:n.patch.value??o.value,close:n.patch.close??o.close??"",
+      cInc:n.contacts.map(()=>true),ioInc:!!n.io,ioAmount:n.io?.amount||0,ioTerms:n.io?.netTerms||30,ioNum:n.io?.number||""};
+  openModal("Customize — "+n.subject,`
+    <div class="frow">
+      <div class="fg"><label class="label">Stage</label><select class="inp" onchange="DR.stage=this.value">${STAGES.map(s=>`<option value="${s[0]}"${s[0]===DR.stage?" selected":""}>${s[0]}</option>`).join("")}</select></div>
+      <div class="fg"><label class="label">Value</label><input class="inp" type="number" value="${DR.value}" oninput="DR.value=+this.value"></div>
+      <div class="fg"><label class="label">Expected Close</label><input class="inp" type="date" value="${DR.close}" oninput="DR.close=this.value"></div>
+    </div>
+    ${n.contacts.length?`<div class="fg"><label class="label">New Contacts</label>${n.contacts.map((c,i)=>`<label style="display:flex;align-items:center;gap:8px;font-size:13px;padding:4px 0;cursor:pointer"><input type="checkbox" checked onchange="DR.cInc[${i}]=this.checked" style="accent-color:#0A4F32">${esc(c.name)}${c.title?" — "+esc(c.title):""}${c.email?" ("+esc(c.email)+")":""}</label>`).join("")}</div>`:""}
+    ${n.io?`<div class="fg"><label style="display:flex;align-items:center;gap:8px;font-size:13px;cursor:pointer;margin-bottom:8px"><input type="checkbox" ${DR.ioInc?"checked":""} onchange="DR.ioInc=this.checked" style="accent-color:#0A4F32"><span class="label" style="margin:0">Create IO document</span></label>
+      <div class="frow">
+        <div class="fg" style="margin-bottom:0"><label class="label">Amount</label><input class="inp" type="number" value="${DR.ioAmount}" oninput="DR.ioAmount=+this.value"></div>
+        <div class="fg" style="margin-bottom:0"><label class="label">Net Terms</label><input class="inp" type="number" value="${DR.ioTerms}" oninput="DR.ioTerms=+this.value"></div>
+        <div class="fg" style="margin-bottom:0"><label class="label">IO Number</label><input class="inp" value="${esc(DR.ioNum)}" oninput="DR.ioNum=this.value"></div>
+      </div></div>`:""}`,
+    `<button class="btn btn-ghost" onclick="closeModal()">Cancel</button><button class="btn btn-primary" onclick="applyCustomN()">Apply Update</button>`);
+}
+function applyCustomN(){
+  const n=notifs.find(x=>x.id===DR.nid);
+  const contactsSel=n.contacts.filter((_,i)=>DR.cInc[i]);
+  const io=DR.ioInc?{amount:DR.ioAmount,netTerms:DR.ioTerms,number:DR.ioNum}:null;
+  const d=DR;closeModal();
+  applyRes(n,{stage:d.stage,value:d.value,close:d.close},contactsSel,io);
+}
+
+/* ============================ revenue ============================ */
+function pageRevenue(){
+  const rev=revenueEntries.filter(e=>e.type==="revenue").reduce((a,e)=>a+e.amount,0);
+  const cost=revenueEntries.filter(e=>e.type==="cost").reduce((a,e)=>a+e.amount,0);
+  const md=monthlyData();
+  const list=[...revenueEntries].sort((a,b)=>b.date.localeCompare(a.date)).filter(e=>!revFilter||e.type===revFilter);
+  const maxM=Math.max(...md.map(m=>Math.max(m.revenue,m.cost,m.profit)));
+  const W=640,H=210,PD=44,bw=Math.min(16,(W-PD-20)/(md.length*3.6));
+  const gx=i=>PD+(W-PD-16)*(i+.5)/md.length, gy=v=>H-28-(H-52)*v/maxM;
+  const chart= revTab==="monthly"
+    ?`<div style="padding:6px 4px;overflow-x:auto"><svg class="chart" viewBox="0 0 ${W} ${H}" style="width:100%;min-width:460px">
+      ${[0,.25,.5,.75,1].map(f=>`<line x1="${PD}" x2="${W-8}" y1="${gy(maxM*f).toFixed(1)}" y2="${gy(maxM*f).toFixed(1)}" stroke="rgba(10,79,50,.08)" stroke-dasharray="3 3"/><text x="${PD-6}" y="${(gy(maxM*f)+4).toFixed(1)}" text-anchor="end">$${Math.round(maxM*f/1000)}k</text>`).join("")}
+      ${md.map((m,i)=>{const x=gx(i);return `
+        <rect x="${(x-bw*1.6).toFixed(1)}" y="${gy(m.revenue).toFixed(1)}" width="${bw}" height="${(H-28-gy(m.revenue)).toFixed(1)}" fill="#0A4F32" rx="1"/>
+        <rect x="${(x-bw*.5).toFixed(1)}" y="${gy(m.cost).toFixed(1)}" width="${bw}" height="${(H-28-gy(m.cost)).toFixed(1)}" fill="#C0392B" opacity=".75" rx="1"/>
+        <rect x="${(x+bw*.6).toFixed(1)}" y="${gy(Math.max(m.profit,0)).toFixed(1)}" width="${bw}" height="${(H-28-gy(Math.max(m.profit,0))).toFixed(1)}" fill="#BD8C3D" rx="1"/>
+        <text x="${x.toFixed(1)}" y="${H-9}" text-anchor="middle">${m.label}</text>`;}).join("")}
+      </svg>
+      <div style="display:flex;gap:16px;padding:2px 10px 8px;font-family:var(--fd);font-size:10.5px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted)">
+        <span><span style="display:inline-block;width:9px;height:9px;background:#0A4F32;border-radius:1px;margin-right:5px"></span>Revenue</span>
+        <span><span style="display:inline-block;width:9px;height:9px;background:#C0392B;opacity:.75;border-radius:1px;margin-right:5px"></span>Cost</span>
+        <span><span style="display:inline-block;width:9px;height:9px;background:#BD8C3D;border-radius:1px;margin-right:5px"></span>Profit</span></div></div>`
+    :`<div class="two" style="padding:16px 18px">${[["Revenue by Category",byCategory("revenue"),"#0A4F32"],["Cost by Category",byCategory("cost"),"#C0392B"]].map(([label,data,color])=>{
+        const mx=Math.max(...data.map(d=>d.value));
+        return `<div><div style="font-family:var(--fd);font-weight:600;font-size:13px;margin-bottom:10px">${label}</div>
+        ${data.map(d=>`<div style="display:flex;align-items:center;gap:10px;margin-bottom:7px">
+          <span style="font-family:var(--fd);font-weight:600;font-size:11px;text-transform:uppercase;letter-spacing:.06em;width:120px;flex-shrink:0;color:var(--ink)">${esc(d.name)}</span>
+          <div style="flex:1;background:rgba(10,79,50,.06);border-radius:1px;height:12px"><div style="width:${(100*d.value/mx).toFixed(1)}%;height:100%;background:${color};border-radius:1px"></div></div>
+          <span style="font-family:var(--fd);font-weight:600;font-size:12px;color:var(--muted);width:64px;text-align:right">${fmt$(d.value)}</span></div>`).join("")}</div>`;}).join("")}</div>`;
+  return pageHead("Financial","Revenue",`<button class="btn btn-primary ce" onclick="newEntry()">+ Add Entry</button>`)+`
+  <div class="kpis" style="grid-template-columns:repeat(auto-fit,minmax(160px,1fr))">
+    <div class="kpi"><div class="l">Total Revenue</div><div class="v">${fmt$(rev)}</div></div>
+    <div class="kpi"><div class="l">Total Cost</div><div class="v" style="color:var(--danger)">${fmt$(cost)}</div></div>
+    <div class="kpi"><div class="l">Net Profit</div><div class="v" style="color:${rev-cost>=0?"var(--forest)":"var(--danger)"}">${fmt$(rev-cost)}</div></div>
+    <div class="kpi"><div class="l">Margin</div><div class="v" style="color:var(--gold-d)">${rev?(100*(rev-cost)/rev).toFixed(1)+"%":"—"}</div></div>
+  </div>
+  <div class="card"><div class="h"><span class="t">Analytics</span>
+    <span style="margin-left:auto;display:inline-flex;gap:4px">
+      <button class="btn btn-sm" style="${revTab==="monthly"?"background:var(--forest);color:#fff;border:1px solid var(--forest)":"background:transparent;color:var(--muted);border:1px solid rgba(10,79,50,.2)"}" onclick="revTab='monthly';render()">Monthly Trend</button>
+      <button class="btn btn-sm" style="${revTab==="category"?"background:var(--forest);color:#fff;border:1px solid var(--forest)":"background:transparent;color:var(--muted);border:1px solid rgba(10,79,50,.2)"}" onclick="revTab='category';render()">By Category</button></span></div>
+    ${chart}</div>
+  <div class="card"><div class="h">
+    <div class="chips"><span class="cl">Type</span>
+      <button class="chip${revFilter===""?" on":""}" onclick="revFilter='';render()">All</button>
+      <button class="chip${revFilter==="revenue"?" on":""}" onclick="revFilter='revenue';render()">Revenue</button>
+      <button class="chip${revFilter==="cost"?" on":""}" onclick="revFilter='cost';render()">Cost</button></div></div>
+  <div class="tbl-wrap"><table>
+    <tr><th>Date</th><th>Type</th><th>Description</th><th>Category</th><th>Partner</th><th class="num">Amount</th><th>Tags</th></tr>
+    ${list.map(e=>{const isRev=e.type==="revenue";return `<tr>
+      <td style="color:var(--muted);font-size:12.5px">${fmtDate(e.date)}</td>
+      <td><span style="font-family:var(--fd);font-weight:700;font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:${isRev?"var(--forest)":"var(--danger)"}">${isRev?"+ Rev":"– Cost"}</span></td>
+      <td style="font-weight:600">${esc(e.description)}</td>
+      <td><span class="badge b-muted">${esc(e.category)}</span></td>
+      <td style="color:var(--muted);font-size:12.5px">${esc(P(e.pid)?.name||"—")}</td>
+      <td class="num" style="color:${isRev?"var(--forest)":"var(--danger)"}">${isRev?"+":"–"}${fmt$(e.amount)}</td>
+      <td>${e.tags.map(t=>`<span class="tag-chip">${esc(t)}</span>`).join(" ")||"—"}</td></tr>`;}).join("")}
+  </table></div></div>`;
+}
+function newEntry(){DR={id:null,type:"revenue",amount:0,currency:"USD",date:todayISO(),category:settings.revenueCategories[0],pid:"",description:"",tags:[]};modalEntry();}
+function modalEntry(){
+  openModal("Add Revenue / Cost Entry",`
+    <div class="fg"><label class="label">Type</label><div style="display:flex;gap:8px">
+      <button class="btn" style="flex:1;justify-content:center;${DR.type==="revenue"?"background:var(--forest);color:#fff;border-color:var(--forest)":""}" onclick="DR.type='revenue';modalEntry()">+ Revenue</button>
+      <button class="btn" style="flex:1;justify-content:center;${DR.type==="cost"?"background:var(--danger);color:#fff;border-color:var(--danger)":""}" onclick="DR.type='cost';modalEntry()">– Cost</button></div></div>
+    <div class="frow">
+      <div class="fg"><label class="label">Amount *</label><input class="inp" type="number" value="${DR.amount}" oninput="DR.amount=+this.value"></div>
+      <div class="fg" style="max-width:100px"><label class="label">Currency</label><select class="inp" onchange="DR.currency=this.value">${selOpts(settings.currencies,DR.currency)}</select></div>
+      <div class="fg"><label class="label">Date *</label><input class="inp" type="date" value="${DR.date}" oninput="DR.date=this.value"></div>
+    </div>
+    <div class="frow">
+      <div class="fg"><label class="label">Category</label><select class="inp" onchange="DR.category=this.value">${selOpts(settings.revenueCategories,DR.category)}</select></div>
+      <div class="fg"><label class="label">Partner (optional)</label><select class="inp" onchange="DR.pid=this.value">${partnerOpts(DR.pid)}</select></div>
+    </div>
+    <div class="fg"><label class="label">Description *</label><input class="inp" value="${esc(DR.description)}" oninput="DR.description=this.value" placeholder="Brief description of this entry"></div>
+    <div class="fg"><label class="label">Tags (comma separated)</label><input class="inp" value="${esc(DR.tags.join(", "))}" oninput="DR._tags=this.value"></div>`,
+    `<button class="btn btn-ghost" onclick="closeModal()">Cancel</button><button class="btn btn-primary" onclick="saveEntry()">Add Entry</button>`);
+}
+function saveEntry(){
+  if(!DR.description.trim()||!(DR.amount>0))return toast("Description and a positive amount are required");
+  if(DR._tags!==undefined)DR.tags=DR._tags.split(",").map(s=>s.trim()).filter(Boolean);
+  delete DR._tags;DR.id=uid();DR.pid=DR.pid||null;
+  revenueEntries.push(DR);closeModal();render();toast("Entry added — partner revenue and KPIs recalculated");
+}
+
+/* ============================ wise ============================ */
+function pageWise(){
+  const sc={outgoing_payment_sent:"#0A4F32",funds_converted:"#0A4F32",incoming_payment_waiting:"#E67E22",processing:"#2980B9",cancelled:"#C0392B"};
+  return pageHead("Treasury · Admin Only","Wise",`<button class="btn btn-ghost btn-sm" onclick="render();toast('Balances refreshed from the Wise proxy')">↻ Refresh</button>`)+`
+  <div class="card" style="padding:14px 18px;display:flex;align-items:center;gap:12px">
+    <span style="width:10px;height:10px;border-radius:50%;background:#3CCC08;flex-shrink:0"></span>
+    <span style="flex:1"><b style="font-size:14px">Vane Labs Pty Ltd</b><span style="font-size:12.5px;color:var(--muted);margin-left:10px">business profile · read-only</span></span>
+    <span class="badge b-gold">Admin Only</span></div>
+  <div class="eyebrow" style="margin-bottom:8px">Balances</div>
+  <div class="kpis" style="grid-template-columns:repeat(auto-fit,minmax(170px,1fr))">
+    ${wise.balances.map(b=>`<div class="kpi"><div class="l">${b.cur}</div><div class="v">${b.cur==="EUR"?"€":b.cur==="AUD"?"A$":"$"}${b.amount.toLocaleString(undefined,{minimumFractionDigits:2})}</div>${b.reserved?`<div class="s">${b.cur==="EUR"?"€":"$"}${b.reserved.toLocaleString()} reserved</div>`:""}</div>`).join("")}
+  </div>
+  <div class="eyebrow" style="margin-bottom:8px">Recent Transfers</div>
+  <div class="card"><div class="tbl-wrap"><table>
+    <tr><th>Date</th><th class="num">From</th><th class="num">To</th><th>Reference</th><th>Status</th></tr>
+    ${wise.transfers.map(t=>`<tr><td style="color:var(--muted);font-size:12.5px">${fmtDate(t.date)}</td>
+      <td class="num">${t.fromC==="EUR"?"€":t.fromC==="AUD"?"A$":"$"}${t.fromV.toLocaleString()}</td>
+      <td class="num">${t.toC==="EUR"?"€":t.toC==="AUD"?"A$":"$"}${t.toV.toLocaleString()}</td>
+      <td style="font-size:12.5px;color:var(--muted)">${esc(t.ref)}</td>
+      <td><span style="font-family:var(--fd);font-weight:700;font-size:10.5px;letter-spacing:.1em;text-transform:uppercase;color:${sc[t.status]||"#4A5752"}">${t.status.replace(/_/g," ")}</span></td></tr>`).join("")}
+  </table></div>
+  <div class="note">Balances and transfers are proxied live from the Wise API and never stored in shared CRM collections; the token lives server-side only, admin-only page.</div></div>`;
+}
+
+/* ============================ xero ============================ */
+function xeroImport(id){
+  const inv=xero.invoices.find(i=>i.id===id);
+  const p=partners.find(x=>x.name===inv.contact);
+  revenueEntries.push({id:uid(),date:inv.date,type:inv.kind==="invoice"?"revenue":"cost",amount:inv.total,currency:"USD",category:"other",
+    description:`Xero ${inv.kind} ${inv.num} — ${inv.contact}`,pid:p?.id||null,tags:["xero"]});
+  xero.imported[id]=true;render();toast(`Imported ${inv.num} as a ${inv.kind==="invoice"?"revenue":"cost"} entry — see the Revenue page`);
+}
+function pageXero(){
+  const tabs=[["invoices","Invoices & Bills"],["contacts","Contacts"],["pnl","Profit & Loss"],["reconcile","Reconciliation"]];
+  let body="";
+  if(xeroTab==="invoices"){
+    body=`<div class="card"><div class="tbl-wrap"><table>
+      <tr><th>Number</th><th>Kind</th><th>Contact</th><th>Date</th><th>Due</th><th>Status</th><th class="num">Total</th><th class="num">Due Amount</th></tr>
+      ${xero.invoices.map(i=>`<tr><td><b>${esc(i.num)}</b></td>
+        <td><span style="font-family:var(--fd);font-weight:700;font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:${i.kind==="invoice"?"var(--forest)":"var(--danger)"}">${i.kind==="invoice"?"+ Invoice":"– Bill"}</span></td>
+        <td>${esc(i.contact)}</td><td style="color:var(--muted);font-size:12.5px">${fmtDate(i.date)}</td><td style="color:var(--muted);font-size:12.5px">${fmtDate(i.due)}</td>
+        <td><span style="font-family:var(--fd);font-weight:700;font-size:10.5px;letter-spacing:.1em;text-transform:uppercase;color:${XSTAT[i.status]||"#4A5752"}">${i.status}</span></td>
+        <td class="num">${fmt$(i.total)}</td><td class="num" style="color:${i.dueAmt>0?"var(--warning)":"var(--muted)"}">${i.dueAmt>0?fmt$(i.dueAmt):"—"}</td></tr>`).join("")}
+    </table></div></div>`;
+  }else if(xeroTab==="contacts"){
+    body=`<div class="card"><div class="tbl-wrap"><table>
+      <tr><th>Name</th><th>Email</th><th>Type</th><th>Status</th></tr>
+      ${xero.contacts.map(c=>`<tr><td style="font-weight:600">${esc(c.name)}</td><td style="color:var(--muted);font-size:12.5px">${esc(c.email)||"—"}</td>
+        <td style="font-size:12.5px">${[c.cust&&"Customer",c.supp&&"Supplier"].filter(Boolean).join(" · ")||"—"}</td>
+        <td><span class="badge b-muted">${c.status.toLowerCase()}</span></td></tr>`).join("")}
+    </table></div></div>`;
+  }else if(xeroTab==="pnl"){
+    const inc=byCategory("revenue"),exp=byCategory("cost");
+    const incT=inc.reduce((a,d)=>a+d.value,0),expT=exp.reduce((a,d)=>a+d.value,0);
+    const row=(n,v,tot)=>`<div style="display:flex;justify-content:space-between;padding:5px 0;border-bottom:1px solid rgba(10,79,50,.06);font-weight:${tot?600:400}">
+      <span style="font-size:13px;color:${tot?"var(--ink)":"var(--muted)"}">${esc(n)}</span><span style="font-size:13px;font-family:var(--fd);font-weight:600">${fmt$(v)}</span></div>`;
+    body=`<div class="card" style="padding:20px 24px;max-width:640px">
+      <div style="font-family:var(--fd);font-weight:600;font-size:15px;margin-bottom:16px">Profit and Loss — last 6 months</div>
+      <div style="margin-bottom:18px"><div class="eyebrow" style="margin-bottom:8px">Income</div>${inc.map(d=>row(d.name,d.value)).join("")}${row("Total Income",incT,1)}</div>
+      <div style="margin-bottom:18px"><div class="eyebrow" style="margin-bottom:8px">Operating Expenses</div>${exp.map(d=>row(d.name,d.value)).join("")}${row("Total Operating Expenses",expT,1)}</div>
+      ${row("Net Profit",incT-expT,1)}</div>`;
+  }else{
+    const matched=[["INV-40218","Northlight DSP",24500,"Northlight DSP — programmatic","id"],["INV-40217","Brightpath Leads",12000,"Brightpath Leads — lead-gen share","amount+date"]];
+    const missing=xero.invoices.filter(i=>["x2","x6"].includes(i.id));
+    body=`
+    <div class="kpis" style="grid-template-columns:repeat(3,1fr)">
+      <div class="kpi" style="border-left:3px solid var(--forest)"><div class="l">Matched</div><div class="v">${matched.length}</div></div>
+      <div class="kpi" style="border-left:3px solid var(--warning)"><div class="l">In Xero, not in CRM</div><div class="v" style="color:var(--warning)">${missing.filter(i=>!xero.imported[i.id]).length}</div></div>
+      <div class="kpi" style="border-left:3px solid var(--info)"><div class="l">In CRM, no Xero record</div><div class="v" style="color:var(--info)">1</div></div>
+    </div>
+    <div class="card"><div class="h"><span class="t">In Xero but not in the CRM — import each explicitly</span></div>
+    <div class="tbl-wrap"><table>
+      <tr><th>Number</th><th>Kind</th><th>Contact</th><th>Date</th><th class="num">Total</th><th style="width:130px"></th></tr>
+      ${missing.map(i=>`<tr><td><b>${esc(i.num)}</b></td>
+        <td><span style="font-family:var(--fd);font-weight:700;font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:${i.kind==="invoice"?"var(--forest)":"var(--danger)"}">${i.kind==="invoice"?"+ Invoice":"– Bill"}</span></td>
+        <td>${esc(i.contact)}</td><td style="color:var(--muted);font-size:12.5px">${fmtDate(i.date)}</td><td class="num">${fmt$(i.total)}</td>
+        <td>${xero.imported[i.id]?'<span style="font-size:12px;color:var(--forest);font-weight:600">✓ Imported</span>':`<button class="btn btn-primary btn-sm ce" onclick="xeroImport('${i.id}')">+ Add to CRM</button>`}</td></tr>`).join("")}
+    </table></div></div>
+    <div class="card"><div class="h"><span class="t">Matched (${matched.length})</span></div>
+    <div class="tbl-wrap"><table>
+      <tr><th>Xero</th><th class="num">Amount</th><th>CRM Entry</th><th>Match</th></tr>
+      ${matched.map(([num,c,amt,entry,via])=>`<tr><td style="font-weight:600;font-size:13px">${num} · ${c}</td><td class="num">${fmt$(amt)}</td><td style="font-size:13px">${entry}</td>
+        <td><span class="badge ${via==="id"?"b-gold":"b-muted"}">${via==="id"?"linked":"amount+date"}</span></td></tr>`).join("")}
+    </table></div></div>
+    <div class="card"><div class="h"><span class="t">CRM entries with no matching Xero record</span></div>
+    <div class="tbl-wrap"><table>
+      <tr><th>Description</th><th>Type</th><th>Date</th><th class="num">Amount</th></tr>
+      <tr><td style="font-weight:600">Helio Consulting — retainer</td><td><span style="font-family:var(--fd);font-weight:700;font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--forest)">+ Rev</span></td><td style="color:var(--muted);font-size:12.5px">${fmtDate(mISO(0,12))}</td><td class="num">${fmt$(3000)}</td></tr>
+    </table></div>
+    <div class="note">Consider invoicing/recording these in Xero.</div></div>`;
+  }
+  return pageHead("Accounting · Admin Only","Xero",`
+    <button class="btn btn-ghost btn-sm" onclick="render();toast('Refetched from the Xero proxy')">↻ Refresh</button>
+    <button class="btn btn-ghost btn-sm" onclick="toast('Production: removes the stored OAuth tokens server-side; you can reconnect any time.')">Disconnect</button>`)+`
+  <div class="card" style="padding:14px 18px;display:flex;align-items:center;gap:12px">
+    <span style="width:10px;height:10px;border-radius:50%;background:#3CCC08;flex-shrink:0"></span>
+    <span style="flex:1"><b style="font-size:14px">Vane Labs Pty Ltd</b><span style="font-size:12.5px;color:var(--muted);margin-left:10px">connected · read-only</span></span>
+    <span class="badge b-gold">Admin Only</span></div>
+  <div style="display:flex;gap:4px;margin-bottom:16px;flex-wrap:wrap">
+    ${tabs.map(([k,l])=>`<button class="btn btn-sm" style="${xeroTab===k?"background:var(--forest);color:#fff;border:1px solid var(--forest)":"background:transparent;color:var(--muted);border:1px solid rgba(10,79,50,.2)"}" onclick="xeroTab='${k}';render()">${l}</button>`).join("")}
+  </div>
+  ${body}
+  <div class="note" style="padding-left:0">Live OAuth proxy — accounting data is fetched on demand, never stored in shared collections; tokens held server-side, admin-only.</div>`;
+}
+/* ============================ users ============================ */
+const ROLE_META={admin:["Admin","Full access — manage users, settings, all data","#0A4F32"],editor:["Editor","Create and edit records, cannot manage users","#2980B9"],viewer:["Viewer","Read-only access to all pages","#4A5752"]};
+function pageUsers(){
+  return pageHead("Access Control","Users",`<button class="btn btn-primary ce" onclick="newUser()">+ Add User</button>`)+`
+  <div style="max-width:900px">
+  <div class="kpis" style="grid-template-columns:repeat(3,1fr)">
+    ${Object.entries(ROLE_META).map(([k,[l,d,c]])=>`<div class="kpi" style="border-left:3px solid ${c}">
+      <div class="l" style="color:${c}">${l}</div><div style="font-size:12.5px;color:var(--muted);line-height:1.5">${d}</div></div>`).join("")}
+  </div>
+  <div class="card"><div class="h"><span class="t">Team Members (${users.length})</span></div>
+    ${users.map((u,i)=>{const name=u.email.split("@")[0];const env=u.source==="env";
+      return `<div style="padding:14px 18px;display:flex;align-items:center;gap:14px;border-bottom:1px solid rgba(10,79,50,.07)">
+      <span style="width:36px;height:36px;background:var(--forest);border-radius:50%;display:flex;align-items:center;justify-content:center;color:var(--gold);font-family:var(--fd);font-weight:700;font-size:16px;flex-shrink:0">${name[0].toUpperCase()}</span>
+      <span style="flex:1;min-width:0">
+        <span style="font-weight:600;font-size:14px">${esc(name)}</span>
+        ${env?'<span class="badge b-forest" style="margin-left:6px;font-size:9px;border:1px solid rgba(10,79,50,.2)" title="Managed by the ADMIN_EMAILS env var">env admin</span>':""}
+        <div style="font-size:12.5px;color:var(--muted)">${esc(u.email)}${u.added?" · added "+fmtDate(u.added):""} · last seen ${u.lastSeen}</div></span>
+      <select class="inp ce" style="width:110px" ${env?"disabled title=\"Managed by ADMIN_EMAILS env var\"":""} onchange="users[${i}].role=this.value;render();toast('Role updated for ${esc(u.email)}')">${selOpts(["admin","editor","viewer"],u.role)}</select>
+      <button class="btn-icon ce" ${env?'disabled style="opacity:.3;cursor:not-allowed" title="Managed by ADMIN_EMAILS env var"':'title="Revoke access"'} onclick="${env?"":`revokeUser(${i})`}">✕</button>
+      </div>`;}).join("")}
+  </div>
+  <div class="note" style="padding-left:0">No invite email is sent — teammates simply sign in with Google using their listed address. Roles are enforced server-side.</div></div>`;
+}
+function revokeUser(i){const u=users[i];users.splice(i,1);render();toast(`Revoked access for ${u.email}`);}
+function newUser(){DR={email:"",role:"editor"};
+  openModal("Add User",`
+    <div class="fg"><label class="label">Google Account Email *</label><input class="inp" type="email" placeholder="colleague@company.com" oninput="DR.email=this.value" onkeydown="if(event.key==='Enter')saveUser()">
+      <p style="font-size:12px;color:var(--muted);margin:8px 0 0;line-height:1.5">No invite email is sent — they simply sign in here with Google using this address.</p></div>
+    <div class="fg"><label class="label">Role</label><div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px" id="roleGrid">
+      ${Object.entries(ROLE_META).map(([k,[l,d,c]])=>`<button class="btn btn-ghost" data-r="${k}" style="flex-direction:column;align-items:flex-start;gap:4px;padding:12px 10px;${k===DR.role?`border-color:${c};background:${c}0f`:""}" onclick="DR.role='${k}';[...document.querySelectorAll('#roleGrid button')].forEach(b=>{const rc={admin:'#0A4F32',editor:'#2980B9',viewer:'#4A5752'}[b.dataset.r];const on=b.dataset.r==='${k}';b.style.borderColor=on?rc:'';b.style.background=on?rc+'0f':''})">
+        <span style="color:${c};font-size:11px;letter-spacing:.1em">${l}</span><span style="font-size:10.5px;color:var(--muted);text-transform:none;letter-spacing:0;font-family:var(--fb);text-align:left;line-height:1.4">${d}</span></button>`).join("")}
+    </div></div>`,
+    `<button class="btn btn-ghost" onclick="closeModal()">Cancel</button><button class="btn btn-primary" onclick="saveUser()">+ Add User</button>`);
+}
+function saveUser(){
+  if(!DR.email.trim()||!DR.email.includes("@"))return toast("A valid email is required");
+  users.push({email:DR.email.trim(),role:DR.role,source:"managed",added:todayISO(),lastSeen:"never"});
+  closeModal();render();toast("User added — they can sign in with Google now");
+}
+
+/* ============================ settings ============================ */
+const SETTING_LISTS=[["docTypes","Document Types"],["partnerTypes","Partner Types"],["partnerCategories","Partner Categories"],["opportunityTypes","Opportunity Types"],["revenueCategories","Revenue / Cost Categories"],["tags","Global Tags"]];
+function setDel(list,item){settings[list]=settings[list].filter(i=>i!==item);render();toast(`Removed "${item}" from ${list}`);}
+function setAdd(list){const el=$("#si-"+list);const v=(el?.value||"").trim();if(!v)return;
+  if(settings[list].includes(v))return toast("Already in the list");
+  settings[list].push(v);render();const n=$("#si-"+list);if(n)n.focus();toast(`Added "${v}"`);}
+function listEditor(list,label){
+  return `<div style="margin-bottom:22px"><label class="label" style="margin-bottom:8px">${label}</label>
+    <div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:8px">
+      ${settings[list].map(i=>`<span class="setchip">${esc(i)}<button class="ce" onclick="setDel('${list}','${esc(i)}')">✕</button></span>`).join("")||'<span style="font-size:12px;color:var(--t3)">Empty</span>'}
+    </div>
+    <div style="display:flex;gap:8px" class="ce">
+      <input class="inp" id="si-${list}" placeholder="Add new ${label.toLowerCase()}…" style="flex:1;max-width:320px" onkeydown="if(event.key==='Enter')setAdd('${list}')">
+      <button class="btn btn-ghost" onclick="setAdd('${list}')">+ Add</button>
+    </div></div>`;
+}
+function pageSettings(){
+  const CURRENCIES=["USD","EUR","GBP","ILS","AUD","CAD","JPY"];
+  return pageHead("Configuration","Settings",`<button class="btn btn-primary ce" onclick="toast('Settings saved (in-memory for this demo; Postgres via /api in production)')">💾 Save Settings</button>`)+`
+  <div style="max-width:800px">
+  <div class="card" style="padding:22px 26px">
+    <h2 style="font-family:var(--fd);font-weight:600;font-size:18px;color:var(--forest);margin-bottom:14px">Company</h2>
+    <div class="fg" style="max-width:320px"><label class="label">Company Name</label><input class="inp" ${canEdit()?"":"disabled"} value="${esc(settings.companyName)}" oninput="settings.companyName=this.value"></div>
+    <div class="fg"><label class="label">Default Currencies</label><div style="display:flex;flex-wrap:wrap;gap:6px">
+      ${CURRENCIES.map(c=>`<button class="chip${settings.currencies.includes(c)?" on":""} ce" onclick="settings.currencies=settings.currencies.includes('${c}')?settings.currencies.filter(x=>x!=='${c}'):[...settings.currencies,'${c}'];render()">${c}</button>`).join("")}
+      ${canEdit()?"":settings.currencies.map(c=>`<span class="chip on">${c}</span>`).join("")}
+    </div></div></div>
+  <div class="card" style="padding:22px 26px">
+    <h2 style="font-family:var(--fd);font-weight:600;font-size:18px;color:var(--forest);margin-bottom:14px">Partners</h2>
+    ${listEditor("partnerTypes","Partner Types")}${listEditor("partnerCategories","Partner Categories")}</div>
+  <div class="card" style="padding:22px 26px">
+    <h2 style="font-family:var(--fd);font-weight:600;font-size:18px;color:var(--forest);margin-bottom:14px">Documents</h2>
+    ${listEditor("docTypes","Document Types")}</div>
+  <div class="card" style="padding:22px 26px">
+    <h2 style="font-family:var(--fd);font-weight:600;font-size:18px;color:var(--forest);margin-bottom:14px">Opportunities &amp; Revenue</h2>
+    ${listEditor("opportunityTypes","Opportunity Types")}${listEditor("revenueCategories","Revenue / Cost Categories")}</div>
+  <div class="card" style="padding:22px 26px">
+    <h2 style="font-family:var(--fd);font-weight:600;font-size:18px;color:var(--forest);margin-bottom:14px">Tags</h2>
+    ${listEditor("tags","Global Tags")}</div>
+  </div>`;
+}
+
+/* ============================ quick add ============================ */
+let qState="input",qParsed=null,qText="";
+function openQuick(){if(!canEdit())return toast("Viewer role is read-only");qState="input";qText="";qParsed=null;$("#quick").style.display="flex";renderQuick();setTimeout(()=>{const t=$("#qtext");if(t)t.focus();},30);}
+function closeQuick(){$("#quick").style.display="none";}
+function renderQuick(){
+  let body="";
+  if(qState==="input"){
+    body=`<textarea class="inp" id="qtext" rows="3" style="width:100%;resize:none" placeholder='Type anything…&#10;e.g. "call Nexgen Fri re: IO renewal, high priority"' onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();submitQuick()}">${esc(qText)}</textarea>
+    <div style="font-size:11.5px;color:var(--t3);margin:8px 2px 0">Detects task, partner, opportunity, or note automatically. ↵ to parse.</div>
+    <div style="display:flex;justify-content:flex-end;margin-top:12px"><button class="btn btn-primary" onclick="submitQuick()">Add →</button></div>`;
+  }else if(qState==="parsing"){
+    body=`<div style="padding:18px 4px;display:flex;align-items:center;gap:10px;color:var(--muted);font-size:13.5px">
+      <span style="color:var(--gold);animation:qpulse 1s infinite">✦</span> Claude is parsing…</div>
+    <style>@keyframes qpulse{0%,100%{opacity:.4}50%{opacity:1}}</style>`;
+  }else{
+    const p=qParsed;
+    const rows=[["Detected type",`<span class="badge b-forest">${p.kind}</span>`],
+      ["Title",esc(p.kind==="partner"?p.name:p.title)],
+      ...(p.kind==="task"?[["Priority",`<span style="font-family:var(--fd);font-weight:700;font-size:11px;text-transform:uppercase;letter-spacing:.1em;color:${PRI_COLOR[p.priority]}">${p.priority}</span>`],["Due date",p.due?fmtDate(p.due):"—"],["Partner match",p.partner?esc(p.partner.name):"no match"]]:[]),
+      ...(p.kind==="opportunity"?[["Value",fmt$(p.value)],["Partner match",p.partner?esc(p.partner.name):"no match — will create unlinked"],["Expected close",p.close?fmtDate(p.close):"—"],["Stage","prospect"]]:[]),
+      ...(p.kind==="partner"?[["Status","prospect"],["Type",settings.partnerTypes[0]]]:[]),
+      ...(p.kind==="note"?[["Content",esc(p.content)]]:[])];
+    body=`<div style="font-size:12px;color:var(--muted);margin-bottom:8px">"${esc(qText)}"</div>
+    <div class="qprev">${rows.map(([k,v])=>`<div style="display:flex;gap:10px;padding:3px 0;font-size:13px"><span class="label" style="margin:0;min-width:110px;padding-top:2px">${k}</span><span style="flex:1">${v}</span></div>`).join("")}</div>
+    <div style="display:flex;justify-content:flex-end;gap:8px;margin-top:12px">
+      <button class="btn btn-ghost" onclick="qState='input';renderQuick();setTimeout(()=>{const t=document.querySelector('#qtext');if(t)t.focus()},30)">← Edit</button>
+      <button class="btn btn-ghost" onclick="closeQuick()">Cancel</button>
+      <button class="btn btn-primary" onclick="createQuick()">Create ${qParsed.kind}</button></div>`;
+  }
+  $("#qboxc").innerHTML=`<div class="qhead"><span>✦ Quick Add</span><button class="btn-icon" onclick="closeQuick()">✕</button></div><div class="qbody">${body}</div>`;
+}
+function submitQuick(){
+  const t=$("#qtext");qText=(t?t.value:qText).trim();
+  if(!qText)return;
+  qState="parsing";renderQuick();
+  setTimeout(()=>{qParsed=parseQuick(qText);qState="preview";renderQuick();},600);
+}
+function parseQuick(t){
+  const lower=t.toLowerCase();
+  const partner=partners.find(p=>lower.includes(p.name.split(" ")[0].toLowerCase()))||null;
+  const pm=lower.match(/\b(urgent|high|medium|low)\b/);
+  const money=t.match(/\$\s?([\d,]+(?:\.\d+)?)\s*(k)?/i);
+  let due=null;
+  if(/\btoday\b/.test(lower))due=dISO(0);
+  else if(/\btomorrow\b/.test(lower))due=dISO(1);
+  else{const dm=lower.match(/\b(mon|tue|wed|thu|fri|sat|sun)[a-z]*\b/);
+    if(dm){const map={sun:0,mon:1,tue:2,wed:3,thu:4,fri:5,sat:6};const diff=((map[dm[1]]-new Date().getDay())%7+7)%7||7;due=dISO(diff);}}
+  if(/^(new|add)\s+partner\s+/i.test(t)){
+    return {kind:"partner",name:t.replace(/^(new|add)\s+partner\s+/i,"").replace(/[,.].*$/,"").trim()||"Unnamed partner"};}
+  if(money){
+    return {kind:"opportunity",title:t.replace(/\$\s?[\d,]+(?:\.\d+)?\s*k?/i,"").replace(/\s{2,}/g," ").replace(/[,\s]+$/,"").trim()||t,
+      value:parseFloat(money[1].replace(/,/g,""))*(money[2]?1000:1),partner,close:due||dISO(30)};}
+  if(due||/^(call|email|send|follow|chase|ping|book|prep|review|schedule)/i.test(lower)){
+    return {kind:"task",title:t.replace(/,?\s*\b(urgent|high|medium|low)\b(\s*priority)?/i,"").trim(),priority:pm?pm[1]:"medium",due,partner};}
+  return {kind:"note",title:t.length>48?t.slice(0,48)+"…":t,content:t};
+}
+function createQuick(){
+  const p=qParsed;
+  if(p.kind==="task"){tasks.unshift({id:uid(),title:p.title,status:"todo",pri:p.priority,due:p.due,pid:p.partner?.id||null,oid:null,desc:"Created via QuickAdd",tags:[]});page="tasks";}
+  else if(p.kind==="partner"){partners.push({id:uid(),name:p.name,type:settings.partnerTypes[0],cat:settings.partnerCategories[0],status:"prospect",terms:30,website:"",tags:[],access:{},notes:"Created via QuickAdd",contacts:[]});page="partners";}
+  else if(p.kind==="opportunity"){opps.push({id:uid(),name:p.title,pid:p.partner?.id||"",stage:"prospect",value:p.value,prob:25,close:p.close,type:settings.opportunityTypes[0],tags:[],notes:"Created via QuickAdd"});page="pipe";}
+  else{notes.unshift({id:uid(),title:p.title,content:p.content,type:"general",pinned:false,tags:[],updated:todayISO()});page="notes";}
+  closeQuick();render();toast(`Added ${p.kind}: ${p.kind==="partner"?p.name:p.title}`);
+}
+
+/* ============================ render / init ============================ */
+const PAGES={dash:pageDash,partners:pagePartners,pipe:pagePipe,docs:pageDocs,notifications:pageNotifications,tasks:pageTasks,calendar:pageCalendar,notes:pageNotes,revenue:pageRevenue,xero:pageXero,wise:pageWise,users:pageUsers,settings:pageSettings};
+const LOCK_MSG={xero:"Accounting data is restricted to admins.",wise:"Treasury data is restricted to admins.",users:"User management is restricted to admins.",settings:"Settings are restricted to admins."};
+function render(){
+  renderSide();
+  if(ADMIN_PAGES.includes(page)&&role!=="admin"){
+    const eb={xero:"Accounting · Admin Only",wise:"Treasury · Admin Only",users:"Access Control",settings:"Configuration"}[page];
+    const ti={xero:"Xero",wise:"Wise",users:"Users",settings:"Settings"}[page];
+    $("#main").innerHTML=pageHead(eb,ti)+lock(LOCK_MSG[page]);
+    return;
+  }
+  $("#main").innerHTML=PAGES[page]();
+}
+window.addEventListener("keydown",e=>{
+  if((e.metaKey||e.ctrlKey)&&e.key.toLowerCase()==="k"){e.preventDefault();$("#quick").style.display==="flex"?closeQuick():openQuick();}
+  if(e.key==="Escape"){closeQuick();closeModal();}
+});
+render();
+</script>
+</body>
+</html>

@@ -1,0 +1,1222 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>RTB Monster — Interactive Demo</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Rajdhani:wght@500;600;700&family=Inter:wght@400;500;600&display=swap');
+:root{
+  --forest:#0A4F32;--forest-deep:#07331F;--gold:#BD8C3D;--gold-d:#887B05;
+  --bg:#FAFAF7;--surface:#fff;--ink:#0E2419;--muted:#4A5752;
+  --danger:#C0392B;--warning:#E67E22;--info:#2980B9;
+  --rule:rgba(10,79,50,.14);
+  --fd:'Rajdhani',sans-serif;--fb:'Inter',sans-serif;
+}
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:var(--bg);color:var(--ink);font-family:var(--fb);font-size:14px;min-height:100vh;-webkit-font-smoothing:antialiased}
+.demo-strip{background:#EAF3EE;border-bottom:1px solid var(--rule);padding:7px 28px;display:flex;justify-content:space-between;align-items:center;font-size:12.5px;color:var(--forest)}
+.demo-strip a{color:var(--ink);text-decoration:none;font-weight:600}
+header{display:flex;align-items:center;gap:12px;padding:13px 28px;border-bottom:1px solid var(--rule);background:var(--surface)}
+header img{width:42px;height:42px}
+.lockup .wm{font-family:var(--fd);font-weight:700;font-size:17px;color:var(--gold);letter-spacing:.04em}
+.lockup .sub{font-family:var(--fd);font-weight:600;font-size:10px;letter-spacing:.18em;text-transform:uppercase;color:var(--muted)}
+header .pgt{margin-left:auto;display:flex;align-items:center;gap:14px;flex-wrap:wrap;justify-content:flex-end;font-family:var(--fd);font-weight:600;font-size:14px;letter-spacing:.1em;text-transform:uppercase;color:var(--forest)}
+.hnav{color:var(--muted);font-size:12px;cursor:pointer;white-space:nowrap}
+.hnav:hover{color:var(--forest)}
+.hnav.cur{color:var(--forest);font-size:14px;font-weight:700;cursor:default}
+.fresh{display:inline-flex;align-items:center;gap:5px;font-family:var(--fb);font-size:11px;letter-spacing:0;text-transform:none;color:var(--muted);font-weight:400}
+.fdot{width:8px;height:8px;border-radius:50%;background:#2e8b57;animation:hb 2s infinite}
+@keyframes hb{0%,100%{opacity:1}50%{opacity:.3}}
+.tzchip{font-family:var(--fb);font-size:12px;letter-spacing:0;text-transform:none;font-weight:400;border:1px solid var(--rule);border-radius:2px;padding:5px 10px;color:var(--muted);cursor:pointer;white-space:nowrap}
+.tzchip:hover{border-color:var(--forest);color:var(--forest)}
+header select{font-size:12px;padding:5px 8px;border:1px solid rgba(10,79,50,.2);border-radius:2px;font-family:var(--fb);background:#fff;color:var(--ink)}
+main{max-width:none;margin:0;padding:18px 28px 60px}
+/* pulse bands */
+.pulse{background:linear-gradient(135deg,var(--forest-deep),var(--forest));border-radius:2px;color:#EDF5F0;padding:14px 18px;margin-bottom:12px}
+.pulse .top{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.pulse .lbl{font-family:var(--fd);font-weight:600;font-size:11px;letter-spacing:.2em;text-transform:uppercase;color:#F2C879;display:flex;align-items:center;gap:8px}
+.pdot{width:8px;height:8px;border-radius:50%;background:#F2C879;animation:hb 1.6s infinite}
+.pulse .hint2{font-size:11px;color:rgba(250,250,247,.55);margin-left:auto}
+.pstat .k{font-family:var(--fd);font-weight:600;font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:rgba(250,250,247,.65)}
+.pstat .v{font-family:var(--fd);font-weight:700;font-size:22px;line-height:1.15}
+.pstat .v small{font-size:12px;font-weight:600;margin-left:4px}
+.pace-up{color:#7FD6A4}.pace-down{color:#F0A48E}
+.pctl{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin:10px 0 6px}
+.psep{width:1px;height:16px;background:rgba(250,250,247,.25);margin:0 4px;align-self:center}
+.pchk b{font-family:var(--fd);font-weight:700;letter-spacing:.02em}
+.prefresh{display:inline-flex;align-items:center;gap:6px;font-family:var(--fd);font-weight:600;font-size:12px;letter-spacing:.06em;color:rgba(250,250,247,.75);background:rgba(250,250,247,.06);border:1px solid rgba(250,250,247,.22);border-radius:12px;padding:3px 10px;cursor:pointer}
+.prefresh:hover{border-color:var(--gold);color:#FAFAF7}
+.prefresh .st{font-size:10px;color:rgba(250,250,247,.5)}
+.pchart{position:relative;margin-top:4px}
+.pguide{position:absolute;top:0;width:1px;background:rgba(250,250,247,.55);pointer-events:none;display:none}
+.ptip{position:absolute;z-index:5;background:#07331F;border:1px solid rgba(250,250,247,.25);border-radius:3px;padding:8px 10px;font-size:11.5px;pointer-events:none;display:none;box-shadow:0 4px 14px rgba(0,0,0,.4);min-width:180px;color:#EDF5F0}
+.ptip .tth{font-family:var(--fd);font-weight:700;font-size:11px;letter-spacing:.08em;color:#F2C879;margin-bottom:5px;display:flex;justify-content:space-between;gap:14px}
+.ptip .tth span:last-child{color:rgba(250,250,247,.5);font-weight:600}
+.ptip table{border-collapse:collapse;width:100%;font-size:11.5px}
+.ptip td{padding:1.5px 0;border:0;white-space:nowrap;background:none}
+.ptip tr:hover td{background:none}
+.ptip td.m{padding-right:12px}
+.ptip td.n{text-align:right;font-family:var(--fd);font-weight:700;padding-left:10px}
+.ptip td.n.yv{color:rgba(250,250,247,.55);font-weight:600}
+.dot2{display:inline-block;width:8px;height:8px;border-radius:2px;margin-right:6px;vertical-align:-1px}
+.pchk{display:inline-flex;align-items:center;gap:6px;font-size:11.5px;padding:3px 10px;border:1px solid rgba(250,250,247,.22);border-radius:12px;background:rgba(250,250,247,.06);cursor:pointer;font-family:var(--fd);font-weight:600;letter-spacing:.03em}
+.pchk:hover{border-color:rgba(250,250,247,.5)}
+.pchk .sw{width:9px;height:9px;border-radius:2px;display:inline-block}
+.pchk.off{opacity:.5}
+.pmovers{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}
+.pmover{font-size:11.5px;padding:3px 9px;border:1px solid rgba(250,250,247,.22);border-radius:2px;background:rgba(250,250,247,.07);white-space:nowrap;cursor:pointer}
+.pmover:hover{background:rgba(189,140,61,.22);border-color:var(--gold)}
+.pmover b{font-family:var(--fd);letter-spacing:.02em}
+/* kpis */
+.kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:10px;margin-bottom:16px}
+.kpi{background:var(--surface);border:1px solid var(--rule);border-radius:2px;padding:14px 16px}
+.kpi.hl{border-color:var(--forest);background:rgba(10,79,50,.03)}
+.kpi .l{font-family:var(--fd);font-weight:600;font-size:10px;letter-spacing:.2em;text-transform:uppercase;color:var(--muted);margin-bottom:6px}
+.kpi .v{font-family:var(--fd);font-weight:700;font-size:27px;line-height:1;color:var(--forest)}
+.kpi .d{font-size:11px;margin-top:5px}
+.up{color:#1f7a00}.down{color:var(--danger)}
+.card{background:var(--surface);border:1px solid var(--rule);border-radius:2px;margin-bottom:16px}
+.card .h{padding:11px 16px;border-bottom:1px solid var(--rule);display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.card .h .t{font-family:var(--fd);font-weight:600;font-size:11px;letter-spacing:.2em;text-transform:uppercase;color:var(--gold-d)}
+.card .h .sub{font-size:11.5px;color:var(--muted);text-transform:none;letter-spacing:0}
+.card .b{padding:12px 16px}
+.chip{font-size:12px;padding:3px 10px;border-radius:2px;border:1px solid var(--rule);background:var(--bg);color:var(--muted);cursor:pointer;font-family:var(--fd);font-weight:600;letter-spacing:.05em;text-transform:uppercase}
+.chip.on{background:rgba(10,79,50,.1);border-color:rgba(10,79,50,.35);color:var(--forest)}
+.chip .num{display:inline-block;background:var(--forest);color:#fff;border-radius:50%;width:14px;height:14px;font-size:9.5px;line-height:14px;text-align:center;margin-right:5px}
+.seg{display:inline-flex;border:1px solid var(--rule);border-radius:2px;overflow:hidden}
+.seg button{font-family:var(--fd);font-weight:600;font-size:11px;letter-spacing:.07em;text-transform:uppercase;padding:6px 13px;border:0;background:transparent;color:var(--muted);cursor:pointer}
+.seg button.on{background:var(--forest);color:#FAFAF7}
+select,input[type=text],input[type=number],input[type=email]{padding:6px 10px;border:1px solid rgba(10,79,50,.2);border-radius:2px;font-family:var(--fb);font-size:12.5px;background:#fff;color:var(--ink)}
+select:focus,input:focus,textarea:focus{outline:none;border-color:var(--forest);box-shadow:0 0 0 2px rgba(10,79,50,.08)}
+textarea{width:100%;min-height:110px;padding:8px 10px;border:1px solid rgba(10,79,50,.2);border-radius:2px;font-family:ui-monospace,Menlo,monospace;font-size:12px;background:#fff;color:var(--ink)}
+table{width:100%;border-collapse:collapse;font-size:12.5px}
+th{background:#f5f5f2;font-family:var(--fd);font-weight:600;font-size:10.5px;letter-spacing:.12em;text-transform:uppercase;color:var(--muted);text-align:left;padding:8px 12px;border-bottom:1px solid var(--rule);white-space:nowrap}
+th.sortable{cursor:pointer}
+th.num,td.num{text-align:right;font-family:ui-monospace,Menlo,monospace;font-variant-numeric:tabular-nums;font-size:11.5px}
+td{padding:8px 12px;border-bottom:1px solid rgba(10,79,50,.08);white-space:nowrap}
+td.mono{font-family:ui-monospace,Menlo,monospace;font-size:11.5px}
+tr:hover td{background:rgba(10,79,50,.025)}
+tr.total td{font-weight:600;background:rgba(189,140,61,.07);border-top:1px solid var(--rule)}
+tr.winner td{background:rgba(10,79,50,.06)}
+.pos{color:#1f7a00;font-weight:600}.neg{color:var(--danger);font-weight:600}
+.tbl-wrap{overflow-x:auto}
+.dv{cursor:pointer;border-bottom:1px dashed transparent}
+.dv:hover{color:var(--forest);border-bottom-color:var(--forest)}
+.fchips{display:flex;gap:6px;flex-wrap:wrap;padding:0 16px 8px}
+.fchip{display:inline-flex;align-items:center;gap:6px;font-size:12px;padding:4px 10px;border-radius:13px;background:rgba(10,79,50,.10);border:1px solid var(--forest);color:var(--forest)}
+.fchip b{font-weight:600}
+.fchip .x{cursor:pointer;font-weight:700;opacity:.7}
+.fchip .x:hover{opacity:1}
+.fchip.th{background:rgba(189,140,61,.12);border-color:var(--gold);color:#7a5a22}
+.sev{font-family:var(--fd);font-weight:600;font-size:10px;letter-spacing:.1em;text-transform:uppercase;padding:2px 8px;border-radius:2px;white-space:nowrap}
+.sev.critical{background:rgba(192,57,43,.12);color:var(--danger)}
+.sev.warning{background:rgba(230,126,34,.14);color:var(--warning)}
+.sev.info{background:rgba(41,128,185,.12);color:var(--info)}
+.sev.off{background:rgba(74,87,82,.12);color:var(--muted)}
+.cta{display:flex;gap:12px;align-items:flex-start;padding:12px 16px;border-bottom:1px solid rgba(10,79,50,.08)}
+.cta:last-child{border-bottom:0}
+.cta.suppressed{opacity:.5}
+.cta .body{flex:1}
+.cta .lbl{font-weight:600;font-size:13.5px}
+.cta .rec{font-size:12.5px;color:var(--muted);margin-top:2px}
+.cta .impact{font-family:var(--fd);font-weight:700;font-size:16px;color:var(--forest);white-space:nowrap}
+.btn{font-family:var(--fd);font-weight:600;font-size:11px;letter-spacing:.08em;text-transform:uppercase;border:1px solid var(--forest);background:var(--forest);color:#fff;padding:6px 13px;border-radius:2px;cursor:pointer}
+.btn:hover{background:var(--forest-deep)}
+.btn.ghost{background:none;color:var(--forest)}
+.btn.ghost:hover{background:rgba(10,79,50,.07)}
+.btn.gold{background:var(--gold);border-color:var(--gold)}
+.btn:disabled{opacity:.45;cursor:default}
+.status{font-family:var(--fd);font-weight:600;font-size:10px;letter-spacing:.08em;text-transform:uppercase;padding:2px 8px;border-radius:2px}
+.status.ok{background:rgba(60,204,8,.14);color:#1f7a00}
+.status.stale{background:rgba(230,126,34,.14);color:var(--warning)}
+.status.missing{background:rgba(192,57,43,.12);color:var(--danger)}
+.badge{font-size:10px;padding:2px 7px;border-radius:10px;background:rgba(74,87,82,.12);color:var(--muted)}
+.badge.win{background:rgba(10,79,50,.12);color:var(--forest)}
+.badge.warn{background:rgba(230,126,34,.14);color:var(--warning)}
+.note{font-size:11.5px;color:var(--muted);padding:9px 16px}
+.note2{border-left:3px solid var(--gold);background:rgba(189,140,61,.07);padding:9px 12px;font-size:12.5px;margin:10px 16px}
+.verdict{font-size:13px;padding:8px 12px;border-radius:2px;background:rgba(10,79,50,.06);border:1px solid var(--rule)}
+.stats{display:flex;gap:22px;flex-wrap:wrap;align-items:baseline;padding:10px 16px 2px}
+.stat .k{font-family:var(--fd);font-weight:600;font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:var(--muted)}
+.stat .v{font-family:var(--fd);font-weight:700;font-size:20px;color:var(--forest)}
+.row{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.lbl-f{display:flex;flex-direction:column;gap:4px;font-family:var(--fd);font-weight:600;font-size:10.5px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted)}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:12px}
+.pill{display:inline-block;padding:2px 8px;border-radius:10px;font-size:11px;font-weight:600}
+.pill.ok{background:rgba(10,79,50,.10);color:var(--forest)}
+.pill.bad{background:rgba(192,57,43,.10);color:var(--danger)}
+.pill.warn{background:rgba(230,126,34,.12);color:var(--warning)}
+.prog{height:8px;background:rgba(10,79,50,.1);border-radius:2px;overflow:hidden;flex:1;min-width:160px}
+.prog i{display:block;height:100%;background:var(--forest);width:0;transition:width .12s linear}
+.alias{display:inline-block;font-size:11px;padding:2px 8px;margin:1px 2px 1px 0;border-radius:10px;background:rgba(10,79,50,.08);color:var(--forest)}
+.alias b{font-weight:600;color:var(--muted)}
+.ename{font-weight:600}
+.eid{font-family:ui-monospace,Menlo,monospace;font-size:11px;color:var(--muted)}
+.check{display:flex;gap:8px;align-items:center;font-size:12.5px;padding:3px 0}
+.check .ok{color:#1f7a00;font-weight:700}
+#toast{position:fixed;bottom:20px;right:20px;background:var(--forest-deep);color:#FAFAF7;padding:10px 16px;border-radius:2px;font-size:13px;opacity:0;transition:opacity .25s;pointer-events:none;z-index:99;max-width:420px}
+svg text{font-family:var(--fd);font-size:10px}
+</style>
+</head>
+<body>
+<div class="demo-strip"><span>◈ Interactive demo — all data is generated sample data</span><a href="../">← Portfolio</a></div>
+<header>
+  <img src="logo.png" alt="Vane Labs">
+  <div class="lockup"><div class="wm">VANE LABS</div><div class="sub">RTB Monster</div></div>
+  <div class="pgt" id="hdr"></div>
+</header>
+<main id="main"></main>
+<div id="toast"></div>
+<script>
+"use strict";
+/* ============ helpers ============ */
+function mulberry(a){return function(){a|=0;a=a+0x6D2B79F5|0;let t=Math.imul(a^a>>>15,1|a);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296;};}
+let rnd=mulberry(1337);
+const fmt$=n=>n==null?"–":"$"+Math.round(n).toLocaleString();
+const usd2=n=>n==null?"–":"$"+Number(n).toFixed(2);
+const pct=n=>n==null?"–":(n*100).toFixed(1)+"%";
+const pct2=n=>n==null?"–":(n*100).toFixed(2)+"%";
+const fmtM=n=>n==null?"–":n>=1e6?(n/1e6).toFixed(1)+"M":n>=1e3?(n/1e3).toFixed(0)+"k":Math.round(n).toLocaleString();
+const $=s=>document.querySelector(s);
+const esc=s=>String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");
+function toast(msg){const t=$("#toast");t.textContent=msg;t.style.opacity=1;clearTimeout(toast._h);toast._h=setTimeout(()=>t.style.opacity=0,3200);}
+function dl(name,text,mime){const a=document.createElement("a");a.href=URL.createObjectURL(new Blob([text],{type:mime||"text/plain"}));a.download=name;document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(a.href),2000);}
+const TODAY=new Date();const HOUR=Math.max(1,TODAY.getHours());
+function dISO(back){const d=new Date(TODAY);d.setDate(d.getDate()-back);return d.toISOString().slice(0,10);}
+function dDow(back){const d=new Date(TODAY);d.setDate(d.getDate()-back);return d.getDay();}
+
+/* ============ data generation (seeded) ============ */
+const LANES=[
+  {supply:"Supply A",demand:"Demand C",platform:"Platform One",  media:"CTV",      geo:"US",scale:9.5, m:0.215,fr:0.108,ecpm:19,bid:0.32,hasBuy:true, trend:1.008},
+  {supply:"Supply A",demand:"Demand C",platform:"Platform Two",  media:"CTV",      geo:"US",scale:6.1, m:0.152,fr:0.094,ecpm:17,bid:0.28,hasBuy:true, trend:1.004},
+  {supply:"Supply A",demand:"Demand D",platform:"Platform One",  media:"CTV",      geo:"US",scale:5.4, m:0.171,fr:0.082,ecpm:21,bid:0.25,hasBuy:true, trend:1.002},
+  {supply:"Supply B",demand:"Demand C",platform:"Platform Two",  media:"In-app",   geo:"DE",scale:4.8, m:-0.042,fr:0.071,ecpm:9, bid:0.30,hasBuy:true, trend:0.994},
+  {supply:"Supply B",demand:"Demand C",platform:"Platform One",  media:"In-app",   geo:"DE",scale:3.9, m:0.128,fr:0.083,ecpm:10,bid:0.33,hasBuy:true, trend:1.006},
+  {supply:"Supply B",demand:"Demand E",platform:"Platform Two",  media:"In-app",   geo:"US",scale:7.2, m:0.146,fr:0.096,ecpm:12,bid:0.29,hasBuy:true, trend:1.001},
+  {supply:"Supply F",demand:"Demand C",platform:"Platform Three",media:"Web video",geo:"UK",scale:9.1, m:0.094,fr:0.021,ecpm:8, bid:0.14,hasBuy:true, trend:0.998},
+  {supply:"Supply F",demand:"Demand G",platform:"Platform Three",media:"Web video",geo:"AU",scale:3.2, m:0.182,fr:0.064,ecpm:11,bid:0.22,hasBuy:false,trend:1.003},
+  {supply:"Supply A",demand:"Demand E",platform:"Platform One",  media:"In-app",   geo:"US",scale:4.4, m:0.164,fr:0.089,ecpm:13,bid:0.27,hasBuy:true, trend:1.005},
+  {supply:"Supply B",demand:"Demand G",platform:"Platform Two",  media:"CTV",      geo:"AU",scale:2.8, m:0.138,fr:0.077,ecpm:16,bid:0.24,hasBuy:true, trend:1.000},
+  {supply:"Supply F",demand:"Demand D",platform:"Platform Three",media:"Web video",geo:"US",scale:3.6, m:0.112,fr:0.049,ecpm:9, bid:0.19,hasBuy:true, trend:0.997},
+  {supply:"Supply A",demand:"Demand G",platform:"Platform Three",media:"CTV",      geo:"UK",scale:2.3, m:0.157,fr:0.086,ecpm:18,bid:0.26,hasBuy:false,trend:1.002},
+];
+LANES.forEach(l=>l.lane=l.supply+" ↔ "+l.demand);
+const MEASURES=["inventories","opportunities","requests","responses","fills","impressions","bids","wins","revenue","cost"];
+const NDAYS=62; // idx 0..61, 61 = today (62 days: supports 30d window + equal prior)
+let FACTS=[];
+for(const l of LANES){
+  for(let i=0;i<NDAYS;i++){
+    const back=NDAYS-1-i, dow=dDow(back);
+    const wk=(dow===0||dow===6)?0.78:1;
+    const f=(0.84+rnd()*0.32)*wk*Math.pow(l.trend,i)*(back===0?(HOUR+1)/24:1); // today partial
+    const requests=l.scale*1e6*f;
+    const fills=requests*l.fr*(0.9+rnd()*0.2);
+    const impressions=fills*0.962;
+    const revenue=impressions/1000*l.ecpm*(0.92+rnd()*0.16);
+    const cost=revenue*(1-(l.m+(rnd()-0.5)*0.02));
+    FACTS.push({lane:l.lane,supply:l.supply,demand:l.demand,platform:l.platform,media:l.media,geo:l.geo,
+      date:dISO(back),idx:i,hasBuy:l.hasBuy,
+      inventories:requests/2.9,opportunities:requests*1.16,requests,responses:requests*l.bid*1.05,
+      fills,impressions,bids:requests*l.bid,wins:l.hasBuy?fills*1.02:0,revenue,cost});
+  }
+}
+/* hourly facts: today by hour, per lane (through current hour) */
+const SHAPE=[0.35,0.3,0.28,0.27,0.3,0.38,0.5,0.68,0.85,0.95,1,1.02,1.05,1.02,1,0.98,1.02,1.08,1.15,1.2,1.15,1,0.8,0.55];
+const SHSUM=SHAPE.reduce((a,b)=>a+b,0);
+let HFACTS=[];
+for(const l of LANES){
+  const t=FACTS.find(r=>r.idx===NDAYS-1&&r.lane===l.lane&&r.platform===l.platform);
+  for(let h=0;h<=HOUR;h++){
+    const w=SHAPE[h]/SHSUM*24/(HOUR+1)*(0.85+rnd()*0.3);
+    const o={hour:String(h).padStart(2,"0")+":00",lane:t.lane,supply:t.supply,demand:t.demand,platform:t.platform,media:t.media,geo:t.geo,hasBuy:t.hasBuy};
+    for(const m of MEASURES)o[m]=t[m]*w;
+    HFACTS.push(o);
+  }
+}
+/* per-media hourly + daily bases for the benchmark bands (media chips filter these) */
+const MEDIA=["In-app","CTV","Web video"];
+const MEDIA_LABEL={"In-app":"In-app","CTV":"CTV","Web video":"Web"};
+const MEDIA_SHORT={"In-app":"inapp","CTV":"ctv","Web video":"web"};
+function hourSeriesM(dayIdx,upto,media){
+  const base={rev:[],req:[],imp:[],fil:[]};
+  const rows=FACTS.filter(r=>r.idx===dayIdx&&r.media===media);
+  const tot={revenue:0,requests:0,impressions:0,fills:0};
+  for(const r of rows){tot.revenue+=r.revenue;tot.requests+=r.requests;tot.impressions+=r.impressions;tot.fills+=r.fills;}
+  const full=dayIdx===NDAYS-1?(24/(HOUR+1)):1; // today totals are partial; scale hourly split
+  for(let h=0;h<=upto;h++){
+    const w=SHAPE[h]/SHSUM*(0.88+rnd()*0.24);
+    const j=()=>0.92+rnd()*0.16; // independent per-measure jitter so rates aren't flat
+    base.rev.push(tot.revenue*full*w*j());base.req.push(tot.requests*full*w*j());
+    base.imp.push(tot.impressions*full*w*j());base.fil.push(tot.fills*full*w*j());
+  }
+  return base;
+}
+const HOUR_M={};
+for(const m of MEDIA)HOUR_M[m]={t:hourSeriesM(NDAYS-1,HOUR,m),y:hourSeriesM(NDAYS-2,23,m)};
+const DAYTOT={};
+for(const m of MEDIA)DAYTOT[m]=[...Array(NDAYS)].map(()=>({rev:0,req:0,imp:0,fil:0,cost:0}));
+for(const r of FACTS){const d=DAYTOT[r.media][r.idx];d.rev+=r.revenue;d.req+=r.requests;d.imp+=r.impressions;d.fil+=r.fills;d.cost+=r.cost;}
+function sumSeries(list){
+  const n=list[0].rev.length;
+  const out={rev:Array(n).fill(0),req:Array(n).fill(0),imp:Array(n).fill(0),fil:Array(n).fill(0)};
+  for(const b of list)for(const k of ["rev","req","imp","fil"])for(let i=0;i<n;i++)out[k][i]+=b[k][i];
+  return out;
+}
+const hourBase=(media,side)=>sumSeries(media.map(m=>HOUR_M[m][side]));
+function dayBase(media,win){
+  const slice=(from,to)=>{
+    const out={rev:[],req:[],imp:[],fil:[],cost:[],dates:[]};
+    for(let i=from;i<=to;i++){
+      let rev=0,req=0,imp=0,fil=0,cost=0;
+      for(const m of media){const d=DAYTOT[m][i];rev+=d.rev;req+=d.req;imp+=d.imp;fil+=d.fil;cost+=d.cost;}
+      out.rev.push(rev);out.req.push(req);out.imp.push(imp);out.fil.push(fil);out.cost.push(cost);
+      out.dates.push(dISO(NDAYS-1-i));
+    }
+    return out;
+  };
+  return {cur:slice(NDAYS-1-win,NDAYS-2),pri:slice(NDAYS-1-2*win,NDAYS-2-win)};
+}
+function metricOf(base,i,key){
+  if(key==="revenue")return base.rev[i];
+  if(key==="requests")return base.req[i];
+  if(key==="ecpm")return base.imp[i]>0?base.rev[i]/base.imp[i]*1000:null;
+  return base.req[i]>0?base.fil[i]/base.req[i]:null;
+}
+const CHART_METRICS={
+  revenue:{label:"Revenue",color:"#F2C879",fmt:fmt$},
+  requests:{label:"Requests",color:"#6FE3A5",fmt:n=>n==null?"–":Math.round(n).toLocaleString()},
+  ecpm:{label:"eCPM",color:"#7CC4F0",fmt:usd2},
+  fill:{label:"Fill rate",color:"#FF9E7D",fmt:pct},
+};
+const MONTHS=["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+const fmtDay=iso=>iso?`${MONTHS[Number(iso.slice(5,7))-1]} ${Number(iso.slice(8,10))}`:"";
+const nowStamp=()=>new Date().toLocaleTimeString([],{hour:"2-digit",minute:"2-digit"});
+/* movers: today-so-far $ delta per lane vs yesterday same hours */
+function computeMovers(){
+  const scale=(HOUR+1)/24;
+  return LANES.map(l=>{
+    const t=FACTS.find(r=>r.idx===NDAYS-1&&r.lane===l.lane&&r.platform===l.platform);
+    const y=FACTS.find(r=>r.idx===NDAYS-2&&r.lane===l.lane&&r.platform===l.platform);
+    return {lane:l.lane,supply:l.supply,demand:l.demand,media:l.media,delta:t.revenue-y.revenue*scale};
+  }).sort((a,b)=>Math.abs(b.delta)-Math.abs(a.delta)).slice(0,3);
+}
+const MOVERS=computeMovers();
+function sumWin(from,to){
+  const s={requests:0,fills:0,impressions:0,revenue:0,cost:0};
+  for(const r of FACTS)if(r.idx>=from&&r.idx<=to){for(const k in s)s[k]+=r[k];}
+  return s;
+}
+const kd=(c,p)=>(c-p)/p;
+
+/* ============ derived metric math ============ */
+function derive(s){
+  s.fill_rate=s.requests>0?s.fills/s.requests:null;
+  s.ecpm_sell=s.impressions>0?s.revenue/s.impressions*1000:null;
+  s.ecpm_buy=s.impressions>0?s.cost/s.impressions*1000:null;
+  s.margin=s.revenue-s.cost;
+  s.margin_pct=s.revenue>0?s.margin/s.revenue:null;
+  s.bid_rate=s.requests>0?s.bids/s.requests:null;
+  s.win_rate=s.requests>0?s.wins/s.requests:null;
+  s.cost_cpm=s.impressions>0?s.cost/s.impressions*1000:null;
+  return s;
+}
+function agg(rows,keys){
+  const map=new Map();
+  for(const r of rows){
+    const kv=keys.map(k=>r[k]),key=kv.join("¦");
+    let g=map.get(key);
+    if(!g){g={_k:kv};for(const m of MEASURES)g[m]=0;map.set(key,g);}
+    for(const m of MEASURES)g[m]+=r[m];
+  }
+  return [...map.values()].map(derive);
+}
+
+/* ============ mode definitions (labels match the real product) ============ */
+const MODE_COLS={
+  margin:[["requests","Requests",fmtM],["fills","Fills",fmtM],["fill_rate","Fill %",pct],["ecpm_sell","eCPM sell",usd2],["revenue","Revenue",fmt$],["cost","Cost",fmt$],["margin","Margin",fmt$],["margin_pct","Margin %",pct]],
+  supply:[["inventories","Inventories",fmtM],["opportunities","Opportunities",fmtM],["requests","Requests",fmtM],["responses","Responses",fmtM],["fills","Fills",fmtM],["impressions","Impressions",fmtM],["ecpm_sell","eCPM",usd2],["revenue","Revenue",fmt$]],
+  demand:[["requests","Requests",fmtM],["bids","Bids",fmtM],["wins","Wins",fmtM],["bid_rate","Bid rate",pct],["win_rate","Win rate",pct],["impressions","Impressions",fmtM],["cost","Cost",fmt$],["cost_cpm","Cost CPM",usd2]],
+};
+const MODE_LABEL={margin:"Margin",supply:"Supply detail",demand:"Demand detail"};
+const DIMS=[["lane","Lane"],["platform","Platform"],["media","Media type"],["geo","Geo"]];
+const dimLabel=k=>({lane:"Lane",platform:"Platform",media:"Media type",geo:"Geo",date:"Date",hour:"Hour"})[k]||k;
+
+/* ============ view state (serialized into location.hash) ============ */
+let S={tab:"cockpit",mode:"margin",dims:["lane"],grain:"auto",th:null,filt:[],sort:{k:"revenue",asc:false},
+  pm:["revenue"],dm:["revenue","requests"],pmedia:[...MEDIA],dmedia:[...MEDIA],dwin:14,kwin:7};
+let suppressHash=false;
+function pushHash(){
+  const h="#"+encodeURIComponent(JSON.stringify({tab:S.tab,mode:S.mode,dims:S.dims,grain:S.grain,th:S.th,filt:S.filt}));
+  if(location.hash!==h){suppressHash=true;location.hash=h;}
+}
+function loadHash(){
+  try{
+    if(!location.hash||location.hash.length<3)return;
+    const p=JSON.parse(decodeURIComponent(location.hash.slice(1)));
+    if(p&&p.dims)S={...S,...p};
+  }catch(e){/* malformed hash: start fresh */}
+}
+window.addEventListener("hashchange",()=>{
+  if(suppressHash){suppressHash=false;return;}
+  loadHash();render();
+});
+function sync(){pushHash();render();}
+
+/* ============ report generator state ============ */
+const R_DEFAULTS={
+  margin:["fill_rate","ecpm_sell","revenue","cost","margin","margin_pct"],
+  supply:["opportunities","requests","fills","impressions","ecpm_sell","revenue"],
+  demand:["requests","bids","wins","win_rate","cost","cost_cpm"],
+};
+let R={mode:"margin",dims:["lane","platform"],metrics:[...R_DEFAULTS.margin],est:null,presets:[]};
+const R_DIMS=[...DIMS,["date","Date"]];
+
+/* ============ ops state ============ */
+const SOURCES=[
+  ["ok","platform_one_sell","Platform One","sell","api","today","current","41,208","0","0"],
+  ["ok","platform_two_sell","Platform Two","sell","api","today","current","28,551","12","0"],
+  ["ok","platform_two_buy","Platform Two","buy","report url","today","current","19,340","0","0"],
+  ["stale","platform_three_sell","Platform Three","sell","email","2d ago","1d","12,006","4","3"],
+  ["missing","platform_four_buy","Platform Four","buy","manual","4d ago","3d","—","—","0"],
+];
+let RUNS=[
+  {when:"Today 06:30",src:"platform_one_sell",mode:"api · tick",rows:41208,q:0,rev:0},
+  {when:"Today 06:30",src:"platform_two_sell",mode:"api · tick",rows:28551,q:12,rev:0},
+  {when:"Today 06:00",src:"platform_two_buy",mode:"report url",rows:19340,q:0,rev:0},
+  {when:"Yesterday 23:30",src:"platform_three_sell",mode:"email",rows:12006,q:4,rev:3},
+];
+let REVIEW=[
+  {platform:"platform_three",raw:"DmdC_EU_v2",kind:"demand"},
+  {platform:"platform_three",raw:"sply-f-webvid",kind:"supply"},
+  {platform:"platform_two",raw:"DC-Video-9981",kind:"demand"},
+];
+const ENTITIES=[
+  {id:"sup_a",name:"Supply A",kind:"supply"},{id:"sup_b",name:"Supply B",kind:"supply"},{id:"sup_f",name:"Supply F",kind:"supply"},
+  {id:"dem_c",name:"Demand C",kind:"demand"},{id:"dem_d",name:"Demand D",kind:"demand"},{id:"dem_e",name:"Demand E",kind:"demand"},{id:"dem_g",name:"Demand G",kind:"demand"},
+];
+let UP={active:false,pct:0,phase:"",adapter:"",mb:0};
+
+/* ============ CTAs ============ */
+let CTAS=[
+  {sev:"critical",label:"Margin below floor — Supply B ↔ Demand C (Platform Two)",
+   rec:"margin 7d = −4.2% with revenue > $100/day. Renegotiate the floor or pause the lane.",impact:1840,
+   ev:{mode:"margin",dims:["lane","platform"],filt:[{dim:"lane",val:"Supply B ↔ Demand C"},{dim:"platform",val:"Platform Two"}]}},
+  {sev:"warning",label:"Low fill, high volume — Supply F web video UK",
+   rec:"9.1M requests/day at 2.1% fill. Ship a whitelist of filling domains; cut wasted QPS ~61%.",impact:920,
+   ev:{mode:"supply",dims:["lane","geo"],filt:[{dim:"platform",val:"Platform Three"},{dim:"geo",val:"UK"}]}},
+  {sev:"info",label:"Connection reroute — Demand C fills better on Platform One",
+   rec:"Same connection, Platform One wins on margin % (+6.3pts) at comparable volume. Shift traffic.",impact:650,
+   ev:{mode:"margin",dims:["platform"],filt:[{dim:"lane",val:"Supply B ↔ Demand C"}]}},
+  {sev:"off",suppressed:"suppressed — buy side missing for 2 of 7 days",
+   label:"Spread compression — Supply A ↔ Demand G (Platform Three)",
+   rec:"eCPM spread narrowed 31% w/w; would rank WARNING once buy-side data completes.",impact:410},
+];
+
+/* ============ connections ============ */
+function connections(){
+  const map={};
+  for(const l of LANES){
+    const k=l.lane+" · "+l.media;
+    (map[k]=map[k]||{lane:l.lane,media:l.media,platforms:[]}).platforms.push(l.platform);
+  }
+  const rev={};
+  for(const r of FACTS)if(r.idx>=NDAYS-7)rev[r.lane+" · "+r.media]=(rev[r.lane+" · "+r.media]||0)+r.revenue;
+  return Object.entries(map).map(([k,v])=>({key:k,...v,revenue:rev[k]||0}))
+    .sort((a,b)=>b.platforms.length-a.platforms.length||b.revenue-a.revenue);
+}
+const CONNS=connections();
+let connSel=CONNS[0].key;
+
+/* ============ whitelist data ============ */
+const WORDS=["pixel","astro","chess","runner","garden","dice","forge","comet","quiz","solitaire","mahjong","bubble","tower","merge","idle","farm","word","block","sniper","drift","royale","craft","dash","hex","loop","orbit","pond","rail","snow","tile","vault","wave","zen","arc","bolt","cove","dune","echo","flux","glow","iris","jolt"];
+function genInventory(media,partner,days){
+  let h=days*7+media.length*131+(partner?partner.length*17:5);
+  const r=mulberry(4200+h);
+  const mk=(w,i)=>media==="web"
+    ? (i%2? w+"-daily.com" : w+"news.net")
+    : media==="ctv" ? "tv."+w+"stream.app" : "com."+w+"games."+WORDS[(i*7+3)%WORDS.length];
+  const items=[];
+  for(let i=0;i<34;i++){
+    const opps=Math.round(6e4+r()*5e6);
+    const fr=0.004+r()*0.085;
+    const fills=Math.round(opps*fr);
+    const wins=Math.round(fills*1.03), bids=Math.round(opps*(0.1+r()*0.3));
+    const revenue=fills*(4+r()*15)/1000;
+    items.push({inv:mk(WORDS[i%WORDS.length],i),opps,fills,fill:fr,bids,wins,revenue,zero:false});
+  }
+  for(let i=0;i<9;i++){ // high-volume zero-fill waste
+    const opps=Math.round(4e6+r()*2.4e7);
+    items.push({inv:mk(WORDS[(i*3+11)%WORDS.length]+"x",i+40),opps,fills:0,fill:0,bids:Math.round(opps*0.02),wins:0,revenue:0,zero:true});
+  }
+  return items;
+}
+let W={partner:"",media:"inapp",days:7,minReq:250000,minFill:2.0,built:null};
+
+/* ============ mapper state ============ */
+const SAMPLE_CSV=`Date;Publisher Tag;DSP;Country;Currency;Ad Requests;Fills;Impressions;Revenue
+2026-08-03;ctv_rok_eu_01;Demand C;DE;EUR;1250340;98421;97210;612.44
+2026-08-03;ctv_rok_eu_01;Demand D;DE;EUR;441250;18804;18211;101.87
+2026-08-03;inapp_gm_us_04;Demand C;US;EUR;2204118;122045;119876;744.02
+2026-08-04;ctv_rok_eu_01;Demand C;DE;EUR;1301882;104110;102934;655.19
+2026-08-04;inapp_gm_us_04;Demand C;US;EUR;2155904;118220;116102;731.66
+2026-08-04;web_vd_uk_02;Demand G;UK;EUR;3810442;44120;43005;96.41`;
+const UNIFIED_FIELDS=["","event_date","currency","geo_country","device_type","os","demand_name_raw","supply_name_raw","supply_tag","app_bundle","site_domain","requests","responses","fills","bids","wins","impressions","clicks","video_starts","video_completes","revenue_raw","cost_raw"];
+const GUESSES=[
+  [/^date|day$/,"event_date"],[/date/,"event_date"],[/currency|curr$/,"currency"],
+  [/geo|country/,"geo_country"],[/device/,"device_type"],
+  [/dsp|demand|buyer|bidder/,"demand_name_raw"],[/ssp|supply(?! tag)|seller|publisher name/,"supply_name_raw"],
+  [/tag|placement|endpoint/,"supply_tag"],[/bundle|app/,"app_bundle"],[/site|domain/,"site_domain"],
+  [/ad ?requests?|requests?|queries/,"requests"],[/responses?/,"responses"],[/fills?|filled/,"fills"],
+  [/bids?$|bid count/,"bids"],[/wins?|won/,"wins"],[/paid imp|impressions?|imps?/,"impressions"],
+  [/clicks?/,"clicks"],[/starts?/,"video_starts"],[/complet/,"video_completes"],
+  [/revenue|earnings|payout/,"revenue_raw"],[/cost|spend|media spend/,"cost_raw"],
+];
+function guessField(header){
+  const h=header.toLowerCase().replace(/[^a-z ]/g," ").trim();
+  for(const [re,f] of GUESSES)if(re.test(h))return f;
+  return "";
+}
+let M={id:"platform_four_sell",platform:"platform_four",side:"sell",mode:"file",tz:"Europe/Berlin",currency:"EUR",fee:"gross",take:0.15,
+  sample:SAMPLE_CSV,delim:";",headers:[],rows:[],mapping:{},keys:{},parsed:false,result:null};
+const FX={EUR:1.0912,USD:1,GBP:1.271,AUD:0.652};
+
+/* ============ COCKPIT bands (chrome mirrors the real cockpit) ============ */
+let BANDS={}; // per-band hover data, rebuilt on every render
+function multiSpark(series,uptoIdx,n,ticks){
+  const W=960,H=140,padT=10,padB=18,padL=8,padR=8;
+  const iW=W-padL-padR,iH=H-padT-padB,last=Math.max(1,n-1);
+  const x=i=>padL+iW*i/last;
+  let grid="";
+  for(const [i,lab] of ticks){
+    const anchor=i===0?"start":i===n-1?"end":"middle";
+    grid+=`<line x1="${x(i)}" y1="${padT}" x2="${x(i)}" y2="${padT+iH}" stroke="rgba(250,250,247,.1)"/>`+
+      `<text x="${x(i)}" y="${H-5}" fill="rgba(250,250,247,.45)" text-anchor="${anchor}">${lab}</text>`;
+  }
+  let parts="";
+  for(const s of series){
+    const vals=[...s.cur.slice(0,uptoIdx+1).filter(v=>v!=null),...s.pri.filter(v=>v!=null)];
+    const max=Math.max(...vals,1e-9)*1.06;
+    const y=v=>padT+iH-iH*v/max;
+    const path=(arr,upto)=>{let d="",pen=false;for(let i=0;i<=upto;i++){const v=arr[i];if(v==null){pen=false;continue;}d+=(pen?"L":"M")+x(i).toFixed(1)+","+y(v).toFixed(1);pen=true;}return d;};
+    parts+=`<path d="${path(s.pri,n-1)}" fill="none" stroke="${s.color}" stroke-opacity=".45" stroke-width="1.8" stroke-dasharray="6 5"/>`;
+    parts+=`<path d="${path(s.cur,uptoIdx)}" fill="none" stroke="${s.color}" stroke-opacity=".22" stroke-width="7" stroke-linecap="round"/>`;
+    parts+=`<path d="${path(s.cur,uptoIdx)}" fill="none" stroke="${s.color}" stroke-width="2.8"/>`;
+    for(let i=0;i<=uptoIdx;i++){if(s.cur[i]==null)continue;const now=i===uptoIdx;parts+=`<circle cx="${x(i).toFixed(1)}" cy="${y(s.cur[i]).toFixed(1)}" r="${now?4:2}" fill="${s.color}"${now?' stroke="#07331F" stroke-width="1.5"':""}/>`;}
+  }
+  return `<svg viewBox="0 0 ${W} ${H}" style="display:block;width:100%;height:auto" preserveAspectRatio="none">${grid}${parts}</svg>`;
+}
+const paceTag=(cur,prev)=>{if(!prev)return"";const p=(cur-prev)/Math.abs(prev)*100;
+  return ` <small class="${p>=0?"pace-up":"pace-down"}">${p>=0?"▲":"▼"} ${Math.abs(p).toFixed(0)}%</small>`;};
+function toggleList(arr,k,min){const i=arr.indexOf(k);if(i>=0){if(arr.length>min)arr.splice(i,1);}else arr.push(k);render();}
+function tgPm(k){toggleList(S.pm,k,1);} function tgDm(k){toggleList(S.dm,k,1);}
+function tgPmed(m){toggleList(S.pmedia,m,1);} function tgDmed(m){toggleList(S.dmedia,m,1);}
+function setDwin(n){S.dwin=n;render();}
+function setKwin(n){S.kwin=Number(n);render();}
+function bandRefresh(){toast("Refreshed — micro-cache bypassed");render();}
+function chipRow(active,base,upto,toggler,mediaSel,mediaToggler,withWin){
+  const s=arr=>arr.slice(0,upto+1).reduce((a,v)=>a+(v??0),0);
+  const val=k=>{
+    if(k==="revenue")return fmt$(s(base.rev));
+    if(k==="requests")return Math.round(s(base.req)).toLocaleString();
+    if(k==="ecpm"){const imp=s(base.imp);return imp>0?usd2(s(base.rev)/imp*1000):"–";}
+    const req=s(base.req);return req>0?pct(s(base.fil)/req):"–";
+  };
+  const mChips=Object.entries(CHART_METRICS).map(([k,def])=>
+    `<span class="pchk ${active.includes(k)?'':'off'}" style="${active.includes(k)?'border-color:'+def.color:''}" onclick="${toggler}('${k}')"><span class="sw" style="background:${def.color}"></span>${def.label} <b>${val(k)}</b></span>`).join("");
+  const medChips=MEDIA.map(m=>
+    `<span class="pchk ${mediaSel.includes(m)?'':'off'}" onclick="${mediaToggler}('${m}')">${MEDIA_LABEL[m]}</span>`).join("");
+  const winChips=withWin?`<span class="psep"></span>`+[7,14,30].map(d=>
+    `<span class="pchk ${S.dwin===d?'':'off'}" style="${S.dwin===d?'border-color:var(--gold)':''}" onclick="setDwin(${d})">${d}d</span>`).join(""):"";
+  return `<div class="pctl">${mChips}<span class="psep"></span>${medChips}${winChips}</div>`;
+}
+function moverClick(lane){
+  S.tab="cockpit";S.mode="margin";S.dims=["lane","platform"];S.filt=[{dim:"lane",val:lane}];S.th=null;
+  sync();scrollToBreakdown();
+}
+function scrollToBreakdown(){setTimeout(()=>{const el=document.getElementById("breakdown-card");if(el)el.scrollIntoView({behavior:"smooth",block:"start"});},60);}
+
+function pulseBand(){
+  const t=hourBase(S.pmedia,"t"),y=hourBase(S.pmedia,"y");
+  BANDS.pulse={t,y,n:24,upto:HOUR,metrics:S.pm,
+    pointLabel:i=>`${String(i).padStart(2,"0")}:00–${String(i).padStart(2,"0")}:59`,colLabel:()=>"today · yday"};
+  const revT=t.rev.reduce((a,b)=>a+b,0),revY=y.rev.slice(0,HOUR+1).reduce((a,b)=>a+b,0);
+  const mFor=idx=>{let rev=0,cost=0;for(const m of S.pmedia){const d=DAYTOT[m][idx];rev+=d.rev;cost+=d.cost;}return rev>0?1-cost/rev:0;};
+  const profT=revT*mFor(NDAYS-1),profY=revY*mFor(NDAYS-2);
+  const ticks=[[0,"00"],[6,"06"],[12,"12"],[18,"18"],[23,"23"]];
+  const series=S.pm.map(k=>({color:CHART_METRICS[k].color,
+    cur:[...Array(HOUR+1)].map((_,i)=>metricOf(t,i,k)),pri:[...Array(24)].map((_,i)=>metricOf(y,i,k))}));
+  const movers=MOVERS.map(m=>`<span class="pmover" onclick="moverClick('${m.lane}')" title="Open in breakdown, filtered to this lane"><b class="${m.delta>=0?'pace-up':'pace-down'}">${m.delta>=0?"▲":"▼"} ${fmt$(Math.abs(m.delta))}</b> ${m.supply} × ${m.demand} · ${MEDIA_SHORT[m.media]}</span>`).join("");
+  return `<div class="pulse" id="band-pulse">
+    <div class="top">
+      <span class="lbl"><span class="pdot"></span>Live · today so far</span>
+      <span class="pstat"><span class="k">Revenue</span><br><span class="v">${fmt$(revT)}${paceTag(revT,revY)}</span></span>
+      <span class="pstat"><span class="k">Profit</span><br><span class="v">${fmt$(profT)}${paceTag(profT,profY)}</span></span>
+      <span class="hint2">hourly benchmarks · today (solid) vs yesterday (dashed) · through ${String(HOUR).padStart(2,"0")}:59 UTC</span>
+      <span class="prefresh" onclick="bandRefresh()" title="Refresh now">↻ <span class="st">${nowStamp()}</span></span>
+    </div>
+    ${chipRow(S.pm,t,HOUR,"tgPm",S.pmedia,"tgPmed",false)}
+    <div class="pchart">${multiSpark(series,HOUR,24,ticks)}<div class="pguide"></div><div class="ptip"></div></div>
+    <div class="pmovers">${movers}</div>
+  </div>`;
+}
+function dailyBand(){
+  const n=S.dwin;
+  const {cur,pri}=dayBase(S.dmedia,n);
+  BANDS.daily={t:cur,y:pri,n,upto:n-1,metrics:S.dm,
+    pointLabel:i=>fmtDay(cur.dates[i]),colLabel:i=>`vs ${fmtDay(pri.dates[i])}`};
+  const sum=a=>a.reduce((x,b)=>x+b,0);
+  const revC=sum(cur.rev),revP=sum(pri.rev);
+  const profC=revC-sum(cur.cost),profP=revP-sum(pri.cost);
+  const ticks=[];const step=Math.max(1,Math.ceil(n/7));
+  for(let i=0;i<n;i+=step)ticks.push([i,fmtDay(cur.dates[i])]);
+  if(ticks[ticks.length-1][0]!==n-1)ticks.push([n-1,fmtDay(cur.dates[n-1])]);
+  const series=S.dm.map(k=>({color:CHART_METRICS[k].color,
+    cur:[...Array(n)].map((_,i)=>metricOf(cur,i,k)),pri:[...Array(n)].map((_,i)=>metricOf(pri,i,k))}));
+  return `<div class="pulse" id="band-daily">
+    <div class="top">
+      <span class="lbl">Daily · last ${n} days</span>
+      <span class="pstat"><span class="k">Revenue</span><br><span class="v">${fmt$(revC)}${paceTag(revC,revP)}</span></span>
+      <span class="pstat"><span class="k">Profit</span><br><span class="v">${fmt$(profC)}${paceTag(profC,profP)}</span></span>
+      <span class="hint2">${fmtDay(cur.dates[0])}–${fmtDay(cur.dates[n-1])} (solid) vs the ${n} days before (dashed) · complete days only</span>
+      <span class="prefresh" onclick="bandRefresh()" title="Refresh now">↻ <span class="st">${nowStamp()}</span></span>
+    </div>
+    ${chipRow(S.dm,cur,n-1,"tgDm",S.dmedia,"tgDmed",true)}
+    <div class="pchart">${multiSpark(series,n-1,n,ticks)}<div class="pguide"></div><div class="ptip"></div></div>
+  </div>`;
+}
+/* hover tooltip: guide line + dark card, today vs benchmark for every checked metric */
+function bindBandHover(id){
+  const band=document.getElementById("band-"+id);if(!band)return;
+  const data=BANDS[id];if(!data)return;
+  const wrap=band.querySelector(".pchart"),svg=wrap.querySelector("svg");
+  const guide=wrap.querySelector(".pguide"),tip=wrap.querySelector(".ptip");
+  const W=960,padL=8,padR=8,iW=W-padL-padR,last=Math.max(1,data.n-1);
+  svg.onmousemove=ev=>{
+    const box=svg.getBoundingClientRect();
+    const i=Math.max(0,Math.min(last,Math.round(((ev.clientX-box.left)/box.width*W-padL)/iW*last)));
+    const gx=(padL+i/last*iW)/W*box.width+svg.offsetLeft;
+    guide.style.display="block";guide.style.left=gx+"px";guide.style.top=svg.offsetTop+"px";guide.style.height=box.height+"px";
+    const rows=data.metrics.map(k=>{
+      const def=CHART_METRICS[k];
+      const c=v=>v==null?"–":def.fmt(v);
+      const tv=i<=data.upto?metricOf(data.t,i,k):null;
+      return `<tr><td class="m"><span class="dot2" style="background:${def.color}"></span>${def.label}</td><td class="n">${c(tv)}</td><td class="n yv">${c(metricOf(data.y,i,k))}</td></tr>`;
+    }).join("");
+    tip.innerHTML=`<div class="tth"><span>${data.pointLabel(i)}</span><span>${data.colLabel(i)}</span></div><table>${rows}</table>`;
+    tip.style.display="block";
+    const tw=tip.offsetWidth||190;
+    const flip=gx+14+tw>svg.offsetLeft+box.width;
+    tip.style.left=(flip?gx-tw-12:gx+12)+"px";tip.style.top=(svg.offsetTop+6)+"px";
+  };
+  svg.onmouseleave=()=>{guide.style.display="none";tip.style.display="none";};
+}
+function kpiStrip(){
+  const n=S.kwin;
+  const zero={inventories:0,opportunities:0,responses:0,bids:0,wins:0};
+  const c=derive({...zero,...sumWin(NDAYS-n,NDAYS-1)});
+  const p=derive({...zero,...sumWin(NDAYS-2*n,NDAYS-1-n)});
+  const delta=v=>`<div class="d ${v>=0?'up':'down'}">${v>=0?"▲":"▼"} ${Math.abs(v*100).toFixed(1)}% vs prior ${n}d</div>`;
+  return `<div class="kpis">
+    <div class="kpi"><div class="l">Revenue · ${n}d</div><div class="v">${fmt$(c.revenue)}</div>${delta(kd(c.revenue,p.revenue))}</div>
+    <div class="kpi"><div class="l">Cost · ${n}d</div><div class="v">${fmt$(c.cost)}</div>${delta(kd(c.cost,p.cost))}</div>
+    <div class="kpi hl"><div class="l">Margin · ${n}d</div><div class="v">${fmt$(c.margin)}</div>${delta(kd(c.margin,p.margin))}</div>
+    <div class="kpi hl"><div class="l">Margin %</div><div class="v">${pct(c.margin_pct)}</div></div>
+    <div class="kpi"><div class="l">eCPM sell</div><div class="v">${usd2(c.ecpm_sell)}</div>${delta(kd(c.ecpm_sell,p.ecpm_sell))}</div>
+    <div class="kpi"><div class="l">Fill rate</div><div class="v">${pct(c.fill_rate)}</div>${delta(kd(c.fill_rate,p.fill_rate))}</div>
+  </div>`;
+}
+/* breakdown */
+function setMode(m){S.mode=m;S.sort={k:MODE_COLS[m][MODE_COLS[m].length-2][0],asc:false};S.th=null;sync();}
+function toggleDim(d){
+  const i=S.dims.indexOf(d);
+  if(i>=0){if(S.dims.length>1)S.dims.splice(i,1);else{toast("Keep at least one dimension");return;}}
+  else if(S.dims.length>=3){toast("Up to 3 dimensions — remove one first");return;}
+  else S.dims.push(d);
+  sync();
+}
+function setGrain(g){S.grain=g;sync();}
+function addFilter(dim,val){
+  if(S.filt.some(f=>f.dim===dim&&f.val===val))return;
+  S.filt.push({dim,val});sync();
+}
+function rmFilter(i){S.filt.splice(i,1);sync();}
+function rmTh(){S.th=null;sync();}
+function applyTh(){
+  const m=$("#th-metric").value,op=$("#th-op").value,v=$("#th-val").value;
+  S.th=m&&v!==""?{m,op,v:Number(v)}:null;
+  sync();
+}
+function setSort(k){if(S.sort.k===k)S.sort.asc=!S.sort.asc;else S.sort={k,asc:false};render();}
+function breakdownRows(){
+  const grain=S.grain==="hour"?"hour":S.grain==="day"?"date":null;
+  let facts=(grain==="hour"?HFACTS:FACTS.filter(r=>r.idx>=NDAYS-7));
+  for(const f of S.filt)facts=facts.filter(r=>r[f.dim]===f.val);
+  const keys=grain?[grain,...S.dims]:[...S.dims];
+  let rows=agg(facts,keys);
+  const totals=derive(facts.reduce((a,r)=>{for(const m of MEASURES)a[m]=(a[m]||0)+r[m];return a;},{}));
+  if(S.th){
+    const t=S.th;
+    rows=rows.filter(r=>{const v=r[t.m];if(v==null)return false;
+      return t.op===">"?v>t.v:t.op==="<"?v<t.v:Math.abs(v-t.v)<Math.max(Math.abs(t.v)*0.005,1e-9);});
+  }
+  const sk=S.sort.k;
+  rows.sort((a,b)=>((a[sk]??-1e18)-(b[sk]??-1e18))*(S.sort.asc?1:-1));
+  return {rows,totals,keys,grain};
+}
+function breakdownCard(){
+  const cols=MODE_COLS[S.mode];
+  const {rows,totals,keys,grain}=breakdownRows();
+  const thMetricOpts=cols.map(([k,l])=>`<option value="${k}" ${S.th&&S.th.m===k?"selected":""}>${l}</option>`).join("");
+  const dimChips=DIMS.map(([k,l])=>{
+    const i=S.dims.indexOf(k);
+    return `<span class="chip ${i>=0?'on':''}" onclick="toggleDim('${k}')">${i>=0?`<span class="num">${i+1}</span>`:""}${l}</span>`;
+  }).join("");
+  const chips=S.filt.map((f,i)=>`<span class="fchip"><b>${dimLabel(f.dim)}</b> = ${esc(f.val)} <span class="x" onclick="rmFilter(${i})">×</span></span>`).join("")
+    +(S.th?`<span class="fchip th"><b>${S.th.m.replace(/_/g," ")}</b> ${esc(S.th.op)} ${S.th.v} <span class="x" onclick="rmTh()">×</span></span>`:"");
+  const best=S.mode==="margin"&&!grain?Math.max(...rows.map(r=>r.margin??-1e18)):null;
+  const th=(k,l)=>`<th class="num sortable" onclick="setSort('${k}')">${l}${S.sort.k===k?(S.sort.asc?" ▲":" ▼"):""}</th>`;
+  const head=(grain?`<th>${dimLabel(grain)}</th>`:"")+S.dims.map(d=>`<th>${dimLabel(d)}</th>`).join("")+cols.map(([k,l])=>th(k,l)).join("");
+  const cell=(k,v,f)=>{
+    const cls=(k==="margin"||k==="margin_pct")?(v>=(k==="margin_pct"?0.10:0)?"pos":"neg"):"";
+    return `<td class="num ${cls}">${f(v)}</td>`;
+  };
+  const body=rows.map(r=>{
+    const dimStart=grain?1:0;
+    const tds=(grain?`<td class="mono">${esc(r._k[0])}</td>`:"")+
+      S.dims.map((d,i)=>{
+        const v=r._k[dimStart+i];
+        return `<td><span class="dv" onclick="addFilter('${d}','${String(v).replace(/'/g,"")}')">${esc(v)}</span>${!grain&&S.mode==="margin"&&r.margin===best?' <span class="badge win">winner</span>':""}</td>`;
+      }).join("")+
+      cols.map(([k,,f])=>cell(k,r[k],f)).join("");
+    return `<tr class="${!grain&&S.mode==="margin"&&r.margin===best?"winner":""}">${tds}</tr>`;
+  }).join("");
+  const totalRow=`<tr class="total"><td colspan="${S.dims.length+(grain?1:0)}">Total — filtered slice (${rows.length} rows)</td>${cols.map(([k,,f])=>`<td class="num">${f(totals[k])}</td>`).join("")}</tr>`;
+  return `<div class="card" id="breakdown-card">
+    <div class="h"><span class="t">Breakdown</span>
+      <span class="seg">${["margin","supply","demand"].map(m=>`<button class="${S.mode===m?'on':''}" onclick="setMode('${m}')">${MODE_LABEL[m]}</button>`).join("")}</span>
+      ${dimChips}
+      <span class="sub" style="margin-left:auto">last 7 days</span></div>
+    <div class="b row">
+      <span class="sub">Granularity:</span>
+      <select onchange="setGrain(this.value)">${["auto","day","hour"].map(g=>`<option ${S.grain===g?"selected":""}>${g}</option>`).join("")}</select>
+      <span class="sub">Threshold:</span>
+      <select id="th-metric"><option value="">— none —</option>${thMetricOpts}</select>
+      <select id="th-op">${["&gt;","&lt;","="].map(o=>{const raw=o==="&gt;"?">":o==="&lt;"?"<":"=";return `<option value="${raw}" ${S.th&&S.th.op===raw?"selected":""}>${o}</option>`;}).join("")}</select>
+      <input id="th-val" type="number" step="any" style="width:90px" placeholder="value" value="${S.th?S.th.v:""}">
+      <button class="btn ghost" onclick="applyTh()">Apply</button>
+      <span class="sub" style="margin-left:auto">Click any value to filter · view state lives in the URL</span>
+    </div>
+    ${chips?`<div class="fchips">${chips}</div>`:""}
+    <div class="tbl-wrap"><table><tr>${head}</tr>${totalRow}${body||`<tr><td colspan="12" class="note">No rows match.</td></tr>`}</table></div>
+  </div>`;
+}
+/* report generator */
+function rSetMode(m){R.mode=m;R.metrics=[...R_DEFAULTS[m]];R.est=null;render();}
+function rToggleDim(d){const i=R.dims.indexOf(d);if(i>=0){if(R.dims.length>1)R.dims.splice(i,1);}else R.dims.push(d);R.est=null;render();}
+function rToggleMetric(m){const i=R.metrics.indexOf(m);if(i>=0){if(R.metrics.length>1)R.metrics.splice(i,1);}else R.metrics.push(m);R.est=null;render();}
+function rRows(){
+  const keys=R.dims.map(d=>d==="date"?"date":d);
+  const facts=FACTS.filter(r=>r.idx>=NDAYS-7);
+  return {rows:agg(facts,keys),keys};
+}
+function rEstimate(){
+  const {rows}=rRows();
+  const bytes=rows.length*(R.dims.length+R.metrics.length)*11+120;
+  R.est={rows:rows.length,bytes};
+  render();
+}
+function rDeliver(){
+  if(!R.est)return;
+  const cols=MODE_COLS[R.mode].filter(([k])=>R.metrics.includes(k));
+  const {rows}=rRows();
+  const head=[...R.dims.map(dimLabel),...cols.map(c=>c[1])].join(",");
+  const lines=rows.map(r=>[...r._k.map(v=>`"${v}"`),...cols.map(([k])=>r[k]==null?"":(typeof r[k]==="number"?r[k].toFixed(4):r[k]))].join(","));
+  const name=`rtbm_${R.mode}_${dISO(6)}_${dISO(0)}.csv`;
+  dl(name,[head,...lines].join("\n"),"text/csv");
+  toast(`Delivered ${name} — ${rows.length} rows`);
+}
+function rSavePreset(){
+  const name=$("#rp-name").value.trim();
+  if(!name){toast("Give the report a name first");return;}
+  const schedule=$("#rp-sched").value,email=$("#rp-email").value.trim();
+  R.presets.push({name,mode:R.mode,dims:[...R.dims],metrics:[...R.metrics],schedule,email});
+  $("#rp-name").value="";
+  if(schedule!=="manual")toast(`Scheduled ${schedule}${email?" → "+email:""} (demo: in-memory only)`);
+  else toast(`Saved "${name}"`);
+  render();
+}
+function rRunPreset(i){
+  const p=R.presets[i];
+  R.mode=p.mode;R.dims=[...p.dims];R.metrics=[...p.metrics];
+  rEstimate();rDeliver();
+}
+function rDelPreset(i){R.presets.splice(i,1);render();}
+function reportCard(){
+  const est=R.est;
+  const metricOpts=MODE_COLS[R.mode];
+  return `<div class="card">
+    <div class="h"><span class="t">Report generator</span>
+      <span class="seg">${["margin","supply","demand"].map(m=>`<button class="${R.mode===m?'on':''}" onclick="rSetMode('${m}')">${MODE_LABEL[m]}</button>`).join("")}</span>
+      <span class="sub" style="margin-left:auto">last 7 days · CSV delivery</span></div>
+    <div class="b">
+      <div class="row" style="margin-bottom:8px"><span class="sub" style="min-width:78px">Dimensions:</span>
+        ${R_DIMS.map(([k,l])=>`<span class="chip ${R.dims.includes(k)?'on':''}" onclick="rToggleDim('${k}')">${l}</span>`).join("")}</div>
+      <div class="row" style="margin-bottom:8px"><span class="sub" style="min-width:78px">Metrics:</span>
+        ${metricOpts.map(([k,l])=>`<span class="chip ${R.metrics.includes(k)?'on':''}" onclick="rToggleMetric('${k}')">${l}</span>`).join("")}</div>
+      <div class="row" style="margin-bottom:8px">
+        <button class="btn" onclick="rEstimate()">Estimate</button>
+        ${est?`<span class="verdict"><b>${est.rows.toLocaleString()}</b> rows · ~${est.bytes<1024?est.bytes+" B":(est.bytes/1024).toFixed(1)+" KB"} · ${dISO(6)} → ${dISO(0)} — will download as CSV</span>
+        <button class="btn gold" onclick="rDeliver()">Deliver</button>`:`<span class="sub">${R.dims.length} dimensions · ${R.metrics.length} metrics</span>`}
+      </div>
+      <div class="row" style="border-top:1px solid var(--rule);padding-top:10px">
+        <span class="sub">Save preset:</span>
+        <input id="rp-name" type="text" placeholder="report name…" style="width:150px">
+        <select id="rp-sched"><option>manual</option><option>daily</option><option>weekly</option></select>
+        <input id="rp-email" type="email" placeholder="email to (optional)" style="width:170px">
+        <button class="btn ghost" onclick="rSavePreset()">Save preset</button>
+        ${R.presets.map((p,i)=>`<span class="fchip"><b>${esc(p.name)}</b> (${p.schedule}${p.email?" → "+esc(p.email):""}) <span class="x" title="Run now" onclick="rRunPreset(${i})">▶</span> <span class="x" onclick="rDelPreset(${i})">×</span></span>`).join("")}
+      </div>
+    </div>
+  </div>`;
+}
+/* connection comparison */
+function setConn(k){connSel=k;render();}
+function comparisonCard(){
+  const conn=CONNS.find(c=>c.key===connSel)||CONNS[0];
+  const facts=FACTS.filter(r=>r.idx>=NDAYS-7&&r.lane===conn.lane&&r.media===conn.media);
+  const rows=agg(facts,["platform"]);
+  rows.forEach(r=>{r.hasBuy=LANES.find(l=>l.lane===conn.lane&&l.media===conn.media&&l.platform===r._k[0]).hasBuy;});
+  const two=rows.filter(r=>r.hasBuy&&r.margin_pct!=null);
+  const best=two.length?Math.max(...two.map(r=>r.margin_pct)):null;
+  rows.sort((a,b)=>(b.margin_pct??-1)-(a.margin_pct??-1));
+  const cols=[["requests","Requests",fmtM],["fill_rate","Fill rate",pct],["win_rate","Win rate",pct],["ecpm_buy","eCPM buy",usd2],["ecpm_sell","eCPM sell",usd2],["revenue","Revenue",fmt$],["margin_pct","Margin %",pct]];
+  const body=rows.map(r=>{
+    const winner=two.length>1&&r.hasBuy&&r.margin_pct===best;
+    const badge=r.hasBuy?(winner?' <span class="badge win">best margin</span>':""):' <span class="badge">one-sided</span>';
+    return `<tr class="${winner?"winner":""}"><td>${esc(r._k[0])}${badge}</td>`+
+      cols.map(([k,,f])=>`<td class="num">${r.hasBuy||["requests","fill_rate","ecpm_sell","revenue"].includes(k)?f(r[k]):"–"}</td>`).join("")+"</tr>";
+  }).join("");
+  return `<div class="card">
+    <div class="h"><span class="t">Connection comparison</span><span class="sub">— same connection, which platform wins?</span></div>
+    <div class="b row"><select onchange="setConn(this.value)" style="max-width:460px">
+      ${CONNS.map(c=>`<option value="${c.key}" ${c.key===connSel?"selected":""}>${c.lane} · ${c.media} — ${c.platforms.length} platform${c.platforms.length>1?"s":""} (${fmt$(c.revenue)})</option>`).join("")}
+    </select></div>
+    <div class="tbl-wrap"><table><tr><th>Platform</th>${cols.map(c=>`<th class="num">${c[1]}</th>`).join("")}</tr>${body}</table></div>
+    <div class="note">One-sided = only sell-side reports delivered for that platform — buy metrics unavailable, margin ungraded.</div>
+  </div>`;
+}
+/* CTAs */
+function showEvidence(i){
+  const c=CTAS[i];if(!c.ev)return;
+  S.tab="cockpit";S.mode=c.ev.mode;S.dims=[...c.ev.dims];S.filt=c.ev.filt.map(f=>({...f}));S.th=null;S.grain="auto";
+  sync();scrollToBreakdown();
+  toast("Breakdown filtered to the evidence slice");
+}
+function reEvaluate(){
+  for(const c of CTAS)c.impact=Math.round(c.impact*(0.8+rnd()*0.5));
+  const live=CTAS.filter(c=>!c.suppressed).sort((a,b)=>b.impact-a.impact);
+  CTAS=[...live,...CTAS.filter(c=>c.suppressed)];
+  toast("Rules engine re-ran over fresh rollups — CTAs re-ranked");
+  render();
+}
+function ctaCard(){
+  return `<div class="card">
+    <div class="h"><span class="t">Action points — ranked</span><span style="margin-left:auto"><button class="btn ghost" onclick="reEvaluate()">Re-evaluate</button></span></div>
+    ${CTAS.map((c,i)=>`<div class="cta ${c.suppressed?"suppressed":""}">
+      <span class="sev ${c.suppressed?"off":c.sev}">${c.suppressed?"Suppressed":c.sev}</span>
+      <div class="body"><div class="lbl">${esc(c.label)}</div>
+        <div class="rec">${c.suppressed?`<i>${esc(c.suppressed)}</i> — `:""}${esc(c.rec)}</div></div>
+      <div class="impact">+${fmt$(c.impact).slice(1)?fmt$(c.impact):""}/mo</div>
+      ${c.suppressed?"":`<button class="btn" onclick="showEvidence(${i})">Evidence</button>`}
+    </div>`).join("")}
+  </div>`;
+}
+function pageCockpit(){
+  return pulseBand()+dailyBand()+kpiStrip()+breakdownCard()+reportCard()+comparisonCard()+ctaCard();
+}
+
+/* ============ OPS BOARD ============ */
+const ADAPTERS=[
+  ["platform_one_sell","platform_one_sell (Platform One · sell · csv)"],
+  ["platform_two_sell","platform_two_sell (Platform Two · sell · csv)"],
+  ["platform_two_buy","platform_two_buy (Platform Two · buy · json)"],
+  ["platform_three_sell","platform_three_sell (Platform Three · sell · email csv)"],
+  ["group:platform_two","platform_two — BOTH SIDES (Platform Two · sell+buy)"],
+];
+function startUpload(){
+  const adapter=$("#up-adapter").value;
+  const file=$("#up-file").files[0];
+  if(!adapter){toast("Pick an adapter first");return;}
+  if(!file){toast("Pick a file first");return;}
+  UP={active:true,pct:0,phase:"upload",adapter,mb:(file.size/1048576).toFixed(1)};
+  render();
+  const tick=setInterval(()=>{
+    if(UP.phase==="upload"){
+      UP.pct=Math.min(100,UP.pct+6+rnd()*13);
+      if(UP.pct>=100){UP.phase="ingest";UP.pct=100;}
+    }else if(UP.phase==="ingest"){
+      UP.ingestT=(UP.ingestT||0)+1;
+      if(UP.ingestT>=9){
+        clearInterval(tick);
+        const rows=Math.round(8000+rnd()*34000),q=Math.round(rnd()*7),rev=rnd()<0.5?1:0;
+        RUNS.unshift({when:"Just now",src:adapter.replace("group:","")+(adapter.startsWith("group:")?" (both sides)":""),mode:"manual upload",rows,q,rev});
+        if(rev)REVIEW.push({platform:adapter.startsWith("group:")?"platform_two":adapter.split("_").slice(0,2).join("_"),raw:"NewPartner_"+Math.round(rnd()*900+100),kind:rnd()<0.5?"demand":"supply"});
+        UP={active:false,done:`Done: ${rows.toLocaleString()} rows loaded, ${q} quarantined, ${rev} name${rev===1?"":"s"} to review.`};
+        toast("Ingest complete — run appended to the board");
+        render();return;
+      }
+    }
+    const bar=document.getElementById("up-bar"),lab=document.getElementById("up-label");
+    if(bar)bar.style.width=UP.pct+"%";
+    if(lab)lab.textContent=UP.phase==="upload"?`Uploading ${UP.mb} MB — ${Math.floor(UP.pct)}% (stay on the page)`:`Upload complete — ingesting ${UP.mb} MB through ${UP.adapter}…`;
+  },110);
+}
+function resolveName(i,entityId){
+  if(!entityId)return;
+  const item=REVIEW[i];
+  REVIEW.splice(i,1);
+  toast(`Alias saved: ${item.raw} → ${entityId} — history reattached`);
+  render();
+}
+function pageOps(){
+  const ok=SOURCES.filter(s=>s[0]==="ok").length,stale=SOURCES.filter(s=>s[0]==="stale").length,missing=SOURCES.filter(s=>s[0]==="missing").length;
+  const upload=`<div class="card">
+    <div class="h"><span class="t">Manual report upload</span><span class="sub">— manual feed until the platform API arrives</span></div>
+    <div class="b row">
+      <select id="up-adapter" style="min-width:290px"><option value="">— choose adapter —</option>
+        ${ADAPTERS.map(([v,l])=>`<option value="${v}">${l}</option>`).join("")}</select>
+      <input type="file" id="up-file" accept=".csv,.tsv,.txt,.eml,.json" style="font-size:12.5px">
+      <button class="btn" onclick="startUpload()" ${UP.active?"disabled":""}>Upload &amp; ingest</button>
+      ${UP.active?`<div class="prog"><i id="up-bar" style="width:${UP.pct}%"></i></div><span class="sub" id="up-label">Uploading ${UP.mb} MB — ${Math.floor(UP.pct)}%</span>`:UP.done?`<span class="sub">${UP.done}</span>`:""}
+    </div>
+    <div class="note">The file streams through the adapter's pipeline immediately — dedup means re-uploading the same period is always safe.</div>
+  </div>`;
+  const review=`<div class="card">
+    <div class="h"><span class="t">Names to review</span><span class="sub">— unresolved partner names from reports</span></div>
+    ${REVIEW.length?`<div class="tbl-wrap"><table>
+      <tr><th>Platform</th><th>Raw name</th><th>Kind</th><th>Map to entity</th></tr>
+      ${REVIEW.map((r,i)=>`<tr><td>${esc(r.platform)}</td><td class="mono">${esc(r.raw)}</td><td>${r.kind}</td>
+        <td><select onchange="resolveName(${i},this.value)"><option value="">— choose entity —</option>
+          ${ENTITIES.filter(e=>e.kind===r.kind).map(e=>`<option value="${e.id}">${e.name} (${e.id})</option>`).join("")}</select></td></tr>`).join("")}
+    </table></div>
+    <div class="note">Names seen in reports that don't match any alias. Rows already loaded stay visible as unresolved lanes until re-ingested.</div>`
+    :`<div class="note">Queue clear — every partner name in the last runs resolved to a canonical entity.</div>`}
+  </div>`;
+  return `
+  <div class="stats" style="padding:0 0 12px">
+    <div class="stat"><div class="k">Delivering</div><div class="v">${ok}</div></div>
+    <div class="stat"><div class="k">Stale</div><div class="v" style="color:var(--warning)">${stale}</div></div>
+    <div class="stat"><div class="k">Missing</div><div class="v" style="color:var(--danger)">${missing}</div></div>
+    <div class="stat"><div class="k">Names awaiting review</div><div class="v" style="color:${REVIEW.length?"var(--warning)":"var(--forest)"}">${REVIEW.length}</div></div>
+  </div>
+  ${upload}
+  <div class="card">
+    <div class="h"><span class="t">Sources — did everything deliver?</span></div>
+    <div class="tbl-wrap"><table>
+      <tr><th>Status</th><th>Source</th><th>Platform</th><th>Side</th><th>Mode</th><th>Latest data</th><th>Behind</th><th class="num">Rows (last run)</th><th class="num">Quarantined</th><th class="num">Names to review</th></tr>
+      ${SOURCES.map(s=>`<tr><td><span class="status ${s[0]}">${s[0]}</span></td><td class="mono">${s[1]}</td><td>${s[2]}</td><td>${s[3]}</td><td>${s[4]}</td><td>${s[5]}</td><td>${s[6]}</td><td class="num">${s[7]}</td><td class="num">${s[8]==="0"?"0":`<span class="badge warn">${s[8]}</span>`}</td><td class="num">${s[9]==="0"?"0":`<span class="badge warn">${s[9]}</span>`}</td></tr>`).join("")}
+    </table></div>
+    <div class="note">ok = data through yesterday · stale = 2–3 days behind · missing = older or never delivered. The pipeline normalizes every platform's schema, currency, timezone and counting method into one margin truth — UTC + USD + net revenue, restatement-safe.</div>
+  </div>
+  <div class="card">
+    <div class="h"><span class="t">Recent pipeline runs</span></div>
+    <div class="tbl-wrap"><table>
+      <tr><th>When</th><th>Source</th><th>Mode</th><th class="num">Rows</th><th class="num">Quarantined</th><th class="num">Unresolved names</th></tr>
+      ${RUNS.map(r=>`<tr><td>${r.when}</td><td class="mono">${esc(r.src)}</td><td>${r.mode}</td><td class="num">${r.rows.toLocaleString()}</td><td class="num">${r.q?`<span class="badge warn">${r.q}</span>`:"0"}</td><td class="num">${r.rev?`<span class="badge warn">${r.rev}</span>`:"0"}</td></tr>`).join("")}
+    </table></div>
+  </div>
+  ${review}`;
+}
+
+/* ============ WHITELIST BUILDER ============ */
+function wlSet(k,v){W[k]=k==="days"||k==="minReq"?Number(v):k==="minFill"?Number(v):v;}
+function wlMedia(m){W.media=m;W.built=null;render();}
+function wlBuild(){
+  W.partner=$("#wl-partner").value;W.days=Number($("#wl-days").value);
+  W.minReq=Number($("#wl-minreq").value)||0;W.minFill=Number($("#wl-minfill").value)||0;
+  const items=genInventory(W.media,W.partner,W.days);
+  const wl=items.filter(x=>!x.zero&&x.opps>=W.minReq&&x.fill*100>=W.minFill).sort((a,b)=>b.fill-a.fill);
+  const bl=items.filter(x=>x.zero&&x.opps>=W.minReq).sort((a,b)=>b.opps-a.opps);
+  const revAll=items.reduce((a,x)=>a+x.revenue,0),oppsAll=items.reduce((a,x)=>a+x.opps,0);
+  W.built={wl,bl,coverage:wl.reduce((a,x)=>a+x.revenue,0)/revAll,qpsCut:bl.reduce((a,x)=>a+x.opps,0)/oppsAll};
+  render();
+}
+function wlExport(list,fmtKind){
+  if(!W.built)return;
+  const rows=W.built[list];
+  const scope=`${W.partner||"network-wide"}_${W.media}_${W.days}d`;
+  if(fmtKind==="txt"){
+    dl(`rtbm_${list==="wl"?"whitelist":"blacklist"}_${scope}.txt`,rows.map(r=>r.inv).join("\n"));
+  }else{
+    const head="inventory,opportunities,fills,fill_rate,revenue_usd";
+    dl(`rtbm_${list==="wl"?"whitelist":"blacklist"}_${scope}.csv`,[head,...rows.map(r=>`${r.inv},${r.opps},${r.fills},${(r.fill*100).toFixed(3)}%,${r.revenue.toFixed(2)}`)].join("\n"),"text/csv");
+  }
+  toast("File downloaded");
+}
+function pageWhitelist(){
+  const idNoun=W.media==="web"?"Domain":"Bundle";
+  const b=W.built;
+  const tbl=(rows,cls)=>`<div class="tbl-wrap"><table>
+    <tr><th>${idNoun}</th><th class="num">Opportunities</th><th class="num">Fills</th><th class="num">Fill rate</th><th class="num">Bids</th><th class="num">Wins</th><th class="num">Revenue</th></tr>
+    ${rows.map(r=>`<tr><td class="mono">${esc(r.inv)}</td><td class="num">${fmtM(r.opps)}</td><td class="num">${fmtM(r.fills)}</td><td class="num ${cls==="bl"?"neg":"pos"}">${pct2(r.fill)}</td><td class="num">${fmtM(r.bids)}</td><td class="num">${fmtM(r.wins)}</td><td class="num">${fmt$(r.revenue)}</td></tr>`).join("")}
+  </table></div>`;
+  return `<div class="card">
+    <div class="h"><span class="t">Build a list</span><span class="sub">— what to target, and what to stop sending</span></div>
+    <div class="b row" style="align-items:flex-end;gap:12px">
+      <label class="lbl-f">Demand partner
+        <select id="wl-partner" style="min-width:220px">
+          <option value="" ${W.partner===""?"selected":""}>— all demand (network-wide) —</option>
+          ${["Demand C","Demand D","Demand E","Demand G"].map(d=>`<option ${W.partner===d?"selected":""}>${d}</option>`).join("")}
+        </select></label>
+      <label class="lbl-f">Media type
+        <span class="seg">${[["inapp","In-app"],["web","Web"],["ctv","CTV"]].map(([k,l])=>`<button class="${W.media===k?'on':''}" onclick="wlMedia('${k}')">${l}</button>`).join("")}</span></label>
+      <label class="lbl-f">Window
+        <select id="wl-days">${[[7,"Last 7 days"],[14,"Last 14 days"],[30,"Last 30 days"]].map(([v,l])=>`<option value="${v}" ${W.days===v?"selected":""}>${l}</option>`).join("")}</select></label>
+      <label class="lbl-f">Min requests
+        <input type="number" id="wl-minreq" value="${W.minReq}" step="10000" min="0" style="width:110px"></label>
+      <label class="lbl-f">Min fill %
+        <input type="number" id="wl-minfill" value="${W.minFill}" step="0.1" min="0" style="width:90px"></label>
+      <button class="btn" onclick="wlBuild()">Build lists</button>
+    </div>
+    <div class="note">Whitelist = the inventory that proves it fills — send it to the partner to target. Blacklist = inventory we keep sending that never comes back — every line is QPS and bandwidth paid for and earned nothing.</div>
+  </div>
+  ${b?`
+  <div class="stats">
+    <div class="stat"><div class="k">Revenue coverage</div><div class="v">${pct(b.coverage)}</div></div>
+    <div class="stat"><div class="k">Wasted QPS cut</div><div class="v">${pct(b.qpsCut)}</div></div>
+    <div class="stat"><div class="k">Whitelist size</div><div class="v">${b.wl.length}</div></div>
+    <div class="stat"><div class="k">Blacklist size</div><div class="v">${b.bl.length}</div></div>
+    <div class="stat"><div class="k">Scope</div><div class="v" style="font-size:14px">${W.partner||"network-wide"} · ${W.media} · ${W.days}d</div></div>
+  </div>
+  <div class="card">
+    <div class="h"><span class="t">Whitelist — ${b.wl.length} ${idNoun.toLowerCase()}s that fill</span>
+      <span style="margin-left:auto" class="row">
+        <button class="btn gold" onclick="wlExport('wl','txt')">Export .txt</button>
+        <button class="btn ghost" onclick="wlExport('wl','csv')">Export .csv</button></span></div>
+    ${tbl(b.wl,"wl")}
+  </div>
+  <div class="card">
+    <div class="h"><span class="t" style="color:var(--danger)">Blacklist — high-volume zero-fill waste</span>
+      <span style="margin-left:auto" class="row">
+        <button class="btn ghost" onclick="wlExport('bl','txt')">Export .txt</button>
+        <button class="btn ghost" onclick="wlExport('bl','csv')">Export .csv</button></span></div>
+    <div class="note2"><b>${fmtM(b.bl.reduce((a,x)=>a+x.opps,0))} opportunities</b> went to these ${b.bl.length} ${idNoun.toLowerCase()}s and came back with nothing at all${W.partner?` for ${W.partner}`:""}. That's the QPS you stop paying for.</div>
+    ${tbl(b.bl,"bl")}
+  </div>`:`<div class="card"><div class="note">Pick a scope and hit <b>Build lists</b>.</div></div>`}`;
+}
+
+/* ============ PARTNERS & PLATFORMS ============ */
+function pagePartners(){
+  const plat=agg(FACTS.filter(r=>r.idx>=NDAYS-7),["platform"]);
+  const fresh={"Platform One":"today 06:30","Platform Two":"today 06:30","Platform Three":"yesterday 23:30 · 1d behind"};
+  const lanesOf=p=>LANES.filter(l=>l.platform===p);
+  const connsOf=p=>new Set(LANES.filter(l=>l.platform===p).map(l=>l.lane)).size;
+  const ALIASES={
+    "Supply A":[["platform_one","SupplyA_Video"],["platform_one","#4471"],["platform_two","supply-a"],["platform_three","SupA CTV"]],
+    "Supply B":[["platform_one","SupplyB"],["platform_two","supply-b-inapp"],["platform_two","#8802"]],
+    "Supply F":[["platform_three","SupplyF WebVid"],["platform_three","#1204"]],
+    "Demand C":[["platform_one","DemandC_US"],["platform_two","demand-c"],["platform_three","DmdC_EU"],["platform_one","#3310"]],
+    "Demand D":[["platform_one","DemandD"],["platform_three","dmd-d-vid"]],
+    "Demand E":[["platform_two","DemandE_Perf"],["platform_two","#5518"]],
+    "Demand G":[["platform_two","demand-g"],["platform_three","DG Media"]],
+  };
+  const TAGS={"Supply A":124,"Supply B":86,"Supply F":41,"Demand C":63,"Demand D":22,"Demand E":37,"Demand G":18};
+  const ids={"Supply A":"sup_a","Supply B":"sup_b","Supply F":"sup_f","Demand C":"dem_c","Demand D":"dem_d","Demand E":"dem_e","Demand G":"dem_g"};
+  const partnerRow=(name,kind)=>{
+    const facts=FACTS.filter(r=>r.idx>=NDAYS-7&&(kind==="supply"?r.supply:r.demand)===name);
+    const s=derive(facts.reduce((a,r)=>{for(const m of MEASURES)a[m]=(a[m]||0)+r[m];return a;},{}));
+    const plats=new Set(facts.map(r=>r.platform)).size;
+    const conns=new Set(facts.map(r=>r.lane)).size;
+    return `<tr>
+      <td><div class="ename">${name}</div><div class="eid">${ids[name]}</div></td>
+      <td style="white-space:normal">${(ALIASES[name]||[]).map(([p,a])=>`<span class="alias"><b>${p}:</b> ${esc(a)}</span>`).join("")}</td>
+      <td class="num">${plats}</td><td class="num">${conns}</td><td class="num">${TAGS[name]}</td>
+      <td class="num">${fmt$(kind==="supply"?s.cost:s.revenue)}</td></tr>`;
+  };
+  return `<div class="card">
+    <div class="h"><span class="t">Platforms / servers</span></div>
+    <div class="tbl-wrap"><table>
+      <tr><th>Platform</th><th class="num">Lanes</th><th class="num">Connections</th><th class="num">Revenue 7d</th><th class="num">Cost 7d</th><th class="num">Margin 7d</th><th>Latest data</th></tr>
+      ${plat.map(p=>`<tr><td class="ename">${p._k[0]}</td><td class="num">${lanesOf(p._k[0]).length}</td><td class="num">${connsOf(p._k[0])}</td><td class="num">${fmt$(p.revenue)}</td><td class="num">${fmt$(p.cost)}</td><td class="num ${p.margin>=0?"pos":"neg"}">${fmt$(p.margin)}</td><td>${fresh[p._k[0]]}</td></tr>`).join("")}
+    </table></div>
+  </div>
+  <div class="card">
+    <div class="h"><span class="t">Supply partners</span></div>
+    <div class="tbl-wrap"><table>
+      <tr><th>Partner</th><th>Aliases / platform IDs</th><th class="num">Platforms</th><th class="num">Connections</th><th class="num">Tags 7d</th><th class="num">Cost 7d</th></tr>
+      ${["Supply A","Supply B","Supply F"].map(n=>partnerRow(n,"supply")).join("")}
+    </table></div>
+  </div>
+  <div class="card">
+    <div class="h"><span class="t">Demand partners</span></div>
+    <div class="tbl-wrap"><table>
+      <tr><th>Partner</th><th>Aliases / platform IDs</th><th class="num">Platforms</th><th class="num">Connections</th><th class="num">Tags 7d</th><th class="num">Revenue 7d</th></tr>
+      ${["Demand C","Demand D","Demand E","Demand G"].map(n=>partnerRow(n,"demand")).join("")}
+    </table></div>
+  </div>
+  <div class="note" style="padding:0 4px">Canonical entities live in the registry (git-versioned). Aliases map each platform's editable names AND stable numeric IDs to one entity — so renames on a platform can never split a partner's history.</div>`;
+}
+
+/* ============ MAPPER ============ */
+function mSet(k,v){M[k]=k==="take"?Number(v):v;if(k==="side")render();}
+function mParse(){
+  M.sample=$("#m-sample").value;
+  const lines=M.sample.split(/\r?\n/).filter(l=>l.trim());
+  if(!lines.length){toast("Paste a sample report first");return;}
+  const first=lines[0];
+  const counts={";":(first.match(/;/g)||[]).length,",":(first.match(/,/g)||[]).length,"\t":(first.match(/\t/g)||[]).length};
+  M.delim=Object.entries(counts).sort((a,b)=>b[1]-a[1])[0][0];
+  M.headers=lines[0].split(M.delim).map(s=>s.trim().replace(/^"|"$/g,""));
+  M.rows=lines.slice(1).map(l=>l.split(M.delim).map(s=>s.trim()));
+  M.mapping={};M.keys={};
+  for(const h of M.headers){
+    const g=guessField(h);
+    if(g)M.mapping[h]=g;
+    M.keys[h]=["event_date","supply_tag","demand_name_raw","geo_country"].includes(g);
+  }
+  M.parsed=true;M.result=null;
+  toast(`Parsed ${M.rows.length} rows — delimiter "${M.delim===String.fromCharCode(9)?"tab":M.delim}"`);
+  render();
+}
+function mMap(h,f){M.mapping[h]=f;if(!f)delete M.mapping[h];M.result=null;}
+function mKey(h,on){M.keys[h]=on;M.result=null;}
+function mValidate(){
+  const fields=Object.values(M.mapping);
+  if(!fields.includes("event_date")){toast("Map a date column to event_date");return;}
+  if(!fields.includes(M.side==="sell"?"revenue_raw":"cost_raw")){toast(`Map a money column to ${M.side==="sell"?"revenue_raw":"cost_raw"}`);return;}
+  const col=f=>M.headers.findIndex(h=>M.mapping[h]===f);
+  const fx=FX[M.currency.toUpperCase()]??1;
+  const takeMul=M.fee==="gross"?1-M.take:1;
+  const keyCols=M.headers.map((h,i)=>M.keys[h]?i:-1).filter(i=>i>=0);
+  const seen=new Set();let dupes=0,negatives=0;
+  const facts=M.rows.map(r=>{
+    const g=f=>{const i=col(f);return i>=0?r[i]:null;};
+    const money=Number(g(M.side==="sell"?"revenue_raw":"cost_raw"))||0;
+    const nk=keyCols.map(i=>r[i]).join("|");
+    if(seen.has(nk))dupes++;seen.add(nk);
+    const req=Number(g("requests"))||0,imp=Number(g("impressions"))||0,fil=Number(g("fills"))||0;
+    if(money<0||req<0||imp<0)negatives++;
+    const demandRaw=g("demand_name_raw")||"—";
+    return {date:g("event_date"),tag:g("supply_tag")||g("app_bundle")||"—",demand:demandRaw,
+      geo:g("geo_country")||"—",requests:req,fills:fil,impressions:imp,
+      usd:money*fx*takeMul,nk};
+  });
+  const aliasKnown=new Set(["Demand C","Demand D","Demand E","Demand G"]);
+  const unresolved=[...new Set(facts.map(f=>f.demand))].filter(d=>d!=="—"&&!aliasKnown.has(d));
+  M.result={facts,dupes,negatives,unresolved,fx,takeMul,
+    checks:[
+      [`header row parsed — delimiter "${M.delim}" · ${M.headers.length} columns`,true],
+      [`event_date mapped &amp; parseable (${facts[0]?.date??"—"})`,facts.every(f=>/^\d{4}-\d{2}-\d{2}$/.test(f.date||""))],
+      [`money column mapped (${M.side==="sell"?"revenue_raw":"cost_raw"})`,true],
+      [`currency resolved — ${M.currency.toUpperCase()} → USD @ ${fx}`,true],
+      [`fee model applied — ${M.fee==="gross"?`gross − ${(M.take*100).toFixed(0)}% take → net`:"reported net, no adjustment"}`,true],
+      [`timezone normalized — ${M.tz} → UTC`,true],
+      [`partner names resolved — ${[...new Set(facts.map(f=>f.demand))].length-unresolved.length}/${[...new Set(facts.map(f=>f.demand))].length} aliases matched`,unresolved.length===0],
+      [`no negative measures`,negatives===0],
+      [`dedup key unique across sample (${keyCols.length} key columns)`,dupes===0],
+    ]};
+  render();
+}
+function mSave(){
+  toast(`Adapter saved: adapters/${M.id}.json — the scheduler pulls it on the next tick (demo: in-memory)`);
+}
+function pageMapper(){
+  const sel=(id,opts,cur,extra)=>`<select onchange="mSet('${id}',this.value)" ${extra||""}>${opts.map(o=>`<option value="${o[0]}" ${cur===o[0]?"selected":""}>${o[1]}</option>`).join("")}</select>`;
+  const step1=`<div class="card">
+    <div class="h"><span class="t">1 · Adapter basics</span></div>
+    <div class="b grid">
+      <div><label class="lbl-f">Adapter id</label><input type="text" value="${esc(M.id)}" onchange="mSet('id',this.value)"></div>
+      <div><label class="lbl-f">Platform</label><input type="text" value="${esc(M.platform)}" onchange="mSet('platform',this.value)"></div>
+      <div><label class="lbl-f">Side</label>${sel("side",[["sell","sell (revenue)"],["buy","buy (cost)"]],M.side)}</div>
+      <div><label class="lbl-f">Ingest mode</label>${sel("mode",[["file","file"],["email","email"],["api","api"],["manual","manual"]],M.mode)}</div>
+      <div><label class="lbl-f">Reporting timezone</label><input type="text" value="${esc(M.tz)}" onchange="mSet('tz',this.value)"></div>
+      <div><label class="lbl-f">Currency (fallback)</label><input type="text" value="${esc(M.currency)}" onchange="mSet('currency',this.value)"></div>
+      <div><label class="lbl-f">Money reported</label>${sel("fee",[["net","net of platform take"],["gross","gross"]],M.fee)}</div>
+      <div><label class="lbl-f">Take rate (if gross)</label><input type="number" value="${M.take}" min="0" max="1" step="0.01" onchange="mSet('take',this.value)"></div>
+    </div>
+  </div>`;
+  const step2=`<div class="card">
+    <div class="h"><span class="t">2 · Sample report</span><span class="sub">— paste or edit, then parse; delimiter auto-detected</span></div>
+    <div class="b">
+      <textarea id="m-sample">${esc(M.sample)}</textarea>
+      <div class="row" style="margin-top:8px">
+        <button class="btn" onclick="mParse()">Parse sample</button>
+        ${M.parsed?`<span class="pill ok">delimiter: "${M.delim}" · ${M.headers.length} columns · ${M.rows.length} rows</span>`:""}
+      </div>
+    </div>
+  </div>`;
+  let step3="";
+  if(M.parsed){
+    step3=`<div class="card">
+      <div class="h"><span class="t">3 · Column mapping</span><span class="sub">— guessed from headers, fix what's wrong; tick the columns that identify a row (dedup key)</span></div>
+      <div class="tbl-wrap"><table>
+        <tr><th>Source column</th><th>Sample value</th><th>Unified field</th><th>Dedup key</th></tr>
+        ${M.headers.map((h,i)=>`<tr>
+          <td class="mono">${esc(h)}</td><td class="mono" style="color:var(--muted)">${esc((M.rows[0]||[])[i]??"")}</td>
+          <td><select onchange="mMap('${esc(h)}',this.value)">${UNIFIED_FIELDS.map(f=>`<option value="${f}" ${M.mapping[h]===f?"selected":""}>${f||"— ignore —"}</option>`).join("")}</select></td>
+          <td><input type="checkbox" ${M.keys[h]?"checked":""} onchange="mKey('${esc(h)}',this.checked)"></td>
+        </tr>`).join("")}
+      </table></div>
+    </div>`;
+  }
+  let step4="";
+  if(M.parsed){
+    const r=M.result;
+    const passed=r?r.checks.filter(c=>c[1]).length:0;
+    step4=`<div class="card">
+      <div class="h"><span class="t">4 · Validate through the real pipeline</span></div>
+      <div class="b">
+        <div class="row" style="margin-bottom:10px">
+          <button class="btn" onclick="mValidate()">Validate sample</button>
+          ${r?`<span class="pill ok">${r.facts.length} rows ok</span><span class="pill ${r.dupes?"bad":"ok"}">${r.dupes} quarantined</span><span class="pill ${r.unresolved.length?"warn":"ok"}">${r.unresolved.length} unresolved names</span>`:""}
+        </div>
+        ${r?`
+        <div class="sub" style="font-size:11.5px;color:var(--muted);margin-bottom:4px">Parsed → normalized: ${M.currency.toUpperCase()}→USD @ ${r.fx}${M.fee==="gross"?` · gross − ${(M.take*100).toFixed(0)}% take → net`:""} · ${M.tz} → UTC</div>
+        <div class="tbl-wrap"><table>
+          <tr><th>event_date (UTC)</th><th>lane</th><th>geo</th><th class="num">requests</th><th class="num">fills</th><th class="num">impressions</th><th class="num">${M.side==="sell"?"revenue_usd_net":"cost_usd"}</th><th>natural key</th></tr>
+          ${r.facts.slice(0,6).map(f=>`<tr>
+            <td class="mono">${esc(f.date)}</td>
+            <td class="mono">${esc(M.platform)}|${esc(f.tag)}|${esc(f.demand)}</td>
+            <td>${esc(f.geo)}</td>
+            <td class="num">${f.requests.toLocaleString()}</td><td class="num">${f.fills.toLocaleString()}</td><td class="num">${f.impressions.toLocaleString()}</td>
+            <td class="num pos">$${f.usd.toFixed(2)}</td>
+            <td class="mono" style="color:var(--muted)">${esc(f.nk)}</td></tr>`).join("")}
+        </table></div>
+        <div style="margin-top:14px;padding:12px;border:1px solid ${passed===9?"rgba(31,122,0,.35)":"rgba(230,126,34,.4)"};border-radius:2px;background:${passed===9?"rgba(60,204,8,.05)":"rgba(230,126,34,.05)"}">
+          <span class="pill ${passed===9?"ok":"warn"}" style="margin-bottom:6px">conformance: ${passed}/9 checks passed</span>
+          ${r.checks.map(([label,ok])=>`<div class="check"><span class="${ok?"ok":""}" style="${ok?"":"color:var(--warning);font-weight:700"}">${ok?"✓":"!"}</span> ${label}</div>`).join("")}
+        </div>
+        <div class="row" style="margin-top:12px">
+          <button class="btn ghost" onclick="mSave()" ${passed===9?"":"disabled"}>Save adapter</button>
+          <span class="sub" style="font-size:11.5px;color:var(--muted)">${passed===9?"Ready — every sample row normalizes cleanly.":"Fix the mapping until all checks pass."}</span>
+        </div>`:`<div class="note" style="padding:0">Hit <b>Validate sample</b> — the sample runs through the same parse → normalize → conformance pipeline as a real ingest.</div>`}
+      </div>
+    </div>`;
+  }
+  return step1+step2+step3+step4;
+}
+
+/* ============ shell ============ */
+function setTab(t){S.tab=t;sync();window.scrollTo(0,0);}
+function headerRight(){
+  const NAV=[["partners","Partners"],["whitelist","Whitelists"],["ops","Ops board →"],["mapper","Mapper"],["cockpit","Operations cockpit"]];
+  const mins=((Date.now()/60000|0)%38)+5; // fake data age
+  const now=new Date();
+  const hm=String(now.getUTCHours()).padStart(2,"0")+":"+String(now.getUTCMinutes()).padStart(2,"0");
+  return `<span class="fresh"><span class="fdot"></span>data ${mins}m ago</span>`
+    +NAV.map(([k,l])=>`<span class="hnav ${S.tab===k?'cur':''}" onclick="setTab('${k}')">${l}</span>`).join("")
+    +`<span class="tzchip" onclick="toast('Timezone picker — searchable by city or offset in production; the demo pins UTC')">UTC+00:00 · UTC · ${hm}</span>`
+    +`<select onchange="setKwin(this.value)">${[[7,"Last 7 days"],[14,"Last 14 days"],[30,"Last 30 days"]].map(([v,l])=>`<option value="${v}" ${S.kwin===v?"selected":""}>${l}</option>`).join("")}</select>`;
+}
+function render(){
+  $("#hdr").innerHTML=headerRight();
+  $("#main").innerHTML=({cockpit:pageCockpit,ops:pageOps,whitelist:pageWhitelist,partners:pagePartners,mapper:pageMapper})[S.tab]();
+  if(S.tab==="cockpit"){bindBandHover("pulse");bindBandHover("daily");}
+}
+loadHash();
+pushHash();
+render();
+</script>
+</body>
+</html>

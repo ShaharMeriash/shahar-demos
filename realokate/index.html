@@ -1,0 +1,1700 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Realokate — Interactive Demo</title>
+<link rel="icon" href="icon.svg">
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Fredoka+One&family=Inter:wght@300;400;500;600;700&display=swap');
+:root{
+  --bg:#FAFAF8;--s0:#fff;--s1:#F5F3F0;--s2:#EDE9E4;--s3:#E0DBD4;--bd:#C0BAD0;
+  --ink:#1A1823;--t0:#1A1823;--t1:#3D3848;--t2:#7C7591;--t3:#C0BAD0;
+  --g:#EF7960;--g2:rgba(232,107,80,.12);--g3:rgba(232,107,80,.06);
+  --b:#3DC4B6;--b2:rgba(62,207,178,.12);
+  --am:#F6D034;--am2:rgba(245,196,56,.14);
+  --re:#EF7960;--re2:rgba(232,107,80,.12);
+  --fd:'Fredoka One','Nunito',sans-serif;--fb:'Inter',sans-serif;
+  --r:12px;--rl:18px;--shadow:3px 3px 0 #1A1823;--shadow-sm:2px 2px 0 #1A1823;
+}
+.phone.dark{
+  --bg:#121018;--s0:#1C1828;--s1:#241F32;--s2:#2C273C;--s3:#342F48;--bd:#3D3858;
+  --t0:#F0EDE8;--t1:#C0BAD0;--t2:#7C7591;--t3:#4A4560;
+  --g:#FF8A6E;--g2:rgba(255,138,110,.15);--g3:rgba(255,138,110,.07);
+  --b:#4FDFC4;--b2:rgba(79,223,196,.14);
+  --am:#F6D034;--am2:rgba(245,196,56,.14);
+  --re:#FF8A6E;--re2:rgba(255,138,110,.15);
+}
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:#E9E4DC;font-family:var(--fb);color:#1A1823;min-height:100vh;display:flex;flex-direction:column;align-items:center;padding:20px 12px 40px}
+.demo-bar{width:100%;max-width:430px;display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;font-size:13px}
+.demo-bar a{color:#1A1823;text-decoration:none;font-weight:600;background:#fff;border:2px solid #1A1823;border-radius:10px;padding:6px 12px;box-shadow:2px 2px 0 #1A1823}
+.demo-bar .tag{background:#F6D034;border:2px solid #1A1823;border-radius:10px;padding:6px 12px;font-weight:600;box-shadow:2px 2px 0 #1A1823}
+.phone{width:100%;max-width:430px;height:min(880px,90vh);background:var(--bg);border:2px solid #1A1823;border-radius:26px;box-shadow:6px 6px 0 #1A1823;display:flex;flex-direction:column;overflow:hidden;position:relative;color:var(--t0)}
+/* header */
+.app-head{display:flex;align-items:center;justify-content:space-between;padding:14px 14px 10px;border-bottom:2px solid var(--ink);background:var(--s0);flex-shrink:0;gap:8px}
+.app-head .word{height:26px;flex-shrink:0}
+.hbtn{width:34px;height:34px;border:2px solid var(--ink);border-radius:10px;background:var(--s1);display:flex;align-items:center;justify-content:center;box-shadow:var(--shadow-sm);cursor:pointer;font-size:15px;position:relative;flex-shrink:0}
+.hbtn:active{transform:translate(2px,2px);box-shadow:none}
+.bell-count{position:absolute;top:-6px;right:-6px;background:var(--re);color:#fff;font-size:9px;font-weight:700;min-width:16px;height:16px;border-radius:9px;border:1.5px solid var(--ink);display:flex;align-items:center;justify-content:center;padding:0 3px}
+main{flex:1;overflow-y:auto;padding:16px;padding-bottom:12px;position:relative}
+main::-webkit-scrollbar{width:0}
+h2.pg{font-family:var(--fd);font-size:22px;font-weight:400;margin-bottom:2px;color:var(--t0)}
+.sub{font-size:12.5px;color:var(--t2);margin-bottom:14px}
+.card{background:var(--s0);border:2px solid var(--ink);border-radius:var(--rl);box-shadow:var(--shadow);padding:14px;margin-bottom:14px;transition:transform .12s,box-shadow .12s}
+.card:hover{transform:translate(-1px,-1px);box-shadow:4px 4px 0 var(--ink)}
+.card-title{font-family:var(--fd);font-size:14px;margin-bottom:10px;color:var(--t0)}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:6px;font-family:var(--fb);font-size:12.5px;font-weight:700;border:2px solid var(--ink);border-radius:11px;padding:8px 14px;cursor:pointer;box-shadow:var(--shadow-sm);background:var(--s0);color:var(--t0);-webkit-tap-highlight-color:transparent}
+.btn:active{transform:translate(2px,2px);box-shadow:none}
+.btn.g{background:var(--g);color:#fff}
+.btn.b{background:var(--b);color:#0A0908}
+.btn.sm{font-size:11.5px;padding:6px 11px}
+.btn.xs{font-size:10.5px;padding:4px 9px;border-radius:9px}
+.btn:disabled{opacity:.45;cursor:default}
+/* pace card */
+.route{display:flex;align-items:center;gap:10px;font-family:var(--fd);font-size:16px;flex-wrap:wrap;color:var(--t0)}
+.route .arr{flex:1;min-width:36px;height:2px;background:var(--ink);position:relative}
+.route .arr::after{content:"✈️";position:absolute;right:-4px;top:-11px;font-size:14px}
+.days{font-size:12px;color:var(--t2);margin:6px 0 10px}
+.pacebar{height:14px;border:2px solid var(--ink);border-radius:8px;background:var(--s1);overflow:hidden;display:flex;position:relative}
+.pacebar i{display:block;height:100%}
+.pacebar .tmark{position:absolute;top:-3px;bottom:-3px;width:3px;background:var(--g);border-radius:2px}
+.verdict{margin-top:8px;font-size:12.5px;font-weight:600}
+.chips{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px}
+.chip{font-size:11.5px;font-weight:600;border:2px solid var(--ink);border-radius:999px;padding:4px 10px;background:var(--s0);box-shadow:var(--shadow-sm);cursor:pointer;color:var(--t0)}
+.chip:active{transform:translate(2px,2px);box-shadow:none}
+.chip.warn{background:var(--g2);color:#c04a30}.phone.dark .chip.warn{color:#FF8A6E}
+.chip.amber{background:var(--am2)} .chip.ok{background:var(--b2)} .chip.blue{background:rgba(59,130,246,.12)} .chip.grey{background:var(--s1);color:var(--t2)}
+/* crew */
+.crew{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px}
+.crew .mchip{display:inline-flex;align-items:center;gap:6px;border:2px solid var(--ink);border-radius:999px;padding:3px 11px 3px 3px;background:var(--s0);box-shadow:var(--shadow-sm);font-size:12px;font-weight:600;cursor:pointer;color:var(--t0)}
+.avv{width:22px;height:22px;border-radius:50%;border:1.5px solid var(--ink);font-size:10px;font-weight:700;display:inline-flex;align-items:center;justify-content:center;color:#0A0908;flex-shrink:0}
+/* do next */
+.donext .row{display:flex;align-items:center;gap:9px;padding:9px 0;border-bottom:1.5px dashed var(--s2);cursor:pointer}
+.donext .row:last-child{border-bottom:0}
+.why{font-size:10px;font-weight:700;border:1.5px solid var(--ink);border-radius:999px;padding:2px 8px;white-space:nowrap}
+.why.od{background:var(--g2);color:#c04a30}.phone.dark .why.od{color:#FF8A6E}
+.why.dt{background:var(--am2);color:var(--t0)} .why.un{background:var(--b2);color:var(--t0)}
+.donext .t{flex:1;font-size:13px;font-weight:500;color:var(--t0)}
+/* timeline */
+.tl-month{font-family:var(--fd);font-size:13px;color:var(--t1);margin:14px 0 6px}
+.tl-ev{display:flex;gap:10px;align-items:flex-start;padding:6px 0 6px 4px;border-left:3px solid var(--b);margin-left:6px;padding-left:12px;font-size:13px;cursor:pointer}
+.tl-ev b{font-weight:600}
+.tl-ev .d{color:var(--t2);font-size:11.5px}
+.tl-ev.docev{border-left-color:var(--am)}
+.gate-ev{border:2px solid var(--ink);border-radius:var(--r);background:var(--am2);padding:9px 13px;margin:10px 0;box-shadow:var(--shadow-sm);font-size:12.5px}
+.gate-ev b{font-family:var(--fd);font-weight:400}
+.arrive{background:linear-gradient(135deg,#F6D034,#EF7960);border:2px solid var(--ink);border-radius:var(--r);padding:11px 14px;margin:12px 0 4px;box-shadow:var(--shadow-sm);color:#1A1823}
+.arrive .a1{font-family:var(--fd);font-size:15px}
+.arrive .a2{font-size:10.5px;opacity:.78;margin-top:1px}
+/* seg */
+.seg{display:flex;gap:6px;margin-bottom:12px}
+.seg button{flex:1;padding:8px 6px;border:2px solid var(--ink);border-radius:10px;background:var(--s0);font-family:var(--fb);font-size:12px;font-weight:700;color:var(--t2);cursor:pointer;box-shadow:1.5px 1.5px 0 var(--ink);-webkit-tap-highlight-color:transparent}
+.seg button.on{background:var(--g);color:#0A0908}
+.seg button:active{transform:translate(1.5px,1.5px);box-shadow:none}
+/* inputs */
+.finput,.fselect,.ftextarea{width:100%;border:2px solid var(--ink);border-radius:11px;padding:9px 12px;font-family:var(--fb);font-size:13px;background:var(--s1);outline:none;color:var(--t0)}
+.fselect{appearance:auto}
+.flabel{font-size:10.5px;text-transform:uppercase;letter-spacing:1px;color:var(--t2);font-weight:700;margin-bottom:5px}
+/* whose filter */
+.pfilter{display:flex;align-items:center;gap:7px;margin:0 0 12px;flex-wrap:wrap}
+.pfilter-ava{width:30px;height:30px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:800;color:#0A0908;border:2px solid var(--ink);cursor:pointer;opacity:.35;transition:opacity .12s,transform .1s}
+.pfilter-ava.on{opacity:1;transform:scale(1.06)}
+/* plan areas */
+.agroup{margin-bottom:12px;border:2px solid var(--ink);border-radius:var(--rl);background:var(--s0);box-shadow:var(--shadow);overflow:hidden}
+.agroup-head{display:flex;align-items:center;gap:11px;padding:12px 13px;cursor:pointer;user-select:none}
+.agroup-ic{width:34px;height:34px;border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:17px;flex-shrink:0}
+.agroup-main{flex:1;min-width:0}
+.agroup-title{font-weight:700;font-size:13.5px;color:var(--t0)}
+.agroup-bar{height:5px;background:var(--s2);border-radius:4px;margin-top:5px;overflow:hidden}
+.agroup-bar span{display:block;height:100%;border-radius:4px}
+.agroup-count{font-size:11px;font-weight:700;color:var(--t2);flex-shrink:0}
+.agroup-chev{font-size:14px;color:var(--t3);transition:transform .15s}
+.agroup-chev.open{transform:rotate(90deg)}
+.agroup-tasks{border-top:1.5px solid var(--s2)}
+.task{display:flex;align-items:flex-start;gap:10px;padding:10px 13px;border-bottom:1.5px dashed var(--s2)}
+.task:last-child{border-bottom:0}
+.task.shake{animation:shake .4s}
+@keyframes shake{0%,100%{transform:translateX(0)}20%,60%{transform:translateX(-5px)}40%,80%{transform:translateX(5px)}}
+.tick{width:22px;height:22px;border:2px solid var(--ink);border-radius:7px;flex-shrink:0;cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:12px;background:var(--s0);margin-top:1px;color:var(--t0)}
+.tick.done{background:var(--b)} .tick.prog{background:var(--am)}
+.task .tt{flex:1;min-width:0;cursor:pointer}
+.task .tt .n{font-size:13px;font-weight:500;color:var(--t0)}
+.task.is-done .tt .n{text-decoration:line-through;color:var(--t2)}
+.task .meta{display:flex;gap:6px;margin-top:4px;flex-wrap:wrap;align-items:center}
+.mt{font-size:9.5px;font-weight:700;border:1.5px solid var(--ink);border-radius:999px;padding:1px 7px;background:var(--s1);color:var(--t0)}
+.mt.hi{background:var(--g2)} .mt.due{background:var(--am2)} .mt.over{background:var(--g2);color:#c04a30}.phone.dark .mt.over{color:#FF8A6E}
+.mt.lock{background:var(--am2);border-style:dashed}
+.minibar{display:inline-flex;align-items:center;gap:4px;font-size:9.5px;color:var(--t2)}
+.minibar .mb{width:34px;height:4px;background:var(--s2);border-radius:3px;overflow:hidden}
+.minibar .mb span{display:block;height:100%;background:var(--b)}
+.savv{width:19px;height:19px;border-radius:50%;border:1.5px solid var(--ink);font-size:9px;font-weight:700;display:inline-flex;align-items:center;justify-content:center;color:#0A0908}
+/* fab */
+.fab{position:absolute;right:16px;bottom:78px;width:54px;height:54px;border-radius:50%;background:var(--g);border:2px solid var(--ink);box-shadow:3px 3px 0 var(--ink);display:flex;align-items:center;justify-content:center;cursor:pointer;z-index:50}
+.fab:active{transform:translate(2px,2px);box-shadow:1px 1px 0 var(--ink)}
+/* kate chat */
+.chat{display:flex;flex-direction:column;gap:10px;padding-bottom:10px}
+.msg{display:flex;gap:8px;align-items:flex-end;max-width:92%}
+.msg.me{align-self:flex-end;flex-direction:row-reverse}
+.bub{border:2px solid var(--ink);border-radius:14px;padding:9px 12px;font-size:13px;line-height:1.5;background:var(--s0);box-shadow:var(--shadow-sm);white-space:pre-wrap;color:var(--t0)}
+.msg.me .bub{background:var(--b2)}
+.kav{width:30px;height:30px;border-radius:50%;overflow:hidden;background:var(--s1);border:1.5px solid var(--ink);display:inline-flex;align-items:flex-end;justify-content:center;flex-shrink:0}
+.sugs{display:flex;gap:8px;flex-wrap:wrap;margin-top:8px}
+.sug{font-size:11px;font-weight:600;border:2px solid var(--ink);border-radius:999px;padding:4px 10px;background:var(--am2);cursor:pointer;box-shadow:var(--shadow-sm);color:var(--t0)}
+.sug:active{transform:translate(2px,2px);box-shadow:none}
+.prop-label{font-size:9.5px;font-weight:700;letter-spacing:1px;color:var(--t2);margin:8px 0 4px}
+.action-card{border:2px solid var(--ink);border-radius:var(--r);background:var(--am2);padding:10px 12px;margin-top:6px;box-shadow:var(--shadow-sm)}
+.action-card.applied{background:var(--b2)}
+.action-card .h{font-size:10px;font-weight:700;letter-spacing:.06em;margin-bottom:3px;color:var(--t1)}
+.action-card .n{font-size:12.5px;font-weight:600;color:var(--t0)}
+.action-card .m{font-size:10.5px;color:var(--t2);margin-top:2px}
+.action-card .btns{display:flex;gap:8px;margin-top:8px}
+.abtn{font-size:11.5px;font-weight:700;border:2px solid var(--ink);border-radius:9px;padding:5px 12px;cursor:pointer;box-shadow:var(--shadow-sm);background:var(--s0);color:var(--t0)}
+.abtn.yes{background:var(--b);color:#0A0908}
+.abtn:active{transform:translate(2px,2px);box-shadow:none}
+.typing{display:inline-flex;gap:4px;padding:4px 2px}
+.typing i{width:6px;height:6px;border-radius:50%;background:var(--t2);animation:tp 1s infinite}
+.typing i:nth-child(2){animation-delay:.18s}.typing i:nth-child(3){animation-delay:.36s}
+@keyframes tp{0%,100%{opacity:.25;transform:translateY(0)}50%{opacity:1;transform:translateY(-3px)}}
+.chat-in{display:flex;gap:8px;padding:10px 12px;border-top:2px solid var(--ink);background:var(--s0)}
+.chat-in input{flex:1;border:2px solid var(--ink);border-radius:11px;padding:9px 12px;font-family:var(--fb);font-size:13.5px;background:var(--s1);outline:none;color:var(--t0)}
+.chat-in button{border:2px solid var(--ink);border-radius:11px;background:var(--g);color:#fff;font-weight:700;padding:0 16px;cursor:pointer;box-shadow:var(--shadow-sm);font-size:14px}
+/* finance */
+.budg .big{font-family:var(--fd);font-size:25px;color:var(--t0)}
+.budg .lbl{font-size:10.5px;color:var(--t2);font-weight:700;letter-spacing:.5px}
+.bbar{height:16px;border:2px solid var(--ink);border-radius:9px;display:flex;background:var(--s1);margin:10px 0 6px;position:relative}
+.bbar i{height:100%;display:block}
+.bbar i:first-child{border-radius:7px 0 0 7px}
+.bbar .mark{position:absolute;top:-5px;bottom:-5px;width:2px;background:var(--t2);opacity:.75}
+.bbar .mark::after{content:attr(data-l);position:absolute;top:-13px;left:-8px;font-size:8.5px;font-weight:700;color:var(--t2)}
+.legend{display:flex;gap:14px;font-size:11px;color:var(--t1);flex-wrap:wrap}
+.legend b{display:inline-block;width:10px;height:10px;border:1.5px solid var(--ink);border-radius:3px;margin-right:5px;vertical-align:-1px}
+.fin-alert{margin-top:10px;font-size:12px;font-weight:700;border-radius:9px;padding:7px 11px}
+.fin-kpi3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:14px}
+.fin-kpi{border:2px solid var(--ink);border-radius:var(--r);background:var(--s0);box-shadow:var(--shadow-sm);padding:10px}
+.fin-kpi .l{font-size:9.5px;text-transform:uppercase;letter-spacing:.8px;color:var(--t2);font-weight:700}
+.fin-kpi .v{font-family:var(--fd);font-size:15px;margin-top:3px}
+.fin-cur-card{border:2px solid var(--ink);border-radius:var(--r);padding:12px;background:var(--s0);box-shadow:var(--shadow-sm);flex:1;min-width:140px}
+.fin-cur-top{display:flex;justify-content:space-between;align-items:baseline}
+.fin-cur-code{font-family:var(--fd);font-size:14px;color:var(--t0)}
+.fin-cur-est{font-size:12px;font-weight:700;color:var(--t0)}
+.fin-cur-bar{height:8px;border:1.5px solid var(--ink);border-radius:5px;display:flex;overflow:hidden;margin:8px 0 6px;background:var(--s1)}
+.fin-cur-sub{display:flex;justify-content:space-between;font-size:10px;font-weight:600}
+.fin-row{display:flex;align-items:center;gap:10px;padding:9px 0;border-bottom:1.5px dashed var(--s2);font-size:12.5px}
+.fin-row:last-child{border-bottom:0}
+.fin-row .ic{width:30px;height:30px;border:2px solid var(--ink);border-radius:9px;display:flex;align-items:center;justify-content:center;background:var(--s1);font-size:14px;flex-shrink:0}
+.fin-row .n{flex:1;min-width:0;font-weight:500;color:var(--t0)}
+.fin-row .n small{display:block;font-size:10.5px;color:var(--t2);font-weight:400}
+.fin-row .a{font-weight:700;white-space:nowrap;color:var(--t0)}
+.fin-row .a.neg{color:#c04a30}.phone.dark .fin-row .a.neg{color:#FF8A6E}
+.fin-row .a.inc{color:#0d9488}.phone.dark .fin-row .a.inc{color:#4FDFC4}
+.fin-area{display:flex;align-items:center;gap:10px;padding:8px 0}
+.fin-area .split{height:9px;border:1.5px solid var(--ink);border-radius:5px;display:flex;overflow:hidden;background:var(--s1);margin-top:5px}
+.dash-label{font-size:10px;text-transform:uppercase;letter-spacing:1.4px;color:var(--t2);font-weight:700;margin:16px 2px 8px}
+/* docs */
+.doc-card{background:var(--s0);border:2px solid var(--ink);border-radius:var(--r);padding:11px 13px;margin-bottom:9px;box-shadow:var(--shadow-sm);cursor:pointer}
+.doc-card-top{display:flex;align-items:flex-start;gap:8px}
+.doc-card-title{font-size:13px;font-weight:600;flex:1;color:var(--t0)}
+.doc-acts{display:flex;gap:5px;flex-wrap:wrap;margin-top:6px}
+.doc-act{font-size:9.5px;font-weight:700;border:1.5px solid var(--ink);border-radius:999px;padding:2px 8px;background:var(--s1);color:var(--t0)}
+.doc-act.ready{background:var(--b2)}
+.doc-act.renew{background:var(--am2)} .doc-act.pay{background:var(--g2)} .doc-act.get{background:rgba(37,99,235,.13)} .doc-act.translate{background:rgba(124,58,237,.13)}
+.doc-meta{display:flex;gap:6px;flex-wrap:wrap;margin-top:6px;font-size:10px;color:var(--t2);align-items:center}
+.doc-exp.warn{color:#B8860B;font-weight:700}.phone.dark .doc-exp.warn{color:#F6D034}
+.doc-cat-head{display:flex;align-items:center;gap:8px;margin:16px 0 8px}
+.doc-cat-head .ic{font-size:15px}
+.doc-cat-head .nm{font-family:var(--fd);font-size:13.5px;color:var(--t1)}
+.doc-cat-head .ct{font-size:10.5px;color:var(--t2);font-weight:600}
+/* tag chips */
+.tagrow{display:flex;flex-wrap:wrap;gap:7px;margin-bottom:4px}
+.tagsel{display:inline-flex;align-items:center;gap:5px;font-size:11.5px;font-weight:700;padding:6px 12px;border-radius:20px;border:2px solid var(--ink);background:var(--s0);color:var(--t1);cursor:pointer;box-shadow:1.5px 1.5px 0 var(--ink);-webkit-tap-highlight-color:transparent}
+.tagsel:active{transform:translate(1.5px,1.5px);box-shadow:none}
+.tagsel.on{background:var(--g);color:#0A0908}
+.tagsel.on.renew{background:var(--am)} .tagsel.on.pay{background:var(--re);color:#fff} .tagsel.on.get{background:#2563eb;color:#fff} .tagsel.on.translate{background:#7c3aed;color:#fff} .tagsel.on.fix{background:var(--t2);color:#fff}
+/* sheets */
+.sheet-bg{position:absolute;inset:0;background:rgba(20,16,30,.45);z-index:200}
+.sheet{position:absolute;left:0;right:0;bottom:0;z-index:201;background:var(--s0);border-top:2px solid var(--ink);border-radius:22px 22px 0 0;padding:10px 18px calc(18px + env(safe-area-inset-bottom));max-height:86%;overflow-y:auto;color:var(--t0)}
+.sheet::-webkit-scrollbar{width:0}
+.sheet-grip{width:40px;height:4px;border-radius:3px;background:var(--bd);margin:2px auto 12px}
+.sheet-title{font-family:var(--fd);font-size:18px;margin-bottom:2px;color:var(--t0)}
+.sheet-sub{font-size:12px;color:var(--t2);margin-bottom:4px}
+.sheet-field-l{font-size:10.5px;text-transform:uppercase;letter-spacing:1.1px;color:var(--t2);font-weight:700;margin:15px 2px 8px}
+.sheet-field-l .opt{text-transform:none;letter-spacing:0;font-weight:500;color:var(--t3)}
+.subrow{display:flex;align-items:center;gap:9px;padding:7px 0;border-bottom:1px solid var(--s2)}
+.subrow:last-child{border-bottom:0}
+.subrow .st{flex:1;font-size:12.5px;font-weight:600;color:var(--t0)}
+.subrow.done .st{text-decoration:line-through;color:var(--t2)}
+.stick{width:18px;height:18px;border:2px solid var(--ink);border-radius:6px;flex-shrink:0;cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:10px;background:var(--s0)}
+.stick.done{background:var(--b)}
+/* more sheet */
+.sheet-id{display:flex;align-items:center;gap:10px;margin-bottom:14px}
+.sheet-avatar{width:38px;height:38px;border-radius:50%;border:2px solid var(--ink);background:var(--g);color:#fff;font-weight:800;font-size:15px;display:flex;align-items:center;justify-content:center}
+.sheet-name{font-size:13.5px;font-weight:700;color:var(--t0)}
+.sheet-sync{font-size:10.5px;color:var(--t2);display:flex;align-items:center;gap:5px;margin-top:1px}
+.sheet-sync-dot{width:7px;height:7px;border-radius:50%}
+.sheet-label{font-size:10px;text-transform:uppercase;letter-spacing:1.4px;color:var(--t2);font-weight:700;margin:12px 2px 8px}
+.sheet-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.sheet-tile{display:flex;flex-direction:column;align-items:center;gap:5px;padding:12px 6px;border:2px solid var(--ink);border-radius:var(--r);background:var(--s1);box-shadow:var(--shadow-sm);cursor:pointer;font-size:12px;font-weight:700;font-family:var(--fb);color:var(--t0)}
+.sheet-tile:active{transform:translate(2px,2px);box-shadow:none}
+.sheet-tile .ic{font-size:19px}
+.sheet-rows{display:flex;flex-direction:column;gap:7px}
+.sheet-row{display:flex;align-items:center;gap:11px;padding:11px 13px;border:2px solid var(--ink);border-radius:var(--r);background:var(--s0);box-shadow:var(--shadow-sm);cursor:pointer;font-size:13px;font-weight:600;font-family:var(--fb);text-align:left;color:var(--t0)}
+.sheet-row:active{transform:translate(2px,2px);box-shadow:none}
+.sheet-row .badge{margin-left:auto;background:var(--re);color:#fff;font-size:10px;font-weight:700;min-width:18px;height:18px;border-radius:10px;display:flex;align-items:center;justify-content:center;padding:0 5px;border:1.5px solid var(--ink)}
+/* notifications */
+.notif-panel{position:absolute;top:58px;right:10px;left:10px;z-index:210;background:var(--s0);border:2px solid var(--ink);border-radius:var(--rl);box-shadow:var(--shadow);max-height:70%;overflow-y:auto;padding:14px}
+.notif-section{font-size:10.5px;text-transform:uppercase;letter-spacing:1px;font-weight:700;color:var(--t2);margin:12px 0 6px}
+.notif-row{display:flex;align-items:center;gap:9px;padding:8px 0;border-bottom:1.5px dashed var(--s2);cursor:pointer}
+.notif-row:last-child{border-bottom:0}
+.notif-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0}
+.notif-title{font-size:12.5px;font-weight:600;color:var(--t0)}
+.notif-meta{font-size:10.5px;color:var(--t2);margin-top:1px}
+/* search */
+.cmd-overlay{position:absolute;inset:0;background:rgba(20,16,30,.5);z-index:220;display:flex;justify-content:center;padding:52px 14px}
+.cmd-box{width:100%;max-width:380px;background:var(--s0);border:2px solid var(--ink);border-radius:var(--rl);box-shadow:var(--shadow);align-self:flex-start;overflow:hidden}
+.cmd-input-wrap{display:flex;align-items:center;gap:8px;padding:11px 14px;border-bottom:2px solid var(--ink)}
+.cmd-input{flex:1;border:none;outline:none;font-family:var(--fb);font-size:14px;background:none;color:var(--t0)}
+.cmd-results{max-height:300px;overflow-y:auto}
+.cmd-result{display:flex;align-items:center;gap:10px;padding:9px 14px;cursor:pointer;border-bottom:1px solid var(--s2)}
+.cmd-result:hover{background:var(--s1)}
+.cmd-result .t{flex:1;min-width:0}
+.cmd-result .t b{font-size:12.5px;font-weight:600;display:block;color:var(--t0)}
+.cmd-result .t small{font-size:10.5px;color:var(--t2)}
+.cmd-badge{font-size:9px;font-weight:700;border:1.5px solid var(--ink);border-radius:999px;padding:1px 7px}
+.cmd-empty{padding:22px 14px;font-size:12px;color:var(--t2);text-align:center}
+.cmd-hint{padding:8px 14px;font-size:10px;color:var(--t3);border-top:1px solid var(--s2)}
+/* funnel */
+.funnel-overlay{position:absolute;inset:0;z-index:230;background:var(--bg);overflow-y:auto;padding:20px 18px 26px}
+.funnel-overlay::-webkit-scrollbar{width:0}
+.funnel-step-label{font-size:11px;font-weight:700;letter-spacing:.6px;color:var(--t2);text-transform:uppercase;margin-bottom:8px}
+.funnel-pbar{height:5px;background:var(--s3);border-radius:3px;margin-bottom:20px;overflow:hidden}
+.funnel-pfill{height:100%;background:var(--g);border-radius:3px;transition:width .4s ease}
+.funnel-title{font-family:var(--fd);font-size:20px;color:var(--t0);margin-bottom:16px;line-height:1.3}
+.funnel-nav{display:flex;justify-content:space-between;align-items:center;margin-top:24px;padding-top:18px;border-top:1.5px solid var(--s2);gap:10px}
+.visa-opt{display:flex;align-items:center;gap:11px;padding:11px 13px;border:2px solid var(--ink);border-radius:var(--r);background:var(--s0);box-shadow:var(--shadow-sm);cursor:pointer;margin-bottom:8px}
+.visa-opt.on{background:var(--g2);border-color:var(--g)}
+.visa-radio{width:16px;height:16px;border-radius:50%;border:2px solid var(--ink);flex-shrink:0;background:var(--s0)}
+.visa-opt.on .visa-radio{background:var(--g)}
+.stat-tile{background:var(--s1);border:2px solid var(--ink);border-radius:12px;padding:10px 14px;text-align:center;box-shadow:var(--shadow-sm)}
+.stat-tile .n{font-family:var(--fd);font-size:19px;color:var(--t0)}
+.stat-tile .l{font-size:10px;color:var(--t2)}
+.gen-wrap{display:flex;flex-direction:column;align-items:center;text-align:center;padding-top:36px}
+.gen-spinner{width:44px;height:44px;border:3px solid var(--s3);border-top-color:var(--g);border-radius:50%;animation:spin .8s linear infinite;margin-bottom:16px}
+@keyframes spin{to{transform:rotate(360deg)}}
+.gen-title{font-family:var(--fd);font-size:18px;color:var(--t0)}
+.gen-sub{font-size:12px;color:var(--t2);max-width:300px;line-height:1.6;margin-top:6px}
+.gen-list{margin-top:18px;width:100%;max-width:320px;text-align:left;display:flex;flex-direction:column;gap:6px}
+.gen-item{font-size:12px;color:var(--t1);border:1.5px solid var(--bd);border-radius:9px;padding:6px 11px;background:var(--s0);animation:genin .3s ease}
+@keyframes genin{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:translateY(0)}}
+/* onboarding banner */
+.onb-banner{display:flex;align-items:center;gap:10px;border:2px solid var(--ink);border-radius:var(--r);background:var(--am2);box-shadow:var(--shadow-sm);padding:9px 12px;margin-bottom:14px;font-size:12px}
+/* tabbar */
+.tabbar{flex-shrink:0;display:flex;border-top:2px solid var(--ink);background:var(--s0);padding:6px 4px 10px;position:relative}
+.tb{flex:1;display:flex;flex-direction:column;align-items:center;gap:3px;font-size:9.5px;font-weight:600;color:var(--t2);cursor:pointer;border:0;background:none;font-family:var(--fb);padding-top:4px;position:relative;-webkit-tap-highlight-color:transparent}
+.tb.on{color:var(--t0)}
+.tb .i{font-size:18px;line-height:1}
+.tb .tbadge{position:absolute;top:0;right:calc(50% - 18px);background:var(--re);color:#fff;font-size:8.5px;font-weight:700;min-width:14px;height:14px;border-radius:8px;display:flex;align-items:center;justify-content:center;padding:0 3px;border:1.5px solid var(--ink)}
+.tb-kate{flex:1;display:flex;flex-direction:column;justify-content:flex-start;align-items:center;cursor:pointer;gap:1px}
+.orb{width:50px;height:50px;border-radius:50%;border:2px solid var(--ink);background:var(--s0);box-shadow:var(--shadow-sm);margin-top:-22px;display:flex;align-items:flex-end;justify-content:center;overflow:hidden}
+.tb-kate.on .orb{background:var(--b2);box-shadow:2px 2px 0 var(--b)}
+.tb-kate .klbl{font-size:9.5px;font-weight:600;color:var(--t2)}
+.tb-kate.on .klbl{color:var(--b)}
+/* toast */
+.toast{position:absolute;bottom:86px;left:50%;transform:translateX(-50%);z-index:400;background:var(--s0);border:2px solid var(--ink);border-radius:var(--r);padding:9px 14px;max-width:88%;box-shadow:var(--shadow-sm);font-size:12px;font-weight:600;animation:tslide .22s ease;display:none;color:var(--t0);text-align:center}
+@keyframes tslide{from{transform:translate(-50%,12px);opacity:0}to{transform:translate(-50%,0);opacity:1}}
+footer.credit{margin-top:16px;font-size:12px;color:#6b675f;text-align:center}
+footer.credit a{color:#4a463e;font-weight:600}
+</style>
+</head>
+<body>
+<div class="demo-bar">
+  <a href="../">← Portfolio</a>
+  <span class="tag">Interactive demo · sample data</span>
+</div>
+
+<div class="phone" id="phone">
+  <div class="app-head">
+    <!-- canonical wordmark: Real (coral) + cube (yellow) + Kate (teal), Fredoka One outlined -->
+    <svg class="word" viewBox="125 616 800 138" fill="none" xmlns="http://www.w3.org/2000/svg" style="width:140px">
+      <text x="133" y="735" font-family="'Fredoka One','Nunito',sans-serif" font-size="134" fill="#EF7960" stroke="#0A0908" stroke-width="10" stroke-linejoin="round" style="paint-order:stroke" letter-spacing="8">Real</text>
+      <g transform="translate(510.5,686.5) scale(1.2) translate(-510.5,-686.5)">
+        <polygon points="470,658 513,636 551,658 509,680" fill="#F6D034" stroke="#0A0908" stroke-width="8.3" stroke-linejoin="round"/>
+        <polygon points="465,666 506,689 506,736 465,713" fill="#F6D034" stroke="#0A0908" stroke-width="8.3" stroke-linejoin="round"/>
+        <polygon points="556,666 556,713 515,736 515,689" fill="#F6D034" stroke="#0A0908" stroke-width="8.3" stroke-linejoin="round"/>
+      </g>
+      <text x="584" y="735" font-family="'Fredoka One','Nunito',sans-serif" font-size="134" fill="#3DC4B6" stroke="#0A0908" stroke-width="10" stroke-linejoin="round" style="paint-order:stroke" letter-spacing="12">Kate</text>
+    </svg>
+    <div style="display:flex;gap:8px">
+      <div class="hbtn" title="Search (⌘K)" onclick="toggleSearch()">🔍</div>
+      <div class="hbtn" title="Notifications" onclick="toggleNotif()">🔔<span class="bell-count" id="bellCount" style="display:none"></span></div>
+    </div>
+  </div>
+  <main id="main"></main>
+  <div class="chat-in" id="chatIn" style="display:none">
+    <input id="kateInput" placeholder="Ask Kate anything…" autocomplete="off">
+    <button id="kateSend">↑</button>
+  </div>
+  <div class="tabbar" id="tabbar"></div>
+  <div id="overlays"></div>
+  <div class="toast" id="toast"></div>
+</div>
+
+<footer class="credit">Realokate — your relocation operating system · built by <a href="../">Shahar Meriash</a></footer>
+
+<script>
+/* ══════════ Kate's canonical mark (from src/brand/Logo.jsx — never redrawn) ══════════ */
+const KATE_SVG = `<svg width="28" height="28" viewBox="0 0 64 64" fill="none">
+<path d="M10 64c0-11 9-16.5 22-16.5S54 53 54 64z" fill="#3DC4B6" stroke="#1A1823" stroke-width="2.4" stroke-linejoin="round"/>
+<path d="M27.5 40h9v9.5c0 2.5-2 4-4.5 4s-4.5-1.5-4.5-4z" fill="#F5C9A4" stroke="#1A1823" stroke-width="2"/>
+<path d="M19.5 26.5c0-10.5 5.5-16.5 12.5-16.5s12.5 6 12.5 16.5c0 8.5-5.2 15.5-12.5 15.5S19.5 35 19.5 26.5z" fill="#F5C9A4" stroke="#1A1823" stroke-width="2.2"/>
+<path d="M24.8 25.4q2.3-1.4 4.6-.5" stroke="#1A1823" stroke-width="1.5" stroke-linecap="round" fill="none"/>
+<path d="M39.2 25.4q-2.3-1.4-4.6-.5" stroke="#1A1823" stroke-width="1.5" stroke-linecap="round" fill="none"/>
+<ellipse cx="27.1" cy="29.2" rx="1.15" ry="1.5" fill="#1A1823"/><ellipse cx="36.9" cy="29.2" rx="1.15" ry="1.5" fill="#1A1823"/>
+<path d="M31.6 30.5q-.6 1.9.5 2.4" stroke="#1A1823" stroke-width="1.2" stroke-linecap="round" fill="none"/>
+<ellipse cx="24.2" cy="33.6" rx="1.9" ry="1.1" fill="#EF7960" opacity=".35"/><ellipse cx="39.8" cy="33.6" rx="1.9" ry="1.1" fill="#EF7960" opacity=".35"/>
+<path d="M28.6 36.2q3.4 2.3 6.8 0" stroke="#1A1823" stroke-width="1.7" stroke-linecap="round" fill="none"/>
+<path d="M15.5 33.5C14 15 22 6.5 32 6.5S50 15 48.5 33.5c-.4 4.5-2.8 6-4.6 3.6-1.3-1.8-1.4-7.4-1-10.6-2.4-4.3-4-6.6-5-9.8-3.8 3.4-12.2 4.6-16.6 2.4-.8 2.4-.9 4.9-.7 7.4.3 3.2.3 8.8-1 10.6-1.8 2.4-4.2.9-4.6-3.6z" fill="#E9B95C" stroke="#1A1823" stroke-width="2.2" stroke-linejoin="round"/>
+<path d="M24.5 11.5c-3.4 2.6-5 6.4-5.4 10.4" stroke="#F6D68C" stroke-width="2" stroke-linecap="round"/>
+<path d="M39 12.5c2.6 2.4 4 5.6 4.4 9.2" stroke="#F6D68C" stroke-width="2" stroke-linecap="round"/>
+<path d="M16.4 24a16.4 16.4 0 0 1 31.2-3" stroke="#1A1823" stroke-width="2.2" stroke-linecap="round" fill="none"/>
+<rect x="13.6" y="23" width="5" height="8" rx="2.5" fill="#EF7960" stroke="#1A1823" stroke-width="2"/>
+<path d="M16 31q0 8.5 9.5 9.5" stroke="#1A1823" stroke-width="2.1" stroke-linecap="round" fill="none"/>
+<circle cx="27.8" cy="40.6" r="2.4" fill="#F6D034" stroke="#1A1823" stroke-width="1.9"/></svg>`;
+const kav = () => `<span class="kav">${KATE_SVG}</span>`;
+
+/* ══════════ dates anchored to "today" so the demo always looks live ══════════ */
+const DAY = 864e5, today = new Date(); today.setHours(0,0,0,0);
+const d = off => { const x = new Date(today.getTime() + off*DAY); return x.getFullYear()+"-"+String(x.getMonth()+1).padStart(2,"0")+"-"+String(x.getDate()).padStart(2,"0"); };
+const fmt = s => new Date(s+"T00:00").toLocaleDateString("en-AU",{day:"numeric",month:"short"});
+const daysTo = s => Math.round((new Date(s+"T00:00") - today)/DAY);
+const esc = s => String(s??"").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");
+const md = s => esc(s).replace(/\*\*(.+?)\*\*/g,"<b>$1</b>");
+const $ = s => document.querySelector(s);
+
+/* ══════════ static data ══════════ */
+const COUNTRIES = [
+  {n:"Israel",f:"🇮🇱",c:"ILS",city:"Tel Aviv"},{n:"Australia",f:"🇦🇺",c:"AUD",city:"Perth"},
+  {n:"United States",f:"🇺🇸",c:"USD",city:"Austin"},{n:"United Kingdom",f:"🇬🇧",c:"GBP",city:"London"},
+  {n:"Canada",f:"🇨🇦",c:"CAD",city:"Toronto"},{n:"Germany",f:"🇩🇪",c:"EUR",city:"Berlin"},
+  {n:"Portugal",f:"🇵🇹",c:"EUR",city:"Lisbon"},{n:"Netherlands",f:"🇳🇱",c:"EUR",city:"Amsterdam"},
+  {n:"Singapore",f:"🇸🇬",c:"SGD",city:"Singapore"},{n:"New Zealand",f:"🇳🇿",c:"NZD",city:"Auckland"},
+  {n:"Japan",f:"🇯🇵",c:"JPY",city:"Tokyo"},
+];
+const ctry = n => COUNTRIES.find(c=>c.n===n)||{n,f:"🌍",c:"USD",city:n};
+const VISAS = {
+  "Australia":[
+    {l:"Skilled Worker — TSS 482 / 186",s:"Employer-sponsored"},
+    {l:"Skilled Independent — 189 / 190",s:"Points-tested"},
+    {l:"Student — subclass 500",s:"With work rights"},
+    {l:"Partner / Family",s:""},
+    {l:"Working Holiday — 417",s:"Ages 18–35"},
+    {l:"Other / Not sure",s:"Kate will figure it out with you"}],
+  _default:[
+    {l:"Skilled / Work visa",s:"Employer or points based"},
+    {l:"Student visa",s:""},
+    {l:"Partner / Family",s:""},
+    {l:"Digital Nomad / Remote",s:""},
+    {l:"Other / Not sure",s:"Kate will figure it out with you"}],
+};
+const DOC_ACTIONS = {
+  get:{l:"To get",ic:"📥"}, renew:{l:"To renew",ic:"🔄"}, translate:{l:"To translate",ic:"🌐"},
+  pay:{l:"To pay",ic:"💳"}, sign:{l:"To sign",ic:"✍️"}, certify:{l:"To certify",ic:"📜"}, fix:{l:"To fix",ic:"🔧"},
+};
+const ACT_ORDER = ["renew","get","translate","sign","certify","pay","fix"];
+const DOC_CATS = {"Identity":"🪪","Visa & Immigration":"🛂","Health":"🏥","Housing":"🏠","Finances":"💰","Education":"🎓","Legal":"⚖️","Other":"📁"};
+const MEM_COLORS = ["#EF7960","#3DC4B6","#8b5cf6","#f97316","#3b82f6","#10b981","#f43f5e"];
+const CUR_SYM = {AUD:"A$",ILS:"₪",USD:"$",GBP:"£",EUR:"€",CAD:"C$",SGD:"S$",NZD:"NZ$",JPY:"¥"};
+
+/* ══════════ workspace state ══════════ */
+let profile, members, areas, items, docs, budget, fx, gate, calConnected, chat;
+let ui = {tab:"home",finTab:"overview",planTab:"area",planQ:"",planWho:null,docGroup:"action",docCat:null,
+  sheet:null,moreOpen:false,notifOpen:false,searchOpen:false,searchQ:"",funnel:null,dark:false,
+  qaOpen:false,onbBanner:true,openAreas:{}};
+
+function seed(){
+  profile = {originCity:"Tel Aviv",originCountry:"Israel",destCity:"Perth",destCountry:"Australia",
+    visaType:"Skilled Worker — TSS 482 / 186",arrivalDate:d(102),person1:"Dana",person2:"Omer",
+    curO:"ILS",curD:"AUD"};
+  members = [
+    {id:"m1",name:"Dana",kind:"adult",color:"#EF7960"},
+    {id:"m2",name:"Omer",kind:"adult",color:"#3DC4B6"},
+    {id:"m3",name:"Noa",kind:"child",age:7,color:"#8b5cf6"},
+    {id:"m4",name:"Ziggy",kind:"pet",species:"Dog",color:"#f97316"},
+  ];
+  areas = [
+    {id:"p1",icon:"🛂",title:"Visa & Immigration",color:"#EF7960"},
+    {id:"p2",icon:"🏠",title:"Housing",color:"#3DC4B6"},
+    {id:"p3",icon:"🎓",title:"Kids & School",color:"#3b82f6"},
+    {id:"p4",icon:"💰",title:"Money & Health",color:"#F6D034"},
+    {id:"p5",icon:"🐾",title:"Pets",color:"#f59e0b"},
+    {id:"p6",icon:"📦",title:"Departure & Logistics",color:"#8b5cf6"},
+  ];
+  items = [
+    {id:"a1",planId:"p1",title:"Submit 482 visa application",priority:"High",status:"done",ddate:d(-20),memberIds:["m1"],cost:3100,cur:"AUD",settled:true,settledDate:d(-20),subs:[],blockedBy:[],notes:"Lodged via migration agent."},
+    {id:"a18",planId:"p1",title:"Migration agent fee",priority:"Medium",status:"done",ddate:d(-40),memberIds:["m1"],cost:9600,cur:"AUD",settled:true,settledDate:d(-40),subs:[],blockedBy:[],notes:""},
+    {id:"a2",planId:"p1",title:"Book visa medical exams",priority:"High",status:"prog",ddate:d(-2),memberIds:["m1","m2"],cost:450,cur:"AUD",settled:false,subs:[
+      {id:"s1",t:"Book Dana's exam",done:true},{id:"s2",t:"Book Omer's exam",done:false},{id:"s3",t:"Print HAP referral letters",done:false}],blockedBy:[],notes:""},
+    {id:"a3",planId:"p1",title:"Get police clearance certificates",priority:"High",status:"tbd",ddate:d(6),memberIds:["m1","m2"],subs:[],blockedBy:[],notes:"Free online via the Israel Police site."},
+    {id:"a16",planId:"p1",title:"Apostille + notarised translations",priority:"High",status:"done",ddate:d(-33),memberIds:["m1"],cost:1400,cur:"ILS",settled:true,settledDate:d(-33),subs:[],blockedBy:[],notes:""},
+    {id:"a4",planId:"p2",title:"Shortlist rental suburbs in Perth",priority:"Medium",status:"done",ddate:d(-12),memberIds:["m1"],subs:[],blockedBy:[],notes:"Fremantle · East Vic Park · Scarborough"},
+    {id:"a5",planId:"p2",title:"Book temporary accommodation (first 4 weeks)",priority:"High",status:"tbd",ddate:d(14),memberIds:["m2"],cost:4800,cur:"AUD",settled:false,subs:[
+      {id:"s4",t:"Shortlist 3 short-stay options",done:true},{id:"s5",t:"Confirm dates around arrival",done:false},{id:"s6",t:"Pay deposit",done:false}],blockedBy:[],notes:""},
+    {id:"a6",planId:"p3",title:"Apply to primary schools near Fremantle",priority:"High",status:"prog",ddate:d(4),memberIds:["m3"],subs:[
+      {id:"s7",t:"Fremantle Primary application",done:true},{id:"s8",t:"White Gum Valley application",done:false}],blockedBy:[],notes:""},
+    {id:"a7",planId:"p3",title:"Request school records + translations",priority:"Medium",status:"tbd",ddate:d(10),memberIds:["m3"],subs:[],blockedBy:[],notes:""},
+    {id:"a8",planId:"p4",title:"Open Australian bank account",priority:"Medium",status:"done",ddate:d(-30),memberIds:["m1"],subs:[],blockedBy:[],notes:"Opened online with NAB."},
+    {id:"a9",planId:"p4",title:"Get quotes: international health insurance",priority:"Medium",status:"tbd",ddate:d(18),memberIds:["m1","m2"],cost:280,cur:"AUD",settled:false,subs:[],blockedBy:[],notes:""},
+    {id:"a10",planId:"p5",title:"Rabies titre test for Ziggy",priority:"High",status:"done",ddate:d(-45),memberIds:["m4"],cost:900,cur:"ILS",settled:true,settledDate:d(-45),subs:[],blockedBy:[],notes:""},
+    {id:"a11",planId:"p5",title:"Book quarantine slot (Mickleham)",priority:"High",status:"tbd",ddate:d(1),memberIds:["m4"],cost:2000,cur:"AUD",settled:false,subs:[],blockedBy:[],notes:"Slots for our window are 70% booked."},
+    {id:"a14",planId:"p5",title:"Book Ziggy's flight (IPATA agent)",priority:"High",status:"tbd",ddate:d(20),memberIds:["m4"],cost:1800,cur:"AUD",settled:false,subs:[],blockedBy:["a11"],notes:""},
+    {id:"a12",planId:"p6",title:"Get 3 moving-container quotes",priority:"Medium",status:"prog",ddate:d(9),memberIds:["m2"],cost:7200,cur:"AUD",settled:false,subs:[
+      {id:"s9",t:"Contact AGS, Kef & Ocean Relocations",done:true},{id:"s10",t:"Compare door-to-door quotes",done:false},{id:"s11",t:"Pick one & book packing date",done:false}],blockedBy:[],notes:""},
+    {id:"a17",planId:"p6",title:"Book one-way flights",priority:"High",status:"tbd",ddate:d(34),memberIds:["m1","m2","m3"],cost:5200,cur:"AUD",settled:false,subs:[],blockedBy:[],notes:""},
+    {id:"a13",planId:"p6",title:"Sell the car",priority:"Low",status:"tbd",ddate:d(40),memberIds:["m2"],cost:8000,cur:"AUD",income:true,settled:false,subs:[],blockedBy:[],notes:""},
+    {id:"a15",planId:"p4",title:"Employer relocation allowance",priority:"Medium",status:"done",ddate:d(-10),memberIds:["m1"],cost:15000,cur:"AUD",income:true,settled:true,settledDate:d(-10),subs:[],blockedBy:[],notes:""},
+  ];
+  docs = [
+    {id:"d1",name:"Passport — Dana",acts:[],cats:["Identity"],who:["m1"],exp:d(900)},
+    {id:"d2",name:"Passport — Noa",acts:["renew"],cats:["Identity"],who:["m3"],exp:d(120)},
+    {id:"d3",name:"Rabies certificate — Ziggy",acts:["certify"],cats:["Health"],who:["m4"],exp:d(60)},
+    {id:"d4",name:"Marriage certificate",acts:["translate"],cats:["Legal"],who:["m1","m2"],exp:""},
+    {id:"d5",name:"School records — Noa",acts:["get","translate"],cats:["Education"],who:["m3"],exp:""},
+    {id:"d6",name:"482 lodgement receipt",acts:[],cats:["Visa & Immigration"],who:[],exp:""},
+    {id:"d7",name:"Rental references",acts:["get"],cats:["Housing"],who:["m1","m2"],exp:""},
+    {id:"d8",name:"Bank statements (3 months)",acts:["get"],cats:["Finances"],who:["m1"],exp:""},
+  ];
+  budget = {amount:120000,cur:"AUD"};
+  fx = 2.17;               // 1 AUD = 2.17 ILS (editable in Settings)
+  gate = {label:"482 visa grant",done:false,eta:d(24)};
+  calConnected = false;
+  chat = [{role:"ai",done:true,
+    text:`Hi ${profile.person1}! I'm Kate, your relocation advisor 🌏\n\nYou're ${daysTo(profile.arrivalDate)} days out from ${profile.destCity} and tracking well. One thing needs attention today: Ziggy's quarantine slot at Mickleham books out fast — want me to walk you through it?`,
+    sugs:["What's due this week?","Best suburbs for families?","How's our budget?"]}];
+}
+
+/* ══════════ helpers ══════════ */
+const memById = id => members.find(m=>m.id===id);
+const areaById = id => areas.find(a=>a.id===id);
+const memLabel = m => m.kind==="pet" ? "🐾" : (m.name||"?")[0].toUpperCase();
+const av = (id,cls) => { const m=memById(id); return m?`<span class="${cls||"savv"}" style="background:${m.color}" title="${esc(m.name)}">${memLabel(m)}</span>`:""; };
+const toAUD = (amt,cur) => cur==="ILS" ? amt/fx : amt;
+const money = (n,cur) => (CUR_SYM[cur||"AUD"]||"")+Math.round(n).toLocaleString();
+const fmtA = n => "A$"+Math.round(n).toLocaleString();
+const blockerOf = it => (it.blockedBy||[]).map(id=>items.find(x=>x.id===id)).find(b=>b&&b.status!=="done");
+const active = () => items.filter(i=>i.status!=="irrelevant");
+
+function showT(msg,type="ok"){
+  const t=$("#toast");
+  t.textContent=(type==="err"?"⚠️ ":"")+msg;
+  t.style.display="block";
+  clearTimeout(showT._t);
+  showT._t=setTimeout(()=>t.style.display="none",3200);
+}
+
+function notifData(){
+  const overdue = active().filter(a=>a.ddate&&a.ddate<d(0)&&a.status!=="done").sort((a,b)=>a.ddate.localeCompare(b.ddate));
+  const due7 = active().filter(a=>a.ddate&&a.status!=="done"&&a.ddate>=d(0)&&a.ddate<=d(7)).sort((a,b)=>a.ddate.localeCompare(b.ddate));
+  const expDocs = docs.filter(x=>x.exp&&daysTo(x.exp)<180).sort((a,b)=>a.exp.localeCompare(b.exp));
+  return {overdue,due7,expDocs,count:overdue.length+due7.length+expDocs.filter(x=>daysTo(x.exp)<30).length||overdue.length+due7.length};
+}
+
+/* ══════════ tab bar (mirrors real mobile tabbar: Home · Plan · Kate · Finance · Docs · More) ══════════ */
+function renderTabbar(){
+  const nd = notifData();
+  const overdueN = nd.overdue.length;
+  const tabs = [
+    {id:"home",label:"Home",icon:"🏠",badge:overdueN},
+    {id:"plan",label:"Plan",icon:"✅"},
+    {id:"kate"},
+    {id:"finance",label:"Finance",icon:"💰"},
+    {id:"docs",label:"Docs",icon:"📄"},
+    {id:"more",label:"More",icon:"⋯"},
+  ];
+  $("#tabbar").innerHTML = tabs.map(t=>{
+    if(t.id==="kate") return `<div class="tb-kate ${ui.tab==='kate'?'on':''}" onclick="go('kate')"><div class="orb">${KATE_SVG}</div><span class="klbl">Kate</span></div>`;
+    if(t.id==="more") return `<button class="tb ${ui.moreOpen||ui.tab==='settings'?'on':''}" onclick="openMore()"><span class="i"><svg width="19" height="19" viewBox="0 0 20 20" fill="none"><circle cx="5" cy="5" r="1.8" fill="#EF7960" stroke="#1A1823" stroke-width="1.4"/><circle cx="15" cy="5" r="1.8" fill="#3DC4B6" stroke="#1A1823" stroke-width="1.4"/><circle cx="5" cy="15" r="1.8" fill="#F6D034" stroke="#1A1823" stroke-width="1.4"/><circle cx="15" cy="15" r="1.8" fill="#EF7960" stroke="#1A1823" stroke-width="1.4"/></svg></span>More${nd.count?`<span class="tbadge">${nd.count}</span>`:""}</button>`;
+    return `<button class="tb ${ui.tab===t.id?'on':''}" onclick="go('${t.id}')"><span class="i">${t.icon}</span>${t.label}${t.badge?`<span class="tbadge">${t.badge}</span>`:""}</button>`;
+  }).join("");
+  const bc=$("#bellCount");
+  bc.style.display = nd.count?"flex":"none"; bc.textContent = nd.count;
+}
+function go(t){ ui.tab=t; ui.notifOpen=false; ui.searchOpen=false; render(); if(t!=="kate") $("#main").scrollTop=0; }
+
+/* ══════════ status cycle with dependency + subtask gates ══════════ */
+function cycleStatus(id){
+  const it = items.find(i=>i.id===id);
+  const next = it.status==="tbd"?"prog":it.status==="prog"?"done":"tbd";
+  if(next==="done"){
+    const blocker = blockerOf(it);
+    if(blocker){ shakeTask(id); showT(`🔒 Finish "${blocker.title}" first`,"err"); return; }
+    const openSubs=(it.subs||[]).filter(s=>!s.done).length;
+    if(openSubs){ shakeTask(id); showT(`☑️ ${openSubs} subtask${openSubs>1?"s":""} still open`,"err"); return; }
+    const unlocked = items.find(x=>x.id!==id&&(x.blockedBy||[]).includes(id)&&!(x.blockedBy||[]).some(b=>b!==id&&items.find(y=>y.id===b&&y.status!=="done")));
+    if(unlocked) showT(`🔓 Unlocked: ${unlocked.title}`);
+    if(it.cost&&!it.income){ it.settled=true; it.settledDate=d(0); }
+  }
+  it.status=next;
+  render();
+}
+function shakeTask(id){
+  const el=document.getElementById("t-"+id);
+  if(el){ el.classList.add("shake"); setTimeout(()=>el.classList.remove("shake"),450); }
+}
+
+/* ══════════ HOME ══════════ */
+function briefText(){
+  const daysLeft = daysTo(profile.arrivalDate);
+  const act = active();
+  const donePct = Math.round(act.filter(i=>i.status==="done").length/Math.max(act.length,1)*100);
+  const SPAN=190, timePct=Math.max(0,Math.min(100,Math.round((SPAN-daysLeft)/SPAN*100)));
+  const overdue = act.filter(a=>a.ddate&&a.ddate<d(0)&&a.status!=="done");
+  const soon = act.filter(a=>a.ddate&&a.status!=="done"&&a.ddate>=d(0)&&a.ddate<=d(7)).sort((a,b)=>a.ddate.localeCompare(b.ddate));
+  let s=`Good morning, ${profile.person1} ☀️ ${daysLeft} days to ${profile.destCity} and you're ${donePct>=timePct?"ahead of pace — nice work":"a touch behind pace, but very fixable"}.`;
+  if(soon.length) s+=` This week's focus: **${soon[0].title.toLowerCase()}**${soon[1]?`, then ${soon[1].title.toLowerCase()}`:""}.`;
+  if(overdue.length) s+=` One thing slipped — **${overdue[0].title.toLowerCase()}** — ten focused minutes gets it back on track.`;
+  else s+=` Nothing overdue. Keep the streak going 💪`;
+  return s;
+}
+function pageHome(){
+  const act = active();
+  const total=act.length, done=act.filter(i=>i.status==="done").length;
+  const donePct=Math.round(done/Math.max(total,1)*100);
+  const daysLeft=daysTo(profile.arrivalDate);
+  const SPAN=190, timePct=Math.max(0,Math.min(100,Math.round((SPAN-daysLeft)/SPAN*100)));
+  const ahead=donePct>=timePct;
+  const nd=notifData();
+  const waiting=act.filter(a=>a.status!=="done"&&blockerOf(a)).length;
+  const dueMoney=act.filter(a=>a.cost&&!a.income&&!a.settled&&a.status!=="done"&&a.ddate&&daysTo(a.ddate)<=60).reduce((s,a)=>s+toAUD(a.cost,a.cur),0);
+  const oc=ctry(profile.originCountry), dc=ctry(profile.destCountry);
+  const next = act.filter(i=>i.status!=="done"&&!blockerOf(i)).sort((a,b)=>(a.ddate||"9999").localeCompare(b.ddate||"9999")).slice(0,5);
+  const why = it => it.ddate&&it.ddate<d(0) ? `<span class="why od">Overdue ${-daysTo(it.ddate)}d</span>`
+    : it.ddate===d(0) ? `<span class="why od">Due today</span>`
+    : it.ddate&&daysTo(it.ddate)<=10 ? `<span class="why dt">Due in ${daysTo(it.ddate)}d</span>`
+    : (it.blockedBy||[]).length ? `<span class="why un">🔓 Unblocked</span>`
+    : `<span class="why un">High priority</span>`;
+  // timeline events
+  const evs = act.filter(i=>i.status!=="done"&&i.ddate&&i.ddate>=d(0)).map(i=>({date:i.ddate,type:"task",it:i}))
+    .concat(docs.filter(x=>x.exp&&daysTo(x.exp)<180).map(x=>({date:x.exp,type:"doc",doc:x})))
+    .concat(gate&&!gate.done?[{date:gate.eta,type:"gate"}]:[])
+    .sort((a,b)=>a.date.localeCompare(b.date)).slice(0,12);
+  const months={};
+  evs.forEach(e=>{const m=new Date(e.date+"T00:00").toLocaleDateString("en-AU",{month:"long",year:"numeric"});(months[m]=months[m]||[]).push(e);});
+  const committed=act.filter(a=>a.cost&&!a.income).reduce((s,a)=>s+toAUD(a.cost,a.cur),0);
+  const settled=act.filter(a=>a.cost&&!a.income&&a.settled).reduce((s,a)=>s+toAUD(a.cost,a.cur),0);
+  return `
+  <h2 class="pg">Welcome back, ${esc(profile.person1)} 👋</h2>
+  <div class="sub">Here's the road ahead.</div>
+  ${ui.onbBanner?`<div class="onb-banner"><span style="font-size:16px">✨</span><span style="flex:1">Watch Kate build a plan from scratch — replay the 2-minute setup.</span><button class="btn xs g" onclick="openFunnel()">▶ Replay</button><span style="cursor:pointer;color:var(--t2);font-weight:700" onclick="ui.onbBanner=false;render()">✕</span></div>`:""}
+  <div class="card">
+    <div class="route"><span style="font-size:20px">${oc.f}</span> ${esc(profile.originCity)} <span class="arr"></span> ${esc(profile.destCity)} <span style="font-size:20px">${dc.f}</span></div>
+    <div class="days"><b>${daysLeft} days</b> until arrival · ${fmt(profile.arrivalDate)}</div>
+    <div class="pacebar"><i style="width:${donePct}%;background:linear-gradient(90deg,var(--b),#0d9488)"></i><span class="tmark" style="left:${timePct}%"></span></div>
+    <div class="verdict" style="color:${ahead?"#0d9488":"#B8860B"}">${ahead?`✓ Ahead — ${donePct}% done vs ${timePct}% of time elapsed`:`⏳ ${timePct-donePct}% behind pace — ${donePct}% done vs ${timePct}% of time`}</div>
+  </div>
+  <div class="chips">
+    ${nd.overdue.length?`<span class="chip warn" onclick="go('plan')">⚠️ ${nd.overdue.length} overdue</span>`:""}
+    ${gate&&!gate.done?`<span class="chip amber" onclick="go('plan')">⏳ ${esc(gate.label)} pending</span>`:""}
+    ${nd.expDocs.length?`<span class="chip amber" onclick="go('docs')">📄 ${nd.expDocs.length} doc${nd.expDocs.length>1?"s":""} expiring</span>`:""}
+    ${dueMoney>0?`<span class="chip blue" onclick="go('finance')">💰 ${fmtA(dueMoney)} due in 60d</span>`:""}
+    ${waiting?`<span class="chip grey" onclick="go('plan')">🔒 ${waiting} waiting</span>`:""}
+  </div>
+  <div class="crew">
+    ${members.map(m=>`<span class="mchip" onclick="ui.planWho='${m.id}';go('plan')"><span class="avv" style="background:${m.color}">${memLabel(m)}</span>${esc(m.name)}${m.kind==="child"?` (${m.age})`:""}${m.kind==="pet"?" 🐕":""}</span>`).join("")}
+  </div>
+  <div class="card donext">
+    <div style="font-family:var(--fd);font-size:14px;margin-bottom:6px;color:var(--g)">▶ DO NEXT</div>
+    ${next.length?next.map(it=>`<div class="row" onclick="openEdit('${it.id}')">${why(it)}<span class="t">${esc(it.title)}</span>${(it.memberIds||[]).map(id=>av(id)).join("")}</div>`).join(""):`<div style="font-size:12px;color:var(--t2);padding:8px 0">All clear 🎉 — nothing urgent.</div>`}
+    <div style="text-align:center;padding-top:8px"><span style="font-size:11.5px;font-weight:700;color:#0d9488;cursor:pointer" onclick="go('plan')">Full plan →</span></div>
+  </div>
+  <div class="card">
+    <div style="font-family:var(--fd);font-size:14px">🗓 The road</div>
+    ${Object.entries(months).map(([m,list])=>`<div class="tl-month">${m}</div>${list.map(e=>{
+      if(e.type==="gate") return `<div class="gate-ev" onclick="go('plan')">🚩 <b>Critical Gate</b> — ${esc(gate.label)} expected · ${fmt(e.date)}<div style="font-size:10.5px;color:var(--t2);margin-top:2px">Flights & final bookings unlock once this lands.</div></div>`;
+      if(e.type==="doc") return `<div class="tl-ev docev" onclick="go('docs')"><div><div>📄 <b>${esc(e.doc.name)}</b> expires</div><div class="d">${fmt(e.date)}</div></div></div>`;
+      return `<div class="tl-ev" onclick="openEdit('${e.it.id}')"><div><div><b>${esc(e.it.title)}</b></div><div class="d">${fmt(e.date)} · ${areaById(e.it.planId)?.icon||""} ${esc(areaById(e.it.planId)?.title||"")}</div></div></div>`;
+    }).join("")}`).join("")}
+    <div class="arrive"><div class="a1">✈️ Arrival in ${esc(profile.destCity)} ${dc.f}</div><div class="a2">${new Date(profile.arrivalDate+"T00:00").toLocaleDateString("en-AU",{weekday:"long",day:"numeric",month:"long"})} — ${daysLeft} days from now</div></div>
+  </div>
+  <div class="card" style="display:flex;align-items:center;gap:10px">
+    <span style="font-size:21px">📅</span>
+    <div style="flex:1;min-width:0">
+      <div style="font-size:12.5px;font-weight:700">${calConnected?"Calendar feed connected ✓":"See these dates in Google Calendar"}</div>
+      <div style="font-size:11px;color:var(--t2)">${calConnected?"Deadlines update automatically in any subscribed calendar.":"A read-only ‘Realokate’ calendar with every deadline and doc expiry."}</div>
+    </div>
+    ${calConnected?`<button class="btn sm" onclick="showT('📋 Feed URL copied — paste in Google Calendar → From URL')">Copy URL</button>`:`<button class="btn sm g" onclick="calConnected=true;render();showT('📅 Feed created — copy the URL or open Google Calendar')">Connect</button>`}
+  </div>
+  <div class="card" style="border-left:4px solid var(--g)">
+    <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">
+      ${kav()}
+      <div style="font-weight:700;font-size:13px">Kate's Daily Briefing</div>
+      <button class="btn xs" style="margin-left:auto" onclick="go('kate')">Chat →</button>
+    </div>
+    <div style="font-size:12.5px;color:var(--t1);line-height:1.65">${md(briefText())}</div>
+  </div>
+  <div class="card" style="display:flex;gap:16px;align-items:center;cursor:pointer" onclick="go('finance')">
+    <div style="flex:1">
+      <div style="font-size:10.5px;color:var(--t2);font-weight:700;letter-spacing:.8px;text-transform:uppercase">Budget pulse</div>
+      <div style="font-family:var(--fd);font-size:18px">${fmtA(committed)} · ${Math.round(committed/toAUD(budget.amount,budget.cur)*100)}%</div>
+      <div style="height:5px;background:var(--s2);border-radius:4px;margin-top:6px"><div style="width:${Math.min(100,Math.round(committed/toAUD(budget.amount,budget.cur)*100))}%;height:100%;background:#0d9488;border-radius:4px"></div></div>
+      <div style="font-size:11px;color:var(--t2);margin-top:4px">${fmtA(settled)} settled · budget ${fmtA(toAUD(budget.amount,budget.cur))}</div>
+    </div>
+    <span style="font-size:12px;font-weight:700;color:#0d9488">Finance →</span>
+  </div>`;
+}
+
+/* ══════════ PLAN ══════════ */
+function matchQ(a){
+  const q=ui.planQ.trim().toLowerCase();
+  if(!q) return true;
+  return a.title.toLowerCase().includes(q)||(a.subs||[]).some(s=>s.t.toLowerCase().includes(q));
+}
+function matchWho(a){ return !ui.planWho||(a.memberIds||[]).includes(ui.planWho); }
+function taskRow(t,showArea){
+  const blocker=blockerOf(t);
+  const over=t.ddate&&t.ddate<d(0)&&t.status!=="done";
+  const subs=t.subs||[], sdone=subs.filter(s=>s.done).length;
+  const a=areaById(t.planId);
+  return `<div class="task ${t.status==="done"?"is-done":""}" id="t-${t.id}">
+    <div class="tick ${t.status}" onclick="cycleStatus('${t.id}')">${blocker&&t.status!=="done"?"🔒":t.status==="done"?"✓":t.status==="prog"?"●":""}</div>
+    <div class="tt" onclick="openEdit('${t.id}')">
+      <div class="n">${esc(t.title)}</div>
+      <div class="meta">
+        ${showArea&&a?`<span style="font-size:9px;color:${a.color};font-weight:700;text-transform:uppercase">${a.icon} ${esc(a.title)}</span>`:""}
+        ${blocker?`<span class="mt lock">🔒 after: ${esc(blocker.title.slice(0,24))}${blocker.title.length>24?"…":""}</span>`:""}
+        ${t.ddate&&t.status!=="done"?`<span class="mt ${over?"over":"due"}">${over?"Overdue":t.ddate===d(0)?"Due today":daysTo(t.ddate)<=7?"Due in "+daysTo(t.ddate)+"d":"Due "+fmt(t.ddate)}</span>`:""}
+        ${t.priority==="High"&&t.status!=="done"?`<span class="mt hi">High</span>`:""}
+        ${t.cost?`<span class="mt" style="${t.settled?"background:var(--b2)":""}">💰 ${money(t.cost,t.cur)}${t.settled?" ✓":""}</span>`:""}
+        ${subs.length?`<span class="minibar"><span class="mb"><span style="width:${sdone/subs.length*100}%"></span></span>${sdone}/${subs.length}</span>`:""}
+      </div>
+    </div>
+    <div style="display:flex;flex-shrink:0;gap:2px;margin-top:2px">${(t.memberIds||[]).map(id=>av(id)).join("")}</div>
+  </div>`;
+}
+function pagePlan(){
+  const act=active();
+  const done=act.filter(i=>i.status==="done").length;
+  const body = ui.planTab==="area" ? planAreas() : planAll();
+  return `
+  <h2 class="pg">Plan</h2>
+  <div class="sub">${areas.length} areas · ${done}/${act.length} tasks done · arrival ${fmt(profile.arrivalDate)}</div>
+  <div class="seg">
+    <button class="${ui.planTab==='area'?'on':''}" onclick="ui.planTab='area';render()">By area</button>
+    <button class="${ui.planTab==='all'?'on':''}" onclick="ui.planTab='all';render()">All tasks</button>
+  </div>
+  <input class="finput" placeholder="🔍 Search tasks…" value="${esc(ui.planQ)}" oninput="planSearch(this.value)" style="margin-bottom:12px">
+  <div class="pfilter">
+    <span style="font-size:10px;text-transform:uppercase;letter-spacing:1.4px;color:var(--t2);font-weight:700;margin-right:2px">Whose</span>
+    ${members.map(m=>`<span class="pfilter-ava ${ui.planWho===m.id||!ui.planWho?"on":""}" style="background:${m.color}" title="${esc(m.name)}" onclick="ui.planWho=ui.planWho==='${m.id}'?null:'${m.id}';render()">${memLabel(m)}</span>`).join("")}
+  </div>
+  <div id="planBody">${body}</div>
+  <div class="fab" onclick="openTaskSheet()" title="Add task"><svg width="26" height="26" viewBox="0 0 24 24" fill="none"><path d="M12 5v14M5 12h14" stroke="#fff" stroke-width="2.6" stroke-linecap="round"/></svg></div>`;
+}
+function planSearch(v){ ui.planQ=v; $("#planBody").innerHTML = ui.planTab==="area"?planAreas():planAll(); }
+function planAreas(){
+  return areas.map((a,i)=>{
+    const ts=items.filter(t=>t.planId===a.id);
+    let shown=ts.filter(matchWho).filter(matchQ);
+    if((ui.planWho||ui.planQ)&&!shown.length) return "";
+    const dn=ts.filter(t=>t.status==="done").length;
+    const pct=ts.length?Math.round(dn/ts.length*100):0;
+    const open = ui.planQ ? true : (ui.openAreas[a.id]!==undefined ? ui.openAreas[a.id] : ts.some(t=>t.status!=="done"&&t.ddate&&daysTo(t.ddate)<=7));
+    return `<div class="agroup">
+      <div class="agroup-head" onclick="ui.openAreas['${a.id}']=${open?"false":"true"};render()">
+        <span class="agroup-ic" style="background:${a.color}22">${a.icon}</span>
+        <div class="agroup-main"><div class="agroup-title">${esc(a.title)}</div>
+          <div class="agroup-bar"><span style="width:${pct}%;background:${a.color}"></span></div></div>
+        <span class="agroup-count">${dn}/${ts.length}</span>
+        <span class="agroup-chev ${open?"open":""}">›</span>
+      </div>
+      ${open?`<div class="agroup-tasks">${shown.length?shown.map(t=>taskRow(t)).join(""):`<div style="padding:12px 14px;font-size:12px;color:var(--t2)">No tasks yet.</div>`}</div>`:""}
+    </div>`;
+  }).join("")+`<div class="sub" style="margin-top:8px">Tap the checkbox to cycle: to-do → in progress → done. Locked tasks wait for their blocker.</div>`;
+}
+function planAll(){
+  const rank=v=>v.status==="done"?2:blockerOf(v)?1:0;
+  const list=items.filter(matchWho).filter(matchQ).sort((x,y)=>rank(x)-rank(y)||((x.ddate||"9999").localeCompare(y.ddate||"9999")));
+  return `
+  <div style="display:flex;justify-content:flex-end;margin-bottom:10px">
+    <button class="btn sm" onclick="exportTasksCSV()">↓ CSV</button>
+  </div>
+  <div class="agroup"><div class="agroup-tasks" style="border-top:0">${list.map(t=>taskRow(t,true)).join("")||`<div style="padding:14px;font-size:12px;color:var(--t2)">No tasks match.</div>`}</div></div>`;
+}
+
+/* ══════════ Task / Edit / Doc sheets ══════════ */
+function openTaskSheet(){
+  ui.sheet={type:"task",draft:{title:"",planId:areas[0].id,prio:"Medium",due:"",who:[],cost:"",cur:profile.curD}};
+  renderOverlays();
+}
+function openEdit(id){
+  const t=items.find(i=>i.id===id); if(!t) return;
+  ui.sheet={type:"edit",id,draft:{title:t.title,planId:t.planId,prio:t.priority,due:t.ddate||"",who:[...(t.memberIds||[])],
+    cost:t.cost||"",cur:t.cur||profile.curD,status:t.status,notes:t.notes||"",subs:(t.subs||[]).map(s=>({...s}))}};
+  renderOverlays();
+}
+function openDocSheet(id){
+  const dd = id?docs.find(x=>x.id===id):null;
+  ui.sheet={type:"doc",id:id||null,draft:dd?{name:dd.name,acts:[...dd.acts],cats:[...dd.cats],who:[...(dd.who||[])],exp:dd.exp||""}:{name:"",acts:[],cats:[],who:[],exp:""}};
+  renderOverlays();
+}
+function closeSheet(){ ui.sheet=null; ui.moreOpen=false; renderOverlays(); }
+const toggleArr=(arr,k)=>{ const i=arr.indexOf(k); i>=0?arr.splice(i,1):arr.push(k); };
+function sheetToggle(field,val){
+  const dr=ui.sheet.draft;
+  if(Array.isArray(dr[field])) toggleArr(dr[field],val); else dr[field]=val;
+  renderOverlays();
+}
+function duePreset(days){
+  ui.sheet.draft.due = ui.sheet.draft.due===d(days)?"":d(days);
+  renderOverlays();
+}
+function sheetTask(){
+  const dr=ui.sheet.draft;
+  return `
+  <div class="sheet-bg" onclick="closeSheet()"></div>
+  <div class="sheet">
+    <div class="sheet-grip"></div>
+    <div class="sheet-title">Add task</div>
+    <div class="sheet-sub">Just a title is required — tag the rest now or later.</div>
+    <div class="sheet-field-l">Title</div>
+    <input class="finput" placeholder="e.g. Book flights" value="${esc(dr.title)}" oninput="ui.sheet.draft.title=this.value" autofocus>
+    <div class="sheet-field-l">Area</div>
+    <div class="tagrow">${areas.map(a=>`<button class="tagsel ${dr.planId===a.id?"on":""}" onclick="sheetToggle('planId','${a.id}')">${a.icon} ${esc(a.title)}</button>`).join("")}</div>
+    <div class="sheet-field-l">Whose <span class="opt">· optional</span></div>
+    <div class="pfilter" style="margin:0">${members.map(m=>`<span class="pfilter-ava ${dr.who.includes(m.id)?"on":""}" style="background:${m.color}" onclick="sheetToggle('who','${m.id}')" title="${esc(m.name)}">${memLabel(m)}</span>`).join("")}</div>
+    <div class="sheet-field-l">Priority</div>
+    <div class="tagrow">${["High","Medium","Low"].map(p=>`<button class="tagsel ${dr.prio===p?"on":""}" onclick="sheetToggle('prio','${p}')">${p==="High"?"🔥 High":p==="Medium"?"◽ Medium":"🌙 Low"}</button>`).join("")}</div>
+    <div class="sheet-field-l">Due <span class="opt">· optional</span></div>
+    <div class="tagrow">
+      <button class="tagsel ${dr.due===d(0)?"on":""}" onclick="duePreset(0)">Today</button>
+      <button class="tagsel ${dr.due===d(7)?"on":""}" onclick="duePreset(7)">This week</button>
+      <button class="tagsel ${dr.due===d(30)?"on":""}" onclick="duePreset(30)">This month</button>
+      <input class="finput" type="date" style="width:150px;padding:7px 10px" value="${dr.due}" onchange="ui.sheet.draft.due=this.value">
+    </div>
+    <div class="sheet-field-l">Cost <span class="opt">· optional · mirrors into Finance</span></div>
+    <div style="display:flex;gap:8px">
+      <input class="finput" type="number" placeholder="Amount" style="flex:1" value="${dr.cost}" oninput="ui.sheet.draft.cost=this.value">
+      <select class="fselect" style="width:90px" onchange="ui.sheet.draft.cur=this.value">${[profile.curD,profile.curO].map(c=>`<option ${dr.cur===c?"selected":""}>${c}</option>`).join("")}</select>
+    </div>
+    <button class="btn g" style="width:100%;margin-top:16px;padding:12px" onclick="addTaskFromSheet()">Add task</button>
+  </div>`;
+}
+function addTaskFromSheet(){
+  const dr=ui.sheet.draft;
+  if(!dr.title.trim()){ showT("Title is required","err"); return; }
+  items.push({id:"a"+Date.now(),planId:dr.planId,title:dr.title.trim(),priority:dr.prio,status:"tbd",ddate:dr.due,
+    memberIds:[...dr.who],cost:dr.cost?+dr.cost:undefined,cur:dr.cur,settled:false,subs:[],blockedBy:[],notes:""});
+  ui.sheet=null; render(); showT("✓ Added");
+}
+function sheetEdit(){
+  const dr=ui.sheet.draft;
+  const t=items.find(i=>i.id===ui.sheet.id);
+  const blockers=(t.blockedBy||[]).map(id=>items.find(x=>x.id===id)).filter(Boolean);
+  return `
+  <div class="sheet-bg" onclick="closeSheet()"></div>
+  <div class="sheet">
+    <div class="sheet-grip"></div>
+    <div style="display:flex;align-items:center">
+      <div class="sheet-title">Task settings</div>
+      <button class="btn xs" style="margin-left:auto;color:var(--re)" onclick="deleteTask('${t.id}')">🗑 Delete</button>
+    </div>
+    <div class="sheet-field-l">Title</div>
+    <input class="finput" value="${esc(dr.title)}" oninput="ui.sheet.draft.title=this.value">
+    <div class="sheet-field-l">Status</div>
+    <div class="tagrow">${[["tbd","To do"],["prog","In progress"],["done","Done"]].map(([v,l])=>`<button class="tagsel ${dr.status===v?"on":""}" onclick="editSetStatus('${v}')">${l}</button>`).join("")}</div>
+    ${blockers.length?`<div class="sheet-field-l">Blocked by</div>${blockers.map(b=>`<div style="font-size:12px;font-weight:600;color:#b45309;margin-bottom:4px">🔒 ${esc(b.title)} ${b.status==="done"?'<span style="color:#0d9488">— done ✓</span>':"— still open"}</div>`).join("")}`:""}
+    <div class="sheet-field-l">Area</div>
+    <div class="tagrow">${areas.map(a=>`<button class="tagsel ${dr.planId===a.id?"on":""}" onclick="sheetToggle('planId','${a.id}')">${a.icon} ${esc(a.title)}</button>`).join("")}</div>
+    <div class="sheet-field-l">Whose</div>
+    <div class="pfilter" style="margin:0">${members.map(m=>`<span class="pfilter-ava ${dr.who.includes(m.id)?"on":""}" style="background:${m.color}" onclick="sheetToggle('who','${m.id}')" title="${esc(m.name)}">${memLabel(m)}</span>`).join("")}</div>
+    <div class="sheet-field-l">Priority & due</div>
+    <div class="tagrow">
+      ${["High","Medium","Low"].map(p=>`<button class="tagsel ${dr.prio===p?"on":""}" onclick="sheetToggle('prio','${p}')">${p}</button>`).join("")}
+      <input class="finput" type="date" style="width:150px;padding:7px 10px" value="${dr.due}" onchange="ui.sheet.draft.due=this.value">
+    </div>
+    <div class="sheet-field-l">Subtasks <span class="opt">· all must be done before the task can finish</span></div>
+    <div style="border:1.5px solid var(--bd);border-radius:12px;padding:2px 12px;margin-bottom:4px;background:var(--s0)">
+      ${dr.subs.length?dr.subs.map((s,i)=>`<div class="subrow ${s.done?"done":""}">
+        <span class="stick ${s.done?"done":""}" onclick="ui.sheet.draft.subs[${i}].done=!ui.sheet.draft.subs[${i}].done;renderOverlays()">${s.done?"✓":""}</span>
+        <span class="st">${esc(s.t)}</span>
+        <span style="cursor:pointer;color:var(--t3);font-size:12px" onclick="ui.sheet.draft.subs.splice(${i},1);renderOverlays()">🗑</span>
+      </div>`).join(""):`<div style="font-size:12px;color:var(--t2);padding:8px 0">No subtasks yet.</div>`}
+      <div style="display:flex;gap:8px;padding:8px 0">
+        <input class="finput" id="newSubIn" placeholder="+ Add subtask…" style="flex:1;padding:7px 10px" onkeydown="if(event.key==='Enter')addSub()">
+        <button class="btn sm" onclick="addSub()">Add</button>
+      </div>
+    </div>
+    <div class="sheet-field-l">Cost</div>
+    <div style="display:flex;gap:8px">
+      <input class="finput" type="number" placeholder="Amount" style="flex:1" value="${dr.cost}" oninput="ui.sheet.draft.cost=this.value">
+      <select class="fselect" style="width:90px" onchange="ui.sheet.draft.cur=this.value">${[profile.curD,profile.curO].map(c=>`<option ${dr.cur===c?"selected":""}>${c}</option>`).join("")}</select>
+    </div>
+    <div class="sheet-field-l">Notes</div>
+    <textarea class="ftextarea" rows="2" oninput="ui.sheet.draft.notes=this.value">${esc(dr.notes)}</textarea>
+    <button class="btn g" style="width:100%;margin-top:16px;padding:12px" onclick="saveEdit()">Save</button>
+  </div>`;
+}
+function addSub(){
+  const inp=$("#newSubIn");
+  if(!inp.value.trim()) return;
+  ui.sheet.draft.subs.push({id:"s"+Date.now(),t:inp.value.trim(),done:false});
+  renderOverlays();
+}
+function editSetStatus(v){
+  const t=items.find(i=>i.id===ui.sheet.id);
+  if(v==="done"){
+    const blocker=blockerOf(t);
+    if(blocker){ showT(`🔒 Finish "${blocker.title}" first`,"err"); return; }
+    const open=ui.sheet.draft.subs.filter(s=>!s.done).length;
+    if(open){ showT(`☑️ ${open} subtask${open>1?"s":""} still open`,"err"); return; }
+  }
+  ui.sheet.draft.status=v; renderOverlays();
+}
+function saveEdit(){
+  const dr=ui.sheet.draft, t=items.find(i=>i.id===ui.sheet.id);
+  if(!dr.title.trim()){ showT("Title is required","err"); return; }
+  Object.assign(t,{title:dr.title.trim(),planId:dr.planId,priority:dr.prio,ddate:dr.due,memberIds:[...dr.who],
+    cost:dr.cost?+dr.cost:undefined,cur:dr.cur,status:dr.status,notes:dr.notes,subs:dr.subs});
+  if(t.status==="done"&&t.cost&&!t.income){ t.settled=true; t.settledDate=t.settledDate||d(0); }
+  ui.sheet=null; render(); showT("Saved ✓");
+}
+function deleteTask(id){
+  items = items.filter(i=>i.id!==id);
+  items.forEach(i=>{ i.blockedBy=(i.blockedBy||[]).filter(b=>b!==id); });
+  ui.sheet=null; render(); showT("Deleted");
+}
+function sheetDoc(){
+  const dr=ui.sheet.draft;
+  return `
+  <div class="sheet-bg" onclick="closeSheet()"></div>
+  <div class="sheet">
+    <div class="sheet-grip"></div>
+    <div class="sheet-title">${ui.sheet.id?"Edit document":"Add document"}</div>
+    <div class="sheet-sub">Just a name is required — tag the rest now or later.</div>
+    <div class="sheet-field-l">Name</div>
+    <input class="finput" placeholder="e.g. Passport – Dana" value="${esc(dr.name)}" oninput="ui.sheet.draft.name=this.value">
+    <div class="sheet-field-l">Whose <span class="opt">· optional</span></div>
+    <div class="pfilter" style="margin:0">${members.map(m=>`<span class="pfilter-ava ${dr.who.includes(m.id)?"on":""}" style="background:${m.color}" onclick="sheetToggle('who','${m.id}')" title="${esc(m.name)}">${memLabel(m)}</span>`).join("")}</div>
+    <div class="sheet-field-l">Needs <span class="opt">· leave empty = Ready</span></div>
+    <div class="tagrow">${ACT_ORDER.map(k=>`<button class="tagsel ${k} ${dr.acts.includes(k)?"on":""}" onclick="sheetToggle('acts','${k}')">${DOC_ACTIONS[k].ic} ${DOC_ACTIONS[k].l}</button>`).join("")}</div>
+    ${dr.acts.length?`<button class="btn xs b" style="margin-top:6px" onclick="ui.sheet.draft.acts=[];renderOverlays()">✓ Mark all handled — it's Ready</button>`:""}
+    <div class="sheet-field-l">Category <span class="opt">· optional</span></div>
+    <div class="tagrow">${Object.keys(DOC_CATS).map(k=>`<button class="tagsel ${dr.cats.includes(k)?"on":""}" onclick="sheetToggle('cats','${k}')">${DOC_CATS[k]} ${k}</button>`).join("")}</div>
+    <div class="sheet-field-l">Expiry <span class="opt">· optional</span></div>
+    <input class="finput" type="date" value="${dr.exp}" onchange="ui.sheet.draft.exp=this.value">
+    <button class="btn g" style="width:100%;margin-top:16px;padding:12px" onclick="saveDoc()">${ui.sheet.id?"Save changes":"Add document"}</button>
+  </div>`;
+}
+function saveDoc(){
+  const dr=ui.sheet.draft;
+  if(!dr.name.trim()){ showT("Give it a name","err"); return; }
+  if(ui.sheet.id){
+    Object.assign(docs.find(x=>x.id===ui.sheet.id),{name:dr.name.trim(),acts:[...dr.acts],cats:[...dr.cats],who:[...dr.who],exp:dr.exp});
+    showT("Saved ✓");
+  } else {
+    docs.push({id:"d"+Date.now(),name:dr.name.trim(),acts:[...dr.acts],cats:[...dr.cats],who:[...dr.who],exp:dr.exp});
+    showT("📄 Document added");
+  }
+  ui.sheet=null; render();
+}
+
+/* ══════════ KATE ══════════ */
+function pageKate(){
+  return `
+  <div style="display:flex;align-items:center;gap:8px;margin-bottom:2px">
+    <h2 class="pg" style="margin:0;display:flex;align-items:center;gap:8px">${kav()} Kate</h2>
+    ${chat.length>1?`<button class="btn xs" style="margin-left:auto" onclick="clearChat()">Clear chat</button>`:""}
+  </div>
+  <div class="sub">Knows your full plan · updates it with your OK</div>
+  <div class="chat" id="chatBox">${chat.map((m,i)=>{
+    if(m.role==="me") return `<div class="msg me"><div class="bub">${esc(m.text)}</div></div>`;
+    if(m.typing) return `<div class="msg">${kav()}<div class="bub"><span class="typing"><i></i><i></i><i></i></span></div></div>`;
+    const body = m.done ? md(m.text) : md(m.shown||"");
+    let extra="";
+    if(m.done&&m.actions&&m.actions.length){
+      extra += `<div class="prop-label">✨ KATE PROPOSES</div>`;
+      extra += m.actions.map((a,ai)=>{
+        const meta={create_task:["➕","New task"],create_doc:["📄","New doc"],complete_task:["✅","Mark done"],set_due:["📅","Set due date"]}[a.type];
+        const name=a.type==="create_task"?a.title:a.type==="create_doc"?a.name:(items.find(x=>x.id===a.id)?.title||a.title||"");
+        const sub=[meta[1],a.ddate?`due ${fmt(a.ddate)}`:null,a.planId?`${areaById(a.planId)?.icon||""} ${areaById(a.planId)?.title||""}`:null,a.acts?a.acts.map(x=>DOC_ACTIONS[x].l).join(", "):null].filter(Boolean).join(" · ");
+        if(a.applied) return `<div class="action-card applied"><div class="n">✅ ${meta[0]==="✅"?"Marked done":"Applied"} — ${esc(name)}</div></div>`;
+        if(a.dismissed) return `<div class="action-card" style="opacity:.55"><div class="n">Skipped — ${esc(name)}</div></div>`;
+        return `<div class="action-card"><div class="h">${meta[0]} ${meta[1].toUpperCase()}</div><div class="n">${esc(name)}</div><div class="m">${esc(sub)}</div>
+          <div class="btns"><button class="abtn yes" onclick="approveKate(${i},${ai})">Apply ✓</button><button class="abtn" onclick="dismissKate(${i},${ai})">Not now</button></div></div>`;
+      }).join("");
+    }
+    const sugs = m.done&&m.sugs?`<div class="sugs">${m.sugs.map(x=>`<span class="sug" onclick="askKate(this.textContent)">${esc(x)}</span>`).join("")}</div>`:"";
+    return `<div class="msg">${kav()}<div style="min-width:0"><div class="bub" ${!m.done?'id="stream-bub"':""}>${body}</div>${extra}${sugs}</div></div>`;
+  }).join("")}</div>`;
+}
+function clearChat(){
+  chat=[{role:"ai",done:true,text:`Fresh start! What's on your mind about the move to ${profile.destCity}?`,
+    sugs:["What's due this week?","Best suburbs for families?","How's our budget?","School rankings near Fremantle?","What does shipping cost?","How does Medicare work for us?"]}];
+  render();
+}
+function kateBrain(q){
+  const s=q.toLowerCase();
+  const act=active();
+  const dueSoon=act.filter(a=>a.ddate&&a.status!=="done"&&a.ddate<=d(7)).sort((a,b)=>a.ddate.localeCompare(b.ddate));
+  if(s.includes("week")||s.includes("due")||s.includes("today")||s.includes("focus")){
+    const lines=dueSoon.slice(0,4).map(a=>`• ${a.title} — ${a.ddate<d(0)?"overdue ⚠️":a.ddate===d(0)?"due today":"due "+fmt(a.ddate)}`).join("\n");
+    const actions=[{type:"create_task",title:"Call PostEntry Quarantine first thing",planId:"p5",prio:"High",ddate:d(1),who:["m4"]}];
+    const med=act.find(a=>a.id==="a2");
+    if(med&&med.status!=="done") actions.push({type:"complete_task",id:"a2",title:med.title});
+    return {text:`Here's your week:\n\n${lines||"• Nothing due — lovely."}\n\nThe quarantine slot is the real deadline — Mickleham is 70% booked for your window. Want me to add a reminder to call first thing? And if the visa medicals are actually booked already, I can tick that off for you.`,
+      actions,sugs:["Best suburbs for families?","How's our budget?","What does shipping cost?"]};
+  }
+  if(s.includes("suburb")||s.includes("area")||s.includes("live")||s.includes("neighborhood")||s.includes("neighbourhood")){
+    return {text:`For a family with a ${members.find(m=>m.kind==="child")?"7-year-old":"kid"} + a dog, I'd shortlist:\n\n• **Fremantle** — walkable, great schools, arty. Rentals ~$780/wk\n• **East Vic Park** — value pick, café strip, ~$650/wk\n• **Scarborough** — beach life, ~$750/wk\n\nYou've already applied to schools near Fremantle, so it has momentum. Want a task to book 3 rental inspections for your first week?`,
+      actions:[{type:"create_task",title:"Book 3 rental inspections in Fremantle",planId:"p2",prio:"Medium",ddate:d(16),who:["m1","m2"]}],
+      sugs:["School rankings near Fremantle?","How's our budget?","What's due this week?"]};
+  }
+  if(s.includes("budget")||s.includes("money")||s.includes("cost of")||s.includes("afford")||s.includes("spend")){
+    const exp=act.filter(a=>a.cost&&!a.income);
+    const est=exp.reduce((t,a)=>t+toAUD(a.cost,a.cur),0);
+    const settled=exp.filter(a=>a.settled).reduce((t,a)=>t+toAUD(a.cost,a.cur),0);
+    const bud=toAUD(budget.amount,budget.cur);
+    return {text:`Budget check 💰\n\n• Total budget: ${fmtA(bud)}\n• Settled: ${fmtA(settled)} (${Math.round(settled/bud*100)}%)\n• Committed, not yet paid: ${fmtA(est-settled)}\n\nYou're under the 50% marker with the big-ticket items (shipping, first rent) still ahead — that's healthy. Biggest upcoming: the moving container at ~A$7,200. I'd lock a quote before prices bump next month.`,
+      sugs:["What does shipping cost?","What's due this week?","Best suburbs for families?"]};
+  }
+  if(s.includes("school")||s.includes("education")||s.includes("enrol")){
+    return {text:`Schools near Fremantle, ranked for you:\n\n1. **Fremantle Primary** — ICSEA 1105, walkable from most rentals. Already applied ✓\n2. **White Gum Valley PS** — smaller, strong arts program\n3. **East Fremantle PS** — great reviews, tighter catchment\n\nPublic enrolment is catchment-based, so the rental decides it. One thing they'll all ask for: Noa's immunisation history statement. Want me to add it to your docs so it doesn't ambush you at enrolment?`,
+      actions:[{type:"create_doc",name:"Immunisation history — Noa",acts:["get"],cats:["Health"],who:["m3"]}],
+      sugs:["Best suburbs for families?","What's due this week?","How does Medicare work for us?"]};
+  }
+  if(s.includes("ship")||s.includes("container")||s.includes("freight")||s.includes("moving cost")){
+    const q3=items.find(x=>x.id==="a12");
+    const actions=q3&&q3.status!=="done"?[{type:"set_due",id:"a12",title:q3.title,ddate:d(5)}]:[];
+    return {text:`Shipping Tel Aviv → Perth, current market:\n\n• **20ft container** (full household): A$7,000–8,500, 6–10 weeks door to door\n• **Shared container** (few m³): A$2,500–4,000\n• Peak-season surcharge kicks in next month\n\nYour quote at ~A$7,200 is right in range. Since prices climb soon, I'd close the quotes this week — shall I pull the deadline up to ${fmt(d(5))}?`,
+      actions,sugs:["How's our budget?","What's due this week?","Best suburbs for families?"]};
+  }
+  if(s.includes("health")||s.includes("medicare")||s.includes("insurance")||s.includes("doctor")||s.includes("medical")){
+    return {text:`Healthcare on a 482, the short version:\n\n• **Medicare** — Israel has a reciprocal agreement, so you're covered for essential care from day one 🎉\n• You'll still need **OVHC-equivalent private cover** as a visa condition until permanent residency\n• Enrol at a Services Australia office in week one — bring passports + visa grant\n\nWant me to add the Medicare enrolment card to your docs so it's ready to tick off after landing?`,
+      actions:[{type:"create_doc",name:"Medicare enrolment — family",acts:["get"],cats:["Health"],who:["m1","m2","m3"]}],
+      sugs:["What's due this week?","How's our budget?","School rankings near Fremantle?"]};
+  }
+  return {text:`Good question! In the full app I answer with your real plan, budget and deadlines in context — and I search the web for current visa timelines, school rankings and cost-of-living data.\n\nIn this demo, try one of these 👇`,
+    sugs:["What's due this week?","Best suburbs for families?","How's our budget?","School rankings near Fremantle?","What does shipping cost?","How does Medicare work for us?"]};
+}
+let streamTimer=null;
+function askKate(q){
+  if(streamTimer) return;
+  chat.push({role:"me",text:q});
+  chat.push({role:"ai",typing:true});
+  render();
+  setTimeout(()=>{
+    const r=kateBrain(q);
+    const m=chat[chat.length-1];
+    m.typing=false; m.text=r.text; m.shown=""; m.done=false;
+    m.actions=(r.actions||[]).map(a=>({...a})); m.sugs=r.sugs||[];
+    render();
+    const t0=Date.now();
+    streamTimer=setInterval(()=>{
+      const i=Math.ceil((Date.now()-t0)/1000*160)+2;  // ~160 chars/s, robust to timer throttling
+      m.shown=m.text.slice(0,i);
+      const bub=$("#stream-bub");
+      if(bub){ bub.innerHTML=md(m.shown); scrollChat(); }
+      if(i>=m.text.length){
+        clearInterval(streamTimer); streamTimer=null;
+        m.done=true; render();
+      }
+    },22);
+  },750);
+}
+function scrollChat(){ const m=$("#main"); m.scrollTop=m.scrollHeight; }
+function approveKate(mi,ai){
+  const a=chat[mi].actions[ai];
+  if(a.type==="create_task"){
+    items.push({id:"a"+Date.now(),planId:a.planId||areas[0].id,title:a.title,priority:a.prio||"High",status:"tbd",
+      ddate:a.ddate||"",memberIds:a.who||["m1"],subs:[],blockedBy:[],notes:"Added by Kate"});
+    showT(`✓ Added "${a.title}"`);
+  } else if(a.type==="create_doc"){
+    docs.push({id:"d"+Date.now(),name:a.name,acts:[...(a.acts||["get"])],cats:[...(a.cats||[])],who:[...(a.who||[])],exp:""});
+    showT(`📄 Added "${a.name}" to Documents`);
+  } else if(a.type==="complete_task"){
+    const it=items.find(x=>x.id===a.id);
+    if(!it){ showT("Couldn't find that task","err"); return; }
+    const blocker=blockerOf(it);
+    if(blocker){ showT(`🔒 Finish "${blocker.title}" first`,"err"); return; }
+    (it.subs||[]).forEach(s=>s.done=true);
+    it.status="done";
+    if(it.cost&&!it.income){ it.settled=true; it.settledDate=d(0); }
+    showT(`✅ "${it.title}" done`);
+  } else if(a.type==="set_due"){
+    const it=items.find(x=>x.id===a.id);
+    if(!it){ showT("Couldn't find that task","err"); return; }
+    it.ddate=a.ddate;
+    showT(`📅 "${it.title}" due ${fmt(a.ddate)}`);
+  }
+  a.applied=true; render();
+}
+function dismissKate(mi,ai){ chat[mi].actions[ai].dismissed=true; render(); }
+
+/* ══════════ FINANCE ══════════ */
+function pageFinance(){
+  const act=active();
+  const exp=act.filter(a=>a.cost&&!a.income);
+  const inc=act.filter(a=>a.cost&&a.income);
+  const settled=exp.filter(a=>a.settled);
+  const pending=exp.filter(a=>!a.settled);
+  const est=exp.reduce((s,a)=>s+toAUD(a.cost,a.cur),0);
+  const paid=settled.reduce((s,a)=>s+toAUD(a.cost,a.cur),0);
+  const bud=toAUD(budget.amount,budget.cur);
+  const estPct=bud?est/bud*100:0;
+  const paidW=Math.min(100,bud?paid/bud*100:0);
+  const pendW=Math.min(Math.max(0,100-paidW),bud?(est-paid)/bud*100:0);
+  let al;
+  if(est>=bud&&bud>0) al={bg:"var(--re2)",fg:"#c04a30",msg:`🔴 Over budget by ${fmtA(est-bud)} (${Math.round(estPct)}%)`};
+  else if(estPct>=80) al={bg:"var(--am2)",fg:"#B8860B",msg:`⚠️ ${Math.round(estPct)}% committed — approaching your limit`};
+  else if(estPct>=50) al={bg:"var(--am2)",fg:"#B8860B",msg:`⏳ Halfway — ${Math.round(estPct)}% of budget committed`};
+  else al={bg:"var(--b2)",fg:"#0d9488",msg:`✓ On track — ${Math.round(estPct)}% of budget planned`};
+  // by currency
+  const byCur={};
+  exp.forEach(a=>{const o=byCur[a.cur||"AUD"]=byCur[a.cur||"AUD"]||{est:0,paid:0};o.est+=a.cost;if(a.settled)o.paid+=a.cost;});
+  // by area
+  const areaAgg=areas.map(p=>{
+    const pi=exp.filter(a=>a.planId===p.id);
+    const pd=pi.filter(a=>a.settled).reduce((s,a)=>s+toAUD(a.cost,a.cur),0);
+    const pe=pi.filter(a=>!a.settled).reduce((s,a)=>s+toAUD(a.cost,a.cur),0);
+    return {p,pd,pe,tot:pd+pe};
+  }).filter(x=>x.tot>0).sort((a,b)=>b.tot-a.tot);
+  const areaMax=areaAgg[0]?.tot||1;
+  const upcoming=pending.filter(a=>a.ddate&&daysTo(a.ddate)<=60).sort((a,b)=>a.ddate.localeCompare(b.ddate));
+  const incRecv=inc.filter(a=>a.settled).reduce((s,a)=>s+toAUD(a.cost,a.cur),0);
+  const incExp=inc.filter(a=>!a.settled).reduce((s,a)=>s+toAUD(a.cost,a.cur),0);
+  const finRow=(r,extra)=>{
+    const a=areaById(r.planId);
+    return `<div class="fin-row"><span class="ic">${a?.icon||"📋"}</span>
+      <span class="n">${esc(r.title)}<small>${a?.title||"—"} · ${r.settled?"settled "+fmt(r.settledDate||d(0)):r.ddate?"due "+fmt(r.ddate):"no date"}</small></span>
+      <span class="a ${r.income?"inc":r.settled?"":"neg"}">${r.income?"+":""}${money(r.cost,r.cur)}</span>${extra||""}</div>`;
+  };
+  let body="";
+  if(ui.finTab==="overview") body=`
+    ${!ui.qaOpen?`<button class="btn g sm" style="width:100%;margin-bottom:14px" onclick="ui.qaOpen=true;render()">+ Quick add expense</button>`
+    :`<div class="card" style="border-color:var(--g)">
+      <div style="font-weight:700;font-size:12px;color:var(--g);margin-bottom:10px">+ Add settled expense</div>
+      <div style="display:flex;flex-direction:column;gap:8px">
+        <input class="finput" id="qaTitle" placeholder="Title — e.g. Vaccinations top-up">
+        <div style="display:flex;gap:8px">
+          <input class="finput" id="qaAmt" type="number" placeholder="Amount" style="flex:1">
+          <select class="fselect" id="qaCur" style="width:86px"><option>${profile.curD}</option><option>${profile.curO}</option></select>
+        </div>
+        <select class="fselect" id="qaArea">${areas.map(p=>`<option value="${p.id}">${p.icon} ${esc(p.title)}</option>`).join("")}</select>
+        <div style="display:flex;gap:8px"><button class="btn g sm" style="flex:1" onclick="quickAdd()">Add</button><button class="btn sm" onclick="ui.qaOpen=false;render()">Cancel</button></div>
+      </div>
+    </div>`}
+    <div class="card budg">
+      <div class="lbl">TOTAL BUDGET</div>
+      <div class="big">${money(budget.amount,budget.cur)}</div>
+      <div class="bbar">
+        <i style="width:${paidW}%;background:var(--b)"></i><i style="width:${pendW}%;background:var(--am)"></i>
+        <span class="mark" data-l="50%" style="left:50%"></span><span class="mark" data-l="80%" style="left:80%"></span>
+      </div>
+      <div class="legend"><span><b style="background:var(--b)"></b>Settled ${fmtA(paid)}</span><span><b style="background:var(--am)"></b>Committed ${fmtA(est-paid)}</span></div>
+      <div class="fin-alert" style="background:${al.bg};color:${al.fg}">${al.msg}</div>
+    </div>
+    <div class="dash-label">Budget by currency</div>
+    <div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:4px">
+      ${Object.entries(byCur).sort((a,b)=>toAUD(b[1].est,b[0])-toAUD(a[1].est,a[0])).map(([c,v])=>{const p=v.est?Math.round(v.paid/v.est*100):0;return `
+      <div class="fin-cur-card">
+        <div class="fin-cur-top"><span class="fin-cur-code">${c}</span><span class="fin-cur-est">${money(v.est,c)}</span></div>
+        <div class="fin-cur-bar"><span style="width:${p}%;background:var(--b)"></span><span style="flex:1;background:var(--am)"></span></div>
+        <div class="fin-cur-sub"><span style="color:#0d9488">${money(v.paid,c)} paid</span><span style="color:#B8860B">${money(v.est-v.paid,c)} left</span></div>
+      </div>`;}).join("")}
+    </div>
+    <div class="dash-label">Totals · in AUD</div>
+    <div class="fin-kpi3">
+      <div class="fin-kpi"><div class="l">Estimated</div><div class="v" style="color:var(--g)">${fmtA(est)}</div></div>
+      <div class="fin-kpi"><div class="l">Settled</div><div class="v" style="color:#0d9488">${fmtA(paid)}</div></div>
+      <div class="fin-kpi"><div class="l">Pending</div><div class="v" style="color:#B8860B">${fmtA(est-paid)}</div></div>
+    </div>
+    <div class="dash-label">Spend by area</div>
+    <div class="card">
+      ${areaAgg.map(x=>`<div class="fin-area">
+        <span class="agroup-ic" style="background:${x.p.color}22;width:30px;height:30px;font-size:15px">${x.p.icon}</span>
+        <div style="flex:1;min-width:0">
+          <div style="display:flex;justify-content:space-between;font-size:12px;font-weight:600"><span>${esc(x.p.title)}</span><span>${fmtA(x.tot)}</span></div>
+          <div class="split"><span style="width:${x.pd/areaMax*100}%;background:var(--b)"></span><span style="width:${x.pe/areaMax*100}%;background:var(--am)"></span></div>
+        </div>
+      </div>`).join("")}
+      <div style="display:flex;gap:14px;font-size:11px;color:var(--t2);margin-top:6px">
+        <span><span style="display:inline-block;width:9px;height:9px;background:var(--b);border-radius:2px;margin-right:4px"></span>Settled</span>
+        <span><span style="display:inline-block;width:9px;height:9px;background:var(--am);border-radius:2px;margin-right:4px"></span>Pending</span>
+      </div>
+    </div>`;
+  else if(ui.finTab==="expenses") body=`
+    <div class="dash-label">${settled.length} settled · ${fmtA(paid)}</div>
+    <div class="card">${[...settled].sort((a,b)=>(b.settledDate||"").localeCompare(a.settledDate||"")).map(r=>finRow(r)).join("")||`<div style="font-size:12px;color:var(--t2);text-align:center;padding:20px 0">No settled expenses yet</div>`}</div>`;
+  else if(ui.finTab==="income") body=`
+    <div class="dash-label">Income · in AUD</div>
+    <div class="fin-kpi3" style="grid-template-columns:1fr 1fr">
+      <div class="fin-kpi"><div class="l">Received</div><div class="v" style="color:#0d9488">${fmtA(incRecv)}</div></div>
+      <div class="fin-kpi"><div class="l">Expected</div><div class="v" style="color:#B8860B">${fmtA(incExp)}</div></div>
+    </div>
+    ${inc.length?`<div class="card">${inc.map(r=>finRow(r)).join("")}</div>`:`<div style="color:var(--t2);text-align:center;padding:24px;font-size:13px">No income items yet.</div>`}`;
+  else body=`
+    <div class="dash-label">${upcoming.length} due in next 60 days · ${fmtA(upcoming.reduce((s,a)=>s+toAUD(a.cost,a.cur),0))}</div>
+    ${upcoming.length?`<div class="card">${upcoming.map(r=>finRow(r,`<button class="btn xs b" style="margin-left:6px" onclick="settleItem('${r.id}')">Settle</button>`)).join("")}</div>`
+    :`<div style="color:var(--t2);text-align:center;padding:28px 0">Nothing due in the next 60 days 🎉</div>`}`;
+  return `
+  <h2 class="pg">Finance 💰</h2>
+  <div class="sub">${settled.length} settled · ${pending.length} due · showing in AUD</div>
+  <div class="seg">${[["overview","Overview"],["expenses","Expenses"],["income","Income"],["upcoming","Due"]].map(([id,l])=>`<button class="${ui.finTab===id?"on":""}" onclick="ui.finTab='${id}';render()">${l}</button>`).join("")}</div>
+  ${body}`;
+}
+function quickAdd(){
+  const title=$("#qaTitle").value.trim(), amt=+$("#qaAmt").value, cur=$("#qaCur").value, planId=$("#qaArea").value;
+  if(!title||!amt){ showT("Title and amount required","err"); return; }
+  items.push({id:"a"+Date.now(),planId,title,priority:"Medium",status:"done",ddate:d(0),memberIds:[],
+    cost:amt,cur,settled:true,settledDate:d(0),subs:[],blockedBy:[],notes:"",finOnly:true});
+  ui.qaOpen=false; render(); showT("Expense added ✓");
+}
+function settleItem(id){
+  const it=items.find(i=>i.id===id);
+  it.settled=true; it.settledDate=d(0); it.status="done";
+  render(); showT(`✅ ${it.title} settled`);
+}
+
+/* ══════════ DOCS ══════════ */
+function pageDocs(){
+  const need=docs.filter(x=>x.acts.length).length;
+  let shown=docs.filter(x=>!ui.docCat||x.cats.includes(ui.docCat));
+  let groups=[];
+  if(ui.docGroup==="action"){
+    ACT_ORDER.forEach(a=>{const ds=shown.filter(x=>x.acts.includes(a));if(ds.length)groups.push({ic:DOC_ACTIONS[a].ic,name:DOC_ACTIONS[a].l,docs:ds});});
+    const ready=shown.filter(x=>!x.acts.length);
+    if(ready.length)groups.push({ic:"✓",name:"Ready",docs:ready});
+  } else {
+    Object.keys(DOC_CATS).forEach(c=>{const ds=shown.filter(x=>x.cats.includes(c));if(ds.length)groups.push({ic:DOC_CATS[c],name:c,docs:ds});});
+    const none=shown.filter(x=>!x.cats.length);
+    if(none.length)groups.push({ic:"📁",name:"Uncategorised",docs:none});
+  }
+  const card=x=>{
+    const dt=x.exp?daysTo(x.exp):null;
+    return `<div class="doc-card" onclick="openDocSheet('${x.id}')">
+      <div class="doc-card-top"><div class="doc-card-title">${esc(x.name)}</div>
+        <div style="display:flex;gap:3px;flex-shrink:0">${(x.who||[]).map(id=>av(id)).join("")}</div></div>
+      <div class="doc-acts">${x.acts.length?x.acts.map(a=>`<span class="doc-act ${a}">${DOC_ACTIONS[a].ic} ${DOC_ACTIONS[a].l}</span>`).join(""):`<span class="doc-act ready">✓ Ready</span>`}</div>
+      <div class="doc-meta">
+        ${x.cats.map(c=>`<span>${DOC_CATS[c]} ${c}</span>`).join("")}
+        ${x.exp?`<span class="doc-exp ${dt<180?"warn":""}">Exp ${new Date(x.exp+"T00:00").toLocaleDateString("en-AU",{month:"short",year:"numeric"})}${dt<180?" · expiring soon ⚠️":""}</span>`:""}
+      </div>
+    </div>`;
+  };
+  return `
+  <h2 class="pg">Docs</h2>
+  <div class="sub">${docs.length} docs · ${need} need action · ${docs.length-need} ready</div>
+  <div class="seg">
+    <button class="${ui.docGroup==='action'?'on':''}" onclick="ui.docGroup='action';render()">By action</button>
+    <button class="${ui.docGroup==='category'?'on':''}" onclick="ui.docGroup='category';render()">By category</button>
+  </div>
+  <div class="tagrow" style="margin-bottom:8px">
+    ${Object.keys(DOC_CATS).map(c=>`<button class="tagsel ${ui.docCat===c?"on":""}" style="font-size:10.5px;padding:5px 10px" onclick="ui.docCat=ui.docCat==='${c}'?null:'${c}';render()">${DOC_CATS[c]} ${c}</button>`).join("")}
+  </div>
+  ${groups.map(g=>`<div class="doc-cat-head"><span class="ic">${g.ic}</span><span class="nm">${g.name}</span><span class="ct">${g.docs.length} doc${g.docs.length!==1?"s":""}</span></div>${g.docs.map(card).join("")}`).join("")||`<div style="text-align:center;padding:36px;color:var(--t2);font-size:13px">No documents in this view.</div>`}
+  <div class="fab" onclick="openDocSheet(null)" title="Add document"><svg width="26" height="26" viewBox="0 0 24 24" fill="none"><path d="M12 5v14M5 12h14" stroke="#fff" stroke-width="2.6" stroke-linecap="round"/></svg></div>`;
+}
+
+/* ══════════ SETTINGS ══════════ */
+function pageSettings(){
+  const oc=ctry(profile.originCountry), dc=ctry(profile.destCountry);
+  return `
+  <h2 class="pg">Settings ⚙️</h2>
+  <div class="sub">Profile · Currencies · Data</div>
+  <div class="card">
+    <div class="card-title">Relocation profile</div>
+    <div style="font-size:14px;font-weight:700;margin-bottom:4px">${oc.f} ${esc(profile.originCity)} → ${esc(profile.destCity)} ${dc.f}</div>
+    <div style="font-size:12px;color:var(--t1);line-height:1.7">
+      ${esc(profile.visaType)}<br>
+      ✈️ Arrival ${fmt(profile.arrivalDate)} · ${daysTo(profile.arrivalDate)} days out<br>
+      🚩 Gate: ${esc(gate.label)} — ${gate.done?"done ✓":"pending"}
+    </div>
+    <div class="dash-label">Household</div>
+    ${members.map(m=>`<div style="display:flex;align-items:center;gap:9px;padding:6px 0;border-bottom:1.5px dashed var(--s2)">
+      ${av(m.id,"avv")}
+      <span style="font-size:13px;font-weight:600;flex:1">${esc(m.name)}</span>
+      <span style="font-size:11px;color:var(--t2)">${m.kind==="adult"?"Adult":m.kind==="child"?`Child · ${m.age}`:`${m.species||"Pet"} 🐕`}</span>
+    </div>`).join("")}
+    <button class="btn g sm" style="margin-top:12px" onclick="openFunnel()">▶ Replay setup</button>
+  </div>
+  <div class="card">
+    <div class="card-title">Workspace currencies</div>
+    <div style="font-size:12px;color:var(--t1);margin-bottom:10px">Tracking <b>${profile.curD}</b> (destination) and <b>${profile.curO}</b> (origin). Totals display in ${profile.curD}.</div>
+    <div class="flabel">1 ${profile.curD} = ? ${profile.curO}</div>
+    <div style="display:flex;gap:8px;align-items:center">
+      <input class="finput" type="number" step="0.01" style="width:120px" value="${fx}" onchange="fx=Math.max(0.01,+this.value||fx);render();showT('Rate updated ✓')">
+      <span style="font-size:11px;color:var(--t2)">Edit to see totals re-convert instantly.</span>
+    </div>
+  </div>
+  <div class="card">
+    <div class="card-title">Export</div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap">
+      <button class="btn sm" onclick="exportTasksCSV()">📥 Tasks CSV</button>
+      <button class="btn sm" onclick="exportFinanceCSV()">📥 Finance CSV</button>
+      <button class="btn sm" onclick="exportDocsCSV()">📥 Docs CSV</button>
+      <button class="btn sm" onclick="printPlan()">🖨 Print plan</button>
+    </div>
+  </div>
+  <div class="card">
+    <div class="card-title">Appearance</div>
+    <button class="btn sm" onclick="toggleDark()">${ui.dark?"☀️ Light mode":"🌙 Dark mode"}</button>
+  </div>
+  <div class="card" style="border-color:var(--re)">
+    <div class="card-title" style="color:var(--re)">Demo data</div>
+    <div style="font-size:12px;color:var(--t1);margin-bottom:10px">Restores the original sample family and plan.</div>
+    <button class="btn sm" style="color:var(--re)" onclick="resetDemo()">⚠ Reset demo</button>
+  </div>`;
+}
+function toggleDark(){ ui.dark=!ui.dark; render(); }
+function resetDemo(){ seed(); ui.planWho=null; ui.planQ=""; ui.openAreas={}; ui.tab="home"; render(); showT("Demo reset ✓ — fresh sample data"); }
+
+/* ══════════ CSV / print ══════════ */
+function csvDl(rows,name){
+  if(!rows.length){ showT("Nothing to export","err"); return; }
+  const keys=Object.keys(rows[0]);
+  const csv=[keys.join(","),...rows.map(r=>keys.map(k=>`"${String(r[k]??"").replace(/"/g,'""')}"`).join(","))].join("\n");
+  const url=URL.createObjectURL(new Blob([csv],{type:"text/csv"}));
+  const a=document.createElement("a"); a.href=url; a.download=name; a.click();
+  URL.revokeObjectURL(url); showT("Exported ✓");
+}
+function exportTasksCSV(){
+  csvDl(items.map(a=>({area:areaById(a.planId)?.title||"",title:a.title,assigned:(a.memberIds||[]).map(id=>memById(id)?.name).filter(Boolean).join(", "),
+    priority:a.priority,status:a.status,due:a.ddate||"",cost:a.cost||"",cur:a.cur||""})),"realokate-tasks.csv");
+}
+function exportFinanceCSV(){
+  csvDl(items.filter(a=>a.cost).map(a=>({area:areaById(a.planId)?.title||"",title:a.title,amount:a.cost,cur:a.cur,
+    kind:a.income?"income":"expense",settled:a.settled?"yes":"no",settledDate:a.settledDate||"",due:a.ddate||""})),"realokate-finance.csv");
+}
+function exportDocsCSV(){
+  csvDl(docs.map(x=>({name:x.name,needs:x.acts.map(a=>DOC_ACTIONS[a].l).join("; "),categories:x.cats.join("; "),expiry:x.exp||""})),"realokate-docs.csv");
+}
+function printPlan(){
+  const done=items.filter(a=>a.status==="done").length;
+  const pct=items.length?Math.round(done/items.length*100):0;
+  const rows=areas.map(p=>{
+    const pi=items.filter(a=>a.planId===p.id); if(!pi.length) return "";
+    const pd=pi.filter(a=>a.status==="done").length;
+    return `<h2>${p.icon} ${p.title} — ${pd}/${pi.length} done</h2><table><tr><th>Task</th><th>Whose</th><th>Priority</th><th>Status</th><th>Due</th></tr>${
+      pi.map(a=>`<tr><td class="${a.status==="done"?"done":""}">${esc(a.title)}</td><td>${(a.memberIds||[]).map(id=>memById(id)?.name).filter(Boolean).join(", ")}</td><td>${a.priority}</td><td>${a.status}</td><td>${a.ddate||""}</td></tr>`).join("")}</table>`;
+  }).join("");
+  const html=`<!DOCTYPE html><html><head><title>Realokate Plan — ${esc(profile.person1)}</title><style>body{font-family:Arial,sans-serif;max-width:900px;margin:40px auto;color:#111;font-size:13px;line-height:1.5}h1{font-size:22px}h2{font-size:16px;border-bottom:1px solid #ccc;padding-bottom:5px;margin-top:28px}table{width:100%;border-collapse:collapse;margin-bottom:12px}th{background:#f5f5f5;text-align:left;padding:6px 10px;border:1px solid #ddd;font-size:11px;text-transform:uppercase}td{padding:6px 10px;border:1px solid #eee}.done{color:#999;text-decoration:line-through}</style></head><body><h1>Relocation Plan — ${esc(profile.person1)}${profile.person2?" + "+esc(profile.person2):""}</h1><p><strong>${esc(profile.originCity)} → ${esc(profile.destCity)}</strong> · Arrival: ${profile.arrivalDate}</p><p>Progress: <strong>${done}/${items.length} tasks (${pct}% done)</strong> · Generated ${new Date().toLocaleDateString()}</p>${rows}</body></html>`;
+  const w=window.open("","_blank","width=1000,height=800");
+  if(w){ w.document.write(html); w.document.close(); setTimeout(()=>w.print(),400); }
+}
+
+/* ══════════ More sheet ══════════ */
+function openMore(){ ui.moreOpen=true; renderOverlays(); renderTabbar(); }
+function sheetMore(){
+  const nd=notifData();
+  return `
+  <div class="sheet-bg" onclick="closeSheet();renderTabbar()"></div>
+  <div class="sheet">
+    <div class="sheet-grip"></div>
+    <div class="sheet-id">
+      <div class="sheet-avatar">D</div>
+      <div style="min-width:0;flex:1">
+        <div class="sheet-name">${esc(profile.person1)} · demo workspace</div>
+        <div class="sheet-sync"><span class="sheet-sync-dot" style="background:#0d9488"></span>Local demo — nothing leaves this page</div>
+      </div>
+      <button class="btn xs" onclick="showT('Google sign-in lives in the real app — this demo stays local')">Sign out</button>
+    </div>
+    <div class="sheet-label">Go to</div>
+    <div class="sheet-grid">
+      <button class="sheet-tile ${ui.tab==='settings'?'on':''}" onclick="closeSheet();go('settings')"><span class="ic">⚙️</span><span>Settings</span></button>
+      <button class="sheet-tile" onclick="closeSheet();openFunnel()"><span class="ic">▶</span><span>Replay setup</span></button>
+    </div>
+    <div class="sheet-label">Quick actions</div>
+    <div class="sheet-rows">
+      <button class="sheet-row" onclick="closeSheet();toggleNotif()"><span>🔔</span><span>Alerts</span>${nd.count?`<span class="badge">${nd.count}</span>`:""}</button>
+      <button class="sheet-row" onclick="closeSheet();toggleSearch()"><span>🔍</span><span>Search</span></button>
+      <button class="sheet-row" onclick="ui.dark=!ui.dark;render()"><span>${ui.dark?"☀️":"🌙"}</span><span>${ui.dark?"Light mode":"Dark mode"}</span></button>
+      <button class="sheet-row" onclick="closeSheet();exportTasksCSV()"><span>📥</span><span>Export plan (CSV)</span></button>
+      <button class="sheet-row" onclick="closeSheet();printPlan()"><span>🖨</span><span>Print plan</span></button>
+    </div>
+  </div>`;
+}
+
+/* ══════════ Notifications ══════════ */
+function toggleNotif(){ ui.notifOpen=!ui.notifOpen; ui.searchOpen=false; renderOverlays(); }
+function notifPanel(){
+  const nd=notifData();
+  const row=(a,color)=>`<div class="notif-row" onclick="ui.notifOpen=false;openEdit('${a.id}');go('plan');openEdit('${a.id}')">
+    <span class="notif-dot" style="background:${color}"></span>
+    <div style="flex:1;min-width:0"><div class="notif-title">${esc(a.title)}</div>
+      <div class="notif-meta">${areaById(a.planId)?.icon||""} ${esc(areaById(a.planId)?.title||"")} · ${a.ddate<d(0)?`${-daysTo(a.ddate)}d overdue`:a.ddate===d(0)?"Due today":daysTo(a.ddate)===1?"Due tomorrow":"Due in "+daysTo(a.ddate)+"d"}</div></div>
+  </div>`;
+  const isEmpty=!nd.overdue.length&&!nd.due7.length&&!nd.expDocs.length;
+  return `
+  <div class="sheet-bg" style="background:transparent" onclick="ui.notifOpen=false;renderOverlays()"></div>
+  <div class="notif-panel">
+    <div style="display:flex;justify-content:space-between;align-items:center">
+      <div style="font-family:var(--fd);font-size:15px">Notifications 🔔</div>
+      <button class="btn xs" onclick="ui.notifOpen=false;renderOverlays()">✕</button>
+    </div>
+    ${isEmpty?`<div style="text-align:center;padding:32px 12px;color:var(--t2)"><div style="font-size:30px;margin-bottom:8px">✅</div><b style="font-size:13px">All clear!</b><div style="font-size:11px;margin-top:4px">No overdue or upcoming items.</div></div>`:""}
+    ${nd.overdue.length?`<div class="notif-section">⚠️ Overdue (${nd.overdue.length})</div>${nd.overdue.map(a=>row(a,"var(--re)")).join("")}`:""}
+    ${nd.due7.length?`<div class="notif-section">🕐 Due this week (${nd.due7.length})</div>${nd.due7.map(a=>row(a,"var(--am)")).join("")}`:""}
+    ${nd.expDocs.length?`<div class="notif-section">📄 Documents expiring (${nd.expDocs.length})</div>${nd.expDocs.map(x=>`
+      <div class="notif-row" onclick="ui.notifOpen=false;go('docs')">
+        <span class="notif-dot" style="background:var(--am)"></span>
+        <div style="flex:1"><div class="notif-title">${esc(x.name)}</div><div class="notif-meta">Expires ${fmt(x.exp)} · in ${daysTo(x.exp)}d</div></div>
+      </div>`).join("")}`:""}
+  </div>`;
+}
+
+/* ══════════ Global search ══════════ */
+function toggleSearch(){ ui.searchOpen=!ui.searchOpen; ui.notifOpen=false; ui.searchQ=""; renderOverlays(); if(ui.searchOpen) setTimeout(()=>$("#cmdInput")?.focus(),30); }
+function searchOverlay(){
+  return `
+  <div class="cmd-overlay" onclick="if(event.target===this){ui.searchOpen=false;renderOverlays()}">
+    <div class="cmd-box">
+      <div class="cmd-input-wrap"><span>🔍</span>
+        <input class="cmd-input" id="cmdInput" placeholder="Search tasks, docs, areas…" value="${esc(ui.searchQ)}" oninput="ui.searchQ=this.value;renderSearchResults()" onkeydown="if(event.key==='Escape'){ui.searchOpen=false;renderOverlays()}else if(event.key==='Enter'){searchGoFirst()}">
+      </div>
+      <div class="cmd-results" id="cmdResults"></div>
+      <div class="cmd-hint">Enter opens first result · Esc closes · ⌘K toggles</div>
+    </div>
+  </div>`;
+}
+function searchResults(){
+  const q=ui.searchQ.trim().toLowerCase();
+  if(!q) return [];
+  const out=[];
+  items.forEach(a=>{ if(a.title.toLowerCase().includes(q)||(a.notes||"").toLowerCase().includes(q)) out.push({type:"task",icon:areaById(a.planId)?.icon||"⚡",id:a.id,title:a.title,sub:[a.status==="prog"?"in progress":a.status,a.ddate&&"due "+fmt(a.ddate)].filter(Boolean).join(" · ")}); });
+  docs.forEach(x=>{ if(x.name.toLowerCase().includes(q)) out.push({type:"doc",icon:"📄",id:x.id,title:x.name,sub:x.acts.length?x.acts.map(a=>DOC_ACTIONS[a].l).join(", "):"Ready"}); });
+  areas.forEach(p=>{ if(p.title.toLowerCase().includes(q)) out.push({type:"area",icon:p.icon,id:p.id,title:p.title,sub:items.filter(i=>i.planId===p.id).length+" tasks"}); });
+  return out.slice(0,20);
+}
+function renderSearchResults(){
+  const rs=searchResults();
+  const badge={task:["Task","var(--g2)"],doc:["Doc","var(--am2)"],area:["Area","var(--b2)"]};
+  $("#cmdResults").innerHTML = !ui.searchQ.trim()
+    ? `<div class="cmd-empty">Type to search across your plan, docs and areas<br><span style="font-size:10.5px;color:var(--t3)">⌘K or the 🔍 chip to toggle</span></div>`
+    : rs.length ? rs.map((r,i)=>`<div class="cmd-result" onclick="searchGo(${i})"><span style="font-size:15px">${r.icon}</span><div class="t"><b>${esc(r.title)}</b><small>${esc(r.sub)}</small></div><span class="cmd-badge" style="background:${badge[r.type][1]}">${badge[r.type][0]}</span></div>`).join("")
+    : `<div class="cmd-empty">No results for "<b>${esc(ui.searchQ)}</b>"</div>`;
+}
+function searchGo(i){
+  const r=searchResults()[i]; if(!r) return;
+  ui.searchOpen=false;
+  if(r.type==="task"){ go("plan"); openEdit(r.id); }
+  else if(r.type==="doc"){ go("docs"); openDocSheet(r.id); }
+  else { ui.openAreas[r.id]=true; go("plan"); }
+}
+function searchGoFirst(){ searchGo(0); }
+
+/* ══════════ ONBOARDING FUNNEL ══════════ */
+const FUNNEL_STEPS=["Your Route","The Move","Who's Moving","Timeline","Finances"];
+function openFunnel(){
+  ui.funnel={step:1,draft:{
+    origin:profile.originCountry,destination:profile.destCountry,visaType:profile.visaType,
+    person1:profile.person1,person2:profile.person2,
+    children:members.filter(m=>m.kind==="child").map(c=>({age:c.age})),
+    pets:members.filter(m=>m.kind==="pet").map(p=>({type:p.species||"Dog",name:p.name})),
+    arrivalDate:profile.arrivalDate,gateLabel:gate.label,
+    curO:profile.curO,curD:profile.curD,budget:budget.amount,
+  }};
+  ui.moreOpen=false; renderOverlays();
+}
+function fNext(){
+  const f=ui.funnel, dr=f.draft;
+  if(f.step===5){
+    if(dr.origin==="Israel"&&dr.destination==="Australia"){ f.step="route"; }
+    else startGen();
+    renderOverlays(); return;
+  }
+  f.step++; renderOverlays();
+}
+function fBack(){
+  const f=ui.funnel;
+  if(f.step==="route") f.step=5;
+  else f.step=Math.max(1,f.step-1);
+  renderOverlays();
+}
+function fCanNext(){
+  const f=ui.funnel, dr=f.draft;
+  if(f.step===1) return dr.origin&&dr.destination&&dr.origin!==dr.destination;
+  if(f.step===2) return !!dr.visaType;
+  if(f.step===3) return !!dr.person1.trim();
+  if(f.step===4) return !!dr.arrivalDate;
+  return true;
+}
+function genPlan(dr){
+  const hasKids=dr.children.length>0, hasPets=dr.pets.length>0, dc=ctry(dr.destination);
+  const T=(t,a,m,p,who,extra)=>({t,a,m,p,who,...(extra||{})});
+  let list=[
+    T("Check everyone's passport validity (12+ months)","p1",-6,"High","all",{doc:{name:"Passport",per:"humans",acts:[]}}),
+    T("Gather civil documents (birth & marriage certificates)","p1",-5,"High","adults",{doc:{name:"Marriage certificate",acts:["get"],cats:["Legal"]}}),
+    T("Submit the visa application","p1",-5,"High","adults",{k:"visa"}),
+    T("Book visa medical exams","p1",-4,"High","adults"),
+    T("End your current housing","p2",-3,"High","adults"),
+    T("Book 2–4 weeks temporary accommodation","p2",-2,"High","adults",{k:"temp"}),
+    T("Prepare a rental application pack","p2",-1,"High","adults",{doc:{name:"Rental references",acts:["get"],cats:["Housing"]}}),
+    T("Find your long-term rental","p2",1,"High","adults",{after:"temp",k:"rental"}),
+    T("Collect school records & reports (English)","p3",-4,"High","kids",{need:"kids",doc:{name:"School records",per:"kids",acts:["get","translate"],cats:["Education"]}}),
+    T("Research schools near target suburbs","p3",-4,"High","adults",{need:"kids"}),
+    T("Enrol the kids in school","p3",1,"High","kids",{need:"kids",after:"rental"}),
+    T("Open a bank account in "+dr.destination,"p4",-1,"High","adults"),
+    T("Get a local tax number","p4",1,"High","adults"),
+    T("Arrange travel & health cover for the transition","p4",-1,"High","all"),
+    T("Copy medical records & stock prescriptions","p4",-2,"Medium","all",{doc:{name:"Medical records",acts:["get"],cats:["Health"]}}),
+    T("Enrol in the local health system","p4",1,"High","all"),
+    T("Vet check, vaccinations & microchip","p5",-5,"High","pets",{need:"pets",k:"vet",doc:{name:"Vaccination card",per:"pets",acts:["get"],cats:["Health"]}}),
+    T("Apply for the pet import permit","p5",-6,"High","pets",{need:"pets",after:"vet",k:"permit",pay:2000,doc:{name:"Pet import permit",acts:["get","pay"],cats:["Health"]}}),
+    T("Book pet transport (IPATA agent)","p5",-3,"High","pets",{need:"pets",after:"permit"}),
+    T("Get 3 international shipping quotes","p6",-4,"Medium","adults",{k:"quotes"}),
+    T("Book the mover / shipping slot","p6",-3,"Medium","adults",{after:"quotes"}),
+    T("Book one-way flights","p6",-2,"High","adults",{after:"visa"}),
+    T("Cancel utilities & subscriptions","p6",-1,"Medium","adults"),
+    T("Declutter: sell / donate / store","p6",-3,"Low","all"),
+    T("Pack an essentials suitcase per person","p6",0,"Medium","all"),
+  ];
+  if(dr.origin==="Israel") list.push(
+    T("Apostille & translate civil documents","p1",-5,"High","adults",{doc:{name:"Apostilled certificates",acts:["get","certify"],cats:["Legal"]}}),
+    T("Order police clearance (תעודת יושר)","p1",-4,"High","adults",{doc:{name:"Police clearance — adults",acts:["get"],cats:["Identity"]}}),
+    T("Sort Bituach Leumi status before leaving","p4",-2,"High","adults"),
+  );
+  if(dr.destination==="Australia"){
+    const relbl={"Get a local tax number":"Apply for a Tax File Number (TFN)","Enrol in the local health system":"Enrol in Medicare / confirm OVHC"};
+    list.forEach(x=>{ if(relbl[x.t]) x.t=relbl[x.t]; });
+  }
+  list=list.filter(x=>!(x.need==="kids"&&!hasKids)&&!(x.need==="pets"&&!hasPets));
+  // members
+  const cols=[...MEM_COLORS];
+  const mem=[{id:"m1",name:dr.person1.trim()||"You",kind:"adult",color:cols[0]}];
+  if(dr.person2&&dr.person2.trim()) mem.push({id:"m2",name:dr.person2.trim(),kind:"adult",color:cols[1]});
+  dr.children.forEach((c,i)=>mem.push({id:"mc"+i,name:members.find(m=>m.kind==="child"&&m.age==c.age)?.name||("Kid "+(i+1)),kind:"child",age:+c.age||7,color:cols[(2+i)%cols.length]}));
+  dr.pets.forEach((p,i)=>mem.push({id:"mp"+i,name:p.name||p.type,kind:"pet",species:p.type,color:cols[(2+dr.children.length+i)%cols.length]}));
+  const adults=mem.filter(m=>m.kind==="adult").map(m=>m.id);
+  const kids=mem.filter(m=>m.kind==="child").map(m=>m.id);
+  const pets=mem.filter(m=>m.kind==="pet").map(m=>m.id);
+  const whoIds=w=>w==="all"?mem.filter(m=>m.kind!=="pet").map(m=>m.id):w==="adults"?adults:w==="kids"?kids:w==="pets"?pets:adults;
+  // dates: months relative to arrival, staggered forward if already past
+  const arrDays=daysTo(dr.arrivalDate);
+  const stagger=[3,5,8,11,14,17,21,25,29,33]; let si=0;
+  const byKey={};
+  const newItems=list.map((x,i)=>{
+    let off=arrDays+x.m*30;
+    if(off<2){ off=stagger[si%stagger.length]; si++; }
+    const it={id:"g"+i,planId:x.a,title:x.t,priority:x.p,status:"tbd",ddate:d(off),
+      memberIds:whoIds(x.who),subs:[],blockedBy:[],notes:"",
+      ...(x.pay?{cost:x.pay,cur:dr.curD,settled:false}:{})};
+    if(x.k) byKey[x.k]=it;
+    return it;
+  });
+  let deps=0;
+  list.forEach((x,i)=>{ if(x.after&&byKey[x.after]){ newItems[i].blockedBy=[byKey[x.after].id]; deps++; } });
+  // docs
+  const newDocs=[]; let di=0;
+  list.forEach((x,i)=>{
+    if(!x.doc) return;
+    const push=(name,who)=>newDocs.push({id:"gd"+(di++),name,acts:[...x.doc.acts],cats:x.doc.cats?[...x.doc.cats]:["Other"],who:who||[],exp:""});
+    if(x.doc.per==="humans") mem.filter(m=>m.kind!=="pet").forEach(m=>push(`${x.doc.name} — ${m.name}`,[m.id]));
+    else if(x.doc.per==="kids") kids.forEach(id=>push(`${x.doc.name} — ${memById2(mem,id)}`,[id]));
+    else if(x.doc.per==="pets") pets.forEach(id=>push(`${x.doc.name} — ${memById2(mem,id)}`,[id]));
+    else push(x.doc.name,whoIds(x.who));
+  });
+  return {items:newItems,docs:newDocs,members:mem,deps,areas:[...new Set(newItems.map(i=>i.planId))].length};
+}
+const memById2=(mem,id)=>mem.find(m=>m.id===id)?.name||"";
+function startGen(){
+  const f=ui.funnel;
+  f.plan=genPlan(f.draft);
+  f.step="gen"; f.genShown=0;
+  renderOverlays();
+  const total=f.plan.items.length, t0=Date.now();
+  const t=setInterval(()=>{
+    if(!ui.funnel||ui.funnel.step!=="gen"){ clearInterval(t); return; }
+    const target=Math.min(total,Math.ceil((Date.now()-t0)/130)); // ~1 task / 130ms, robust to timer throttling
+    const gl=$("#genList");
+    while(f.genShown<target){
+      const it=f.plan.items[f.genShown++];
+      if(gl&&it) gl.insertAdjacentHTML("beforeend",`<div class="gen-item">${areaById(it.planId)?.icon||"✅"} ${esc(it.title)}</div>`);
+    }
+    const sc=gl&&gl.closest(".funnel-overlay");
+    if(sc) sc.scrollTop=sc.scrollHeight;
+    if(f.genShown>=total){ clearInterval(t); setTimeout(()=>{ if(ui.funnel){ ui.funnel.step="preview"; renderOverlays(); } },600); }
+  },130);
+}
+function applyFunnel(){
+  const f=ui.funnel, dr=f.draft, oc=ctry(dr.origin), dc=ctry(dr.destination);
+  profile={originCity:dr.origin==="Israel"?"Tel Aviv":oc.city,originCountry:dr.origin,
+    destCity:dc.city,destCountry:dr.destination,visaType:dr.visaType,
+    arrivalDate:dr.arrivalDate,person1:dr.person1.trim()||"You",person2:(dr.person2||"").trim(),
+    curO:dr.curO,curD:dr.curD};
+  members=f.plan.members; areas=areas.map(a=>a); items=f.plan.items; docs=f.plan.docs;
+  budget={amount:+dr.budget||100000,cur:dr.curD};
+  gate={label:dr.gateLabel||"Visa grant",done:false,eta:d(Math.max(10,Math.round(daysTo(dr.arrivalDate)*0.25)))};
+  chat=[{role:"ai",done:true,
+    text:`Your plan is live, ${profile.person1}! 🎉\n\n${items.length} tasks across ${f.plan.areas} areas, ${docs.length} docs prepared, and ${f.plan.deps} dependencies wired so nothing happens out of order.\n\nAsk me anything — or just start ticking.`,
+    sugs:["What's due this week?","How's our budget?","Best suburbs for families?"]}];
+  ui.funnel=null; ui.planWho=null; ui.planQ=""; ui.openAreas={}; ui.onbBanner=false; ui.tab="home";
+  render();
+  showT(`⚡ Plan ready — ${items.length} tasks · ${docs.length} docs prepared`);
+}
+function funnelOverlay(){
+  const f=ui.funnel, dr=f.draft;
+  const pct=(f.step==="route")?100:typeof f.step==="number"?Math.round(f.step/5*100):100;
+  const label=f.step==="route"?"Ready to go!":typeof f.step==="number"?`Step ${f.step} of 5 · ${FUNNEL_STEPS[f.step-1]}`:"";
+  if(f.step==="gen") return `
+    <div class="funnel-overlay"><div class="gen-wrap">
+      <div class="gen-spinner"></div>
+      <div class="gen-title">Building your plan...</div>
+      <div class="gen-sub">Kate is researching ${esc(dr.origin)} → ${esc(dr.destination)} visa requirements, timelines, and tasks.</div>
+      <div class="gen-list" id="genList"></div>
+    </div></div>`;
+  if(f.step==="preview"){
+    const p=f.plan;
+    return `
+    <div class="funnel-overlay"><div style="max-width:340px;margin:30px auto 0;text-align:center">
+      <div style="font-size:40px;margin-bottom:10px">✨</div>
+      <div class="funnel-title" style="margin-bottom:8px">Your plan is ready</div>
+      <div style="font-size:13px;color:var(--t1);margin-bottom:18px"><b>${p.items.length} tasks across ${p.areas} areas</b> — tuned to your household, nothing you don't need.</div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;justify-content:center;margin-bottom:14px">
+        ${[[p.items.length,"tasks"],[p.areas,"areas"],[p.docs.length,"docs prepared"],[p.deps,"dependencies wired"]].map(([n,l])=>`<div class="stat-tile"><div class="n">${n}</div><div class="l">${l}</div></div>`).join("")}
+      </div>
+      <div style="font-size:11.5px;color:var(--t2);margin-bottom:20px">You can always ask Kate to tailor it further once you're in.</div>
+      <button class="btn g" style="width:100%;padding:13px" onclick="applyFunnel()">Start exploring →</button>
+    </div></div>`;
+  }
+  let body="";
+  if(f.step===1){
+    const sel=(field,val)=>`onchange="fSetCountry('${field}',this.value)"`;
+    const opts=v=>COUNTRIES.map(c=>`<option value="${c.n}" ${v===c.n?"selected":""}>${c.f} ${c.n}</option>`).join("");
+    body=`
+    <div class="funnel-title">Where are you moving? 🌍</div>
+    <div class="flabel">Moving from *</div>
+    <select class="fselect" style="margin-bottom:14px" ${sel("origin","")}>${opts(dr.origin)}</select>
+    <div class="flabel">Moving to *</div>
+    <select class="fselect" ${sel("destination","")}>${opts(dr.destination)}</select>
+    <div style="margin-top:18px;font-size:14px;font-weight:700;text-align:center">${ctry(dr.origin).f} ${esc(dr.origin)} <span style="color:var(--t2)">→</span> ${esc(dr.destination)} ${ctry(dr.destination).f}</div>`;
+  } else if(f.step===2){
+    const visas=VISAS[dr.destination]||VISAS._default;
+    body=`
+    <div class="funnel-title">What brings you there? ✈️</div>
+    <div style="font-size:12px;color:var(--t1);margin-bottom:14px">Official visa categories for <b>${esc(dr.destination)}</b>. Kate will research the specific requirements for whichever you choose.</div>
+    ${visas.map(v=>`<div class="visa-opt ${dr.visaType===v.l?"on":""}" onclick="ui.funnel.draft.visaType='${v.l.replace(/'/g,"\\'")}';renderOverlays()">
+      <div class="visa-radio"></div>
+      <div style="flex:1"><div style="font-size:13px;font-weight:600">${v.l}</div>${v.s?`<div style="font-size:11px;color:var(--t2);margin-top:2px">${v.s}</div>`:""}</div>
+    </div>`).join("")}`;
+  } else if(f.step===3){
+    body=`
+    <div class="funnel-title">Who's making the move? 👨‍👩‍👧</div>
+    <div style="display:flex;gap:10px;margin-bottom:16px">
+      <div style="flex:1"><div class="flabel">Your name *</div><input class="finput" value="${esc(dr.person1)}" oninput="ui.funnel.draft.person1=this.value"></div>
+      <div style="flex:1"><div class="flabel">Partner's name</div><input class="finput" placeholder="Leave blank if solo" value="${esc(dr.person2)}" oninput="ui.funnel.draft.person2=this.value"></div>
+    </div>
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+      <div class="flabel" style="margin:0">Children</div>
+      <button class="btn xs" onclick="ui.funnel.draft.children.push({age:''});renderOverlays()">+ Add child</button>
+    </div>
+    ${dr.children.length?dr.children.map((c,i)=>`<div style="display:flex;gap:8px;margin-bottom:6px;align-items:center">
+      <input class="finput" style="width:74px" type="number" min="0" max="18" placeholder="Age" value="${c.age}" oninput="ui.funnel.draft.children[${i}].age=this.value">
+      <span style="font-size:12px;color:var(--t2)">years old</span>
+      <button class="btn xs" onclick="ui.funnel.draft.children.splice(${i},1);renderOverlays()">✕</button>
+    </div>`).join(""):`<div style="font-size:11px;color:var(--t3);margin-bottom:6px">No children added</div>`}
+    <div style="display:flex;justify-content:space-between;align-items:center;margin:14px 0 8px">
+      <div class="flabel" style="margin:0">Pets</div>
+      <button class="btn xs" onclick="ui.funnel.draft.pets.push({type:'Dog',name:''});renderOverlays()">+ Add pet</button>
+    </div>
+    ${dr.pets.length?dr.pets.map((p,i)=>`<div style="display:flex;gap:8px;margin-bottom:6px;align-items:center">
+      <select class="fselect" style="width:92px" onchange="ui.funnel.draft.pets[${i}].type=this.value">${["Dog","Cat","Bird","Other"].map(t=>`<option ${p.type===t?"selected":""}>${t}</option>`).join("")}</select>
+      <input class="finput" style="flex:1" placeholder="Name (optional)" value="${esc(p.name||"")}" oninput="ui.funnel.draft.pets[${i}].name=this.value">
+      <button class="btn xs" onclick="ui.funnel.draft.pets.splice(${i},1);renderOverlays()">✕</button>
+    </div>`).join(""):`<div style="font-size:11px;color:var(--t3)">No pets added</div>`}`;
+  } else if(f.step===4){
+    body=`
+    <div class="funnel-title">When are you moving? 📅</div>
+    <div class="flabel">When do you plan to arrive? *</div>
+    <input class="finput" type="date" value="${dr.arrivalDate}" onchange="ui.funnel.draft.arrivalDate=this.value">
+    <div style="font-size:11px;color:var(--t2);margin:4px 0 16px">Your target date to land — drives the countdown.</div>
+    <div class="flabel">What needs to happen before you can move? <span style="font-weight:400;text-transform:none">(optional)</span></div>
+    <input class="finput" placeholder="e.g. Visa approval, Job offer, Property sold" value="${esc(dr.gateLabel)}" oninput="ui.funnel.draft.gateLabel=this.value">
+    <div style="font-size:11px;color:var(--t2);margin-top:4px">Once you mark this done in the app, your countdown activates ⏱</div>`;
+  } else if(f.step===5){
+    const curOpts=v=>[...new Set(COUNTRIES.map(c=>c.c))].map(c=>`<option ${v===c?"selected":""}>${c}</option>`).join("");
+    body=`
+    <div class="funnel-title">Set up your finances 💰</div>
+    <div style="font-size:12px;color:var(--t1);padding:10px 14px;background:var(--s2);border-radius:8px;margin-bottom:16px">We detected <b>${ctry(dr.origin).c}</b> for ${esc(dr.origin)} and <b>${ctry(dr.destination).c}</b> for ${esc(dr.destination)}. Pick from the list to change.</div>
+    <div style="display:flex;gap:10px;margin-bottom:14px">
+      <div style="flex:1"><div class="flabel">Origin currency</div><select class="fselect" onchange="ui.funnel.draft.curO=this.value">${curOpts(dr.curO)}</select></div>
+      <div style="flex:1"><div class="flabel">Destination currency</div><select class="fselect" onchange="ui.funnel.draft.curD=this.value">${curOpts(dr.curD)}</select></div>
+    </div>
+    <div class="flabel">Total budget for the move <span style="text-transform:none;font-weight:400">· in ${dr.curD}</span></div>
+    <input class="finput" type="number" value="${dr.budget}" oninput="ui.funnel.draft.budget=this.value">
+    <div style="font-size:11px;color:var(--t2);margin-top:4px">Kate tracks every cost against this — with 50% and 80% alerts.</div>`;
+  } else if(f.step==="route"){
+    body=`
+    <div class="funnel-title">⚡ We know this route well</div>
+    <div style="font-size:13.5px;color:var(--t1);line-height:1.6;margin-bottom:14px">
+      <b>${esc(dr.origin)} → ${esc(dr.destination)}</b> · ${esc(dr.visaType)} is one of our curated routes.
+      A complete plan is ready — no waiting, tuned to your household, nothing you don't need.
+    </div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px">
+      ${(()=>{const p=genPlan(dr);return [[p.items.length,"tasks"],[p.areas,"areas"],[p.docs.length,"docs prepared"],[p.deps,"dependencies wired"]].map(([n,l])=>`<div class="stat-tile"><div class="n">${n}</div><div class="l">${l}</div></div>`).join("");})()}
+    </div>
+    <div style="font-size:11.5px;color:var(--t2)">You can always ask Kate to tailor it further once you're in.</div>`;
+  }
+  const nav = f.step==="route"
+    ? `<div style="display:flex;flex-direction:column;gap:10px;width:100%">
+        <button class="btn g" style="width:100%;padding:12px" onclick="startGen()">⚡ Use the ready-made plan →</button>
+        <div style="display:flex;justify-content:space-between">
+          <button class="btn sm" onclick="fBack()">← Back</button>
+          <button class="btn sm" onclick="startGen()">🤖 Let Kate build custom</button>
+        </div>
+      </div>`
+    : `${f.step===1?`<button class="btn sm" onclick="ui.funnel=null;renderOverlays()">Skip for now</button>`:`<button class="btn sm" onclick="fBack()">← Back</button>`}
+      <button class="btn g" onclick="fNext()" ${fCanNext()?"":"disabled"}>${f.step===5?"Done — Meet Kate →":"Next →"}</button>`;
+  return `
+  <div class="funnel-overlay">
+    <div class="funnel-step-label">${label}</div>
+    <div class="funnel-pbar"><div class="funnel-pfill" style="width:${pct}%"></div></div>
+    ${body}
+    <div class="funnel-nav">${nav}</div>
+  </div>`;
+}
+function fSetCountry(field,val){
+  const dr=ui.funnel.draft;
+  dr[field]=val;
+  if(field==="origin") dr.curO=ctry(val).c;
+  else dr.curD=ctry(val).c;
+  renderOverlays();
+}
+
+/* ══════════ render ══════════ */
+function renderOverlays(){
+  let html="";
+  if(ui.sheet){
+    html = ui.sheet.type==="task"?sheetTask():ui.sheet.type==="edit"?sheetEdit():sheetDoc();
+  }
+  if(ui.moreOpen) html = sheetMore();
+  if(ui.notifOpen) html += notifPanel();
+  if(ui.searchOpen) html += searchOverlay();
+  if(ui.funnel) html = funnelOverlay();
+  $("#overlays").innerHTML = html;
+  if(ui.searchOpen) renderSearchResults();
+  if(ui.funnel&&ui.funnel.step==="gen"&&ui.funnel.genShown){
+    const gl=$("#genList");
+    if(gl) gl.innerHTML=ui.funnel.plan.items.slice(0,ui.funnel.genShown).map(it=>`<div class="gen-item" style="animation:none">${areaById(it.planId)?.icon||"✅"} ${esc(it.title)}</div>`).join("");
+  }
+}
+function render(){
+  const pages={home:pageHome,plan:pagePlan,kate:pageKate,finance:pageFinance,docs:pageDocs,settings:pageSettings};
+  $("#phone").classList.toggle("dark",ui.dark);
+  $("#main").innerHTML = (pages[ui.tab]||pageHome)();
+  $("#chatIn").style.display = ui.tab==="kate"?"flex":"none";
+  renderTabbar();
+  renderOverlays();
+  if(ui.tab==="kate") scrollChat();
+}
+
+/* ══════════ wire up ══════════ */
+$("#kateSend").addEventListener("click",()=>{ const v=$("#kateInput").value.trim(); if(v){ $("#kateInput").value=""; if(ui.tab!=="kate"){ui.tab="kate";} askKate(v);} });
+$("#kateInput").addEventListener("keydown",e=>{ if(e.key==="Enter"){ const v=e.target.value.trim(); if(v){ e.target.value=""; askKate(v);} } });
+window.addEventListener("keydown",e=>{
+  if((e.metaKey||e.ctrlKey)&&e.key==="k"){ e.preventDefault(); toggleSearch(); }
+  if(e.key==="Escape"){ ui.searchOpen=false; ui.notifOpen=false; if(ui.sheet||ui.moreOpen){ ui.sheet=null; ui.moreOpen=false; } renderOverlays(); renderTabbar(); }
+});
+seed();
+render();
+</script>
+</body>
+</html>

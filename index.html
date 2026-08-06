@@ -1,0 +1,172 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Shahar Meriash — Live Product Demos</title>
+<meta name="description" content="Live, fully interactive demos of the ad-tech, CRM and consumer AI products built end-to-end by Shahar Meriash — performance marketing leader and AI-first systems builder.">
+<style>
+:root{
+  --bg:#0b0d12;--bg2:#11141c;--card:#151926;--line:#232838;
+  --text:#e8ebf2;--muted:#98a0b3;--accent:#6c8cff;
+  --tq:#22c55e;--rtb:#f59e0b;--crm:#38bdf8;--rk:#a78bfa;
+}
+*{margin:0;padding:0;box-sizing:border-box}
+html{scroll-behavior:smooth}
+body{background:var(--bg);color:var(--text);font-family:"Inter",-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;line-height:1.6;-webkit-font-smoothing:antialiased}
+.wrap{max-width:1080px;margin:0 auto;padding:0 24px}
+nav{position:sticky;top:0;z-index:10;background:rgba(11,13,18,.82);backdrop-filter:blur(12px);border-bottom:1px solid var(--line)}
+.nav-in{display:flex;align-items:center;justify-content:space-between;height:60px}
+.logo{font-weight:700;letter-spacing:-.02em;text-decoration:none;color:var(--text);font-size:17px}
+.logo span{color:var(--accent)}
+.nav-links{display:flex;gap:22px}
+.nav-links a{color:var(--muted);text-decoration:none;font-size:14px;transition:color .15s}
+.nav-links a:hover{color:var(--text)}
+header{padding:88px 0 64px;position:relative;overflow:hidden}
+header::before{content:"";position:absolute;inset:0;background:
+  radial-gradient(600px 300px at 15% 0%,rgba(108,140,255,.14),transparent 70%),
+  radial-gradient(500px 260px at 85% 20%,rgba(167,139,250,.10),transparent 70%);pointer-events:none}
+.kicker{display:inline-flex;align-items:center;gap:8px;font-size:13px;font-weight:600;color:var(--accent);background:rgba(108,140,255,.1);border:1px solid rgba(108,140,255,.25);padding:6px 14px;border-radius:999px;margin-bottom:22px}
+.kicker::before{content:"";width:7px;height:7px;border-radius:50%;background:var(--accent);animation:pulse 2s infinite}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.35}}
+h1{font-size:clamp(32px,5vw,52px);line-height:1.12;letter-spacing:-.03em;font-weight:800;max-width:880px}
+h1 em{font-style:normal;background:linear-gradient(90deg,#6c8cff,#a78bfa);-webkit-background-clip:text;background-clip:text;color:transparent}
+.sub{margin-top:20px;font-size:17.5px;color:var(--muted);max-width:760px}
+.sub b{color:var(--text);font-weight:600}
+.hero-cta{margin-top:30px;display:flex;gap:14px;flex-wrap:wrap}
+.btn{display:inline-flex;align-items:center;gap:8px;padding:12px 22px;border-radius:10px;font-size:15px;font-weight:600;text-decoration:none;transition:transform .15s,box-shadow .15s}
+.btn-p{background:var(--accent);color:#0b0d12}
+.btn-p:hover{transform:translateY(-1px);box-shadow:0 8px 24px rgba(108,140,255,.35)}
+.btn-s{border:1px solid var(--line);color:var(--text)}
+.btn-s:hover{border-color:var(--accent)}
+.stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:1px;background:var(--line);border:1px solid var(--line);border-radius:14px;overflow:hidden;margin:56px 0 0}
+.stat{background:var(--bg2);padding:20px}
+.stat b{display:block;font-size:24px;letter-spacing:-.02em}
+.stat span{font-size:12.5px;color:var(--muted)}
+section{padding:68px 0}
+.sec-head{margin-bottom:34px}
+.sec-head h2{font-size:30px;letter-spacing:-.02em}
+.sec-head p{color:var(--muted);margin-top:8px;max-width:680px}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(340px,1fr));gap:20px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:28px;display:flex;flex-direction:column;gap:14px;position:relative;transition:transform .18s,border-color .18s;overflow:hidden}
+.card:hover{transform:translateY(-3px)}
+.card::before{content:"";position:absolute;top:0;left:0;right:0;height:3px;background:var(--pc,var(--accent))}
+.card:hover{border-color:var(--pc,var(--accent))}
+.chip-row{display:flex;gap:8px;flex-wrap:wrap}
+.chip{font-size:11.5px;font-weight:600;color:var(--muted);border:1px solid var(--line);border-radius:999px;padding:3px 10px}
+.card h3{font-size:21px;letter-spacing:-.01em;display:flex;align-items:center;gap:10px}
+.dot{width:10px;height:10px;border-radius:3px;background:var(--pc)}
+.card .tag{font-size:12.5px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--pc)}
+.card p{color:var(--muted);font-size:14.5px;flex:1}
+.card .go{display:inline-flex;align-items:center;gap:6px;font-weight:600;font-size:14.5px;color:var(--pc);text-decoration:none;margin-top:4px}
+.card .go:hover{gap:10px}
+.about{background:var(--bg2);border-top:1px solid var(--line);border-bottom:1px solid var(--line)}
+.about-grid{display:grid;grid-template-columns:1.15fr .85fr;gap:48px;align-items:start}
+.about h2{font-size:28px;letter-spacing:-.02em;margin-bottom:16px}
+.about p{color:var(--muted);margin-bottom:14px;font-size:15.5px}
+.about p b{color:var(--text);font-weight:600}
+.bring h3{font-size:13px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--accent);margin:18px 0 8px}
+.bring h3:first-child{margin-top:0}
+.pill-list{display:flex;flex-wrap:wrap;gap:8px}
+.pill{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:6px 12px;font-size:13px;font-weight:600}
+footer{padding:56px 0;text-align:center;color:var(--muted);font-size:14px}
+footer a{color:var(--accent);text-decoration:none}
+.contact-row{display:flex;gap:14px;justify-content:center;flex-wrap:wrap;margin-top:26px}
+.note{margin-top:12px;font-size:12.5px;opacity:.75}
+@media(max-width:760px){.about-grid{grid-template-columns:1fr}header{padding:60px 0 44px}}
+</style>
+</head>
+<body>
+<nav><div class="wrap nav-in">
+  <a class="logo" href="#">Shahar <span>Meriash</span></a>
+  <div class="nav-links"><a href="#demos">Demos</a><a href="#about">About</a><a href="#contact">Contact</a></div>
+</div></nav>
+
+<header><div class="wrap">
+  <div class="kicker">Live project demos · companion to my resume</div>
+  <h1>Senior performance-marketing &amp; monetization leader. <em>AI-first systems builder.</em></h1>
+  <p class="sub">12+ years owning strategy, structure and budget for multi-million-dollar paid engines — <b>$40M annual budget authority</b>, media buying scaled from POC to <b>$20M/year</b>, teams of 5–15. I don't just run the spend; I build the systems underneath it. The four platforms below are live production builds — architected, shipped and operated end-to-end, solo, with an AI-native toolchain. Every demo is fully interactive.</p>
+  <div class="hero-cta">
+    <a class="btn btn-p" href="#demos">Explore the demos →</a>
+    <a class="btn btn-s" href="https://www.linkedin.com/in/shahar-meriash" target="_blank" rel="noopener">LinkedIn</a>
+  </div>
+  <div class="stats">
+    <div class="stat"><b>$40M</b><span>annual paid budget owned</span></div>
+    <div class="stat"><b>POC→$20M/yr</b><span>media buying scaled</span></div>
+    <div class="stat"><b>+30%</b><span>buying effectiveness via automation I built</span></div>
+    <div class="stat"><b>4</b><span>production platforms shipped AI-first, solo</span></div>
+  </div>
+</div></header>
+
+<section id="demos"><div class="wrap">
+  <div class="sec-head">
+    <h2>Interactive product demos</h2>
+    <p>Faithful, fully functional replicas of the live products, running on generated sample data — click anything. The production versions run with real revenue and customer data behind auth. Each demo opens in a new tab.</p>
+  </div>
+  <div class="grid">
+    <div class="card" style="--pc:var(--rtb)">
+      <span class="tag">Ad-tech · Programmatic ops</span>
+      <h3><span class="dot"></span>RTB Monster</h3>
+      <p>A programmatic buy/sell operations cockpit: reconciles reporting from every ad platform (display, video, CTV, in-app, push) into a single contribution-margin view and converts it into ranked spend actions with trust-gated automation. ClickHouse analytical spine, restatement-safe fact tables, JSON adapter ingest, scheduled reporting.</p>
+      <div class="chip-row"><span class="chip">Margin truth vs ROAS</span><span class="chip">ClickHouse</span><span class="chip">Ranked spend actions</span></div>
+      <a class="go" href="rtbmonster/" target="_blank" rel="noopener">Open demo ↗</a>
+    </div>
+    <div class="card" style="--pc:var(--tq)">
+      <span class="tag">Ad-tech · Tracking &amp; attribution</span>
+      <h3><span class="dot"></span>TraQuery</h3>
+      <p>A server-to-server tracking &amp; attribution network: click/conversion tracking, per-geo pricing, publisher postbacks with retry sweeps, bot and test-traffic segregation, click-domain rotation with automated burn-switch failover, and a role-scoped reporting portal with fail-closed permissions.</p>
+      <div class="chip-row"><span class="chip">S2S postbacks</span><span class="chip">Cloudflare edge</span><span class="chip">Fail-closed permissions</span></div>
+      <a class="go" href="traquery/" target="_blank" rel="noopener">Open demo ↗</a>
+    </div>
+    <div class="card" style="--pc:var(--crm)">
+      <span class="tag">Internal tools · Revenue ops</span>
+      <h3><span class="dot"></span>Vane CRM</h3>
+      <p>The internal revenue system of record for my consultancy: partners, six-stage weighted pipeline, invoices &amp; insertion orders, P&amp;L roll-ups, live read-only Xero reconciliation and Wise treasury — plus an AI layer that parses forwarded partner emails into proposed deal updates a human approves.</p>
+      <div class="chip-row"><span class="chip">React + TypeScript</span><span class="chip">Postgres</span><span class="chip">AI email ingest</span></div>
+      <a class="go" href="crm/" target="_blank" rel="noopener">Open demo ↗</a>
+    </div>
+    <div class="card" style="--pc:var(--rk)">
+      <span class="tag">Consumer · AI-native mobile</span>
+      <h3><span class="dot"></span>Realokate</h3>
+      <p>A cross-platform consumer app (Firebase, Capacitor iOS/Android, secure document vault): an AI-first relocation assistant where "Kate" interviews you, generates your whole plan, briefs you daily, and proposes concrete changes you approve with a tap. Built on the principle: an assistant, not a liability.</p>
+      <div class="chip-row"><span class="chip">Capacitor iOS/Android</span><span class="chip">Firebase</span><span class="chip">LLM assistant</span></div>
+      <a class="go" href="realokate/" target="_blank" rel="noopener">Open demo ↗</a>
+    </div>
+  </div>
+</div></section>
+
+<section id="about" class="about"><div class="wrap about-grid">
+  <div>
+    <h2>Builder, not inheritor</h2>
+    <p>My career is the revenue side of paid media: Google, Meta, Taboola, Outbrain, TikTok, and RTB/programmatic across display, video, CTV, in-app and push. I've scaled a new revenue stream from POC to <b>$1M+/month</b>, grown a publisher network <b>400%</b> to secure <b>$2.5M/month</b>, and served as company-wide subject-matter expert in media buying while leading multidisciplinary teams.</p>
+    <p>The difference: I personally build the machinery under the spend — automated buying infrastructure, pause/scale/budget playbooks, guardrails and alerting, restatement-safe data pipelines. One operating principle runs through everything: <b>allocate capital on true margin after fees and returns, never on platform-reported ROAS alone.</b></p>
+    <p>AI-first since founding Vane Labs: Claude Code and agentic workflows in daily production use — which is how one person ships and operates the four platforms above in months, not years.</p>
+  </div>
+  <div class="bring">
+    <h3>Capital allocation &amp; measurement</h3>
+    <div class="pill-list"><span class="pill">Contribution-margin truth</span><span class="pill">S2S attribution</span><span class="pill">SQL · BigQuery · ClickHouse</span></div>
+    <h3>Decision systems</h3>
+    <div class="pill-list"><span class="pill">Pause / scale / budget playbooks</span><span class="pill">Automated guardrails &amp; alerting</span></div>
+    <h3>Channels at scale</h3>
+    <div class="pill-list"><span class="pill">Google Ads</span><span class="pill">Meta</span><span class="pill">Taboola · Outbrain · TikTok</span><span class="pill">RTB / programmatic</span></div>
+    <h3>Leadership &amp; AI-first ops</h3>
+    <div class="pill-list"><span class="pill">Teams of 5–15 · P&amp;L</span><span class="pill">Claude Code · agentic workflows</span><span class="pill">Looker Studio · HubSpot · Salesforce</span></div>
+  </div>
+</div></section>
+
+<section id="contact"><div class="wrap" style="text-align:center">
+  <h2 style="font-size:30px;letter-spacing:-.02em">Let's talk</h2>
+  <p style="color:var(--muted);margin:12px auto 0;max-width:560px">If you need someone who can own a paid-media engine at scale and build the AI-first machinery behind it, I'd love to chat.</p>
+  <div class="contact-row">
+    <a class="btn btn-p" href="mailto:shaharmeriash@gmail.com">shaharmeriash@gmail.com</a>
+    <a class="btn btn-s" href="https://www.linkedin.com/in/shahar-meriash" target="_blank" rel="noopener">linkedin.com/in/shahar-meriash</a>
+    <a class="btn btn-s" href="https://vane-labs.com" target="_blank" rel="noopener">vane-labs.com</a>
+  </div>
+</div></section>
+
+<footer><div class="wrap">
+  <div>© 2026 Shahar Meriash · Perth, Australia</div>
+  <div class="note">All demos run entirely in your browser on generated sample data. No real customer or revenue data is shown.</div>
+</div></footer>
+</body>
+</html>
