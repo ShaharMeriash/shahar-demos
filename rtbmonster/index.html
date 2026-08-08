@@ -157,6 +157,53 @@ tr.winner td{background:rgba(10,79,50,.06)}
 .check{display:flex;gap:8px;align-items:center;font-size:12.5px;padding:3px 0}
 .check .ok{color:#1f7a00;font-weight:700}
 #toast{position:fixed;bottom:20px;right:20px;background:var(--forest-deep);color:#FAFAF7;padding:10px 16px;border-radius:2px;font-size:13px;opacity:0;transition:opacity .25s;pointer-events:none;z-index:99;max-width:420px}
+/* demand radar */
+.rgrid{display:grid;grid-template-columns:1.75fr 1fr;gap:16px;align-items:start}
+@media(max-width:1040px){.rgrid{grid-template-columns:1fr}}
+.rgrid>div{min-width:0}
+/* radar tables carry the real page's tighter metrics, not the cockpit's monospace grid */
+.rtbl th{padding:6px 8px;letter-spacing:.07em}
+.rtbl td{padding:8px}
+.rtbl td.num{font-family:var(--fb);font-size:12.5px}
+tr.rrow{cursor:pointer}
+tr.rsel td{background:rgba(189,140,61,.10)}
+tr.rsel td:first-child{box-shadow:inset 3px 0 0 var(--gold)}
+tr.runpriced td{color:var(--muted)}
+.rslice{font-weight:600}
+.rmix{font-size:11px;color:var(--muted);margin-top:2px;font-weight:400;white-space:normal}
+.rmoney{font-family:var(--fd);font-weight:700;font-size:15px;color:var(--forest)}
+.rmoney.dim{color:var(--muted);font-size:13px}
+.tier{display:inline-block;font-family:var(--fd);font-weight:700;font-size:9.5px;letter-spacing:.09em;text-transform:uppercase;padding:2px 7px;border-radius:2px}
+.tier.proven{background:rgba(10,79,50,.12);color:var(--forest)}
+.tier.thin{background:rgba(230,126,34,.14);color:var(--warning)}
+.tier.unpriced{background:rgba(74,87,82,.12);color:var(--muted)}
+.rkv{display:flex;justify-content:space-between;gap:12px;padding:5px 0;border-bottom:1px dotted var(--rule);font-size:12.5px}
+.rkv:last-child{border-bottom:none}
+.rkv .n{font-family:var(--fd);font-weight:700}
+.rlbl{font-family:var(--fd);font-weight:600;font-size:10.5px;letter-spacing:.09em;text-transform:uppercase;color:var(--muted);margin:14px 0 6px}
+.rlbl.first{margin-top:0}
+.rcomp{display:flex;justify-content:space-between;align-items:baseline;gap:10px;padding:6px 0;border-bottom:1px solid var(--rule);font-size:12.5px}
+.rcomp:last-of-type{border-bottom:none}
+.rcomp .who b{font-weight:600}
+.rcomp .who span{color:var(--muted);font-size:11px}
+.rcomp .num{font-family:var(--fd);font-weight:700;white-space:nowrap;text-align:right;font-size:12.5px}
+.rcomp .num span{color:var(--muted);font-weight:600}
+.verdict.good{background:rgba(10,79,50,.08);border-color:rgba(10,79,50,.3)}
+.verdict.bad{background:rgba(192,57,43,.07);border-color:rgba(192,57,43,.3)}
+.verdict b{font-family:var(--fd);font-weight:700}
+.rmatch{display:flex;gap:10px;align-items:flex-start;padding:9px 0;border-bottom:1px solid var(--rule)}
+.rmatch:last-child{border-bottom:none}
+.rmatch .body{flex:1;min-width:0}
+.rmatch .t{font-weight:600;font-size:13px;display:flex;gap:7px;align-items:baseline;flex-wrap:wrap}
+.rmatch .r{color:var(--muted);font-size:11.5px;margin-top:2px}
+.rmatch .n{font-family:var(--fd);font-weight:700;color:var(--forest);white-space:nowrap}
+.rmatch.supp{opacity:.5}
+.flag{font-family:var(--fd);font-weight:700;font-size:9.5px;letter-spacing:.09em;text-transform:uppercase;padding:2px 7px;border-radius:2px;background:rgba(189,140,61,.16);color:#7a5a22}
+.flag.grey{background:rgba(74,87,82,.12);color:var(--muted)}
+.rbar{height:5px;background:rgba(10,79,50,.1);border-radius:2px;overflow:hidden;margin-top:5px}
+.rbar i{display:block;height:100%;background:var(--gold)}
+.evlink{font-size:11px;color:var(--forest);cursor:pointer;text-decoration:underline;text-underline-offset:2px}
+.rhint{font-size:11.5px;color:var(--muted)}
 svg text{font-family:var(--fd);font-size:10px}
 </style>
 </head>
@@ -1198,10 +1245,241 @@ function pageMapper(){
   return step1+step2+step3+step4;
 }
 
+/* ============ DEMAND RADAR ============ */
+/* The unsold book: unfilled opportunity priced from lanes that already clear the
+   same signature. A slice with no comparable lane is never counted as money. */
+const rusd=n=>"$"+Number(n).toLocaleString("en-US",n<100?{minimumFractionDigits:2,maximumFractionDigits:2}:{maximumFractionDigits:0});
+const rpct=f=>f==null?"—":(f*100)<0.1?(f*100).toFixed(3)+"%":(f*100).toFixed(2)+"%";
+function pctl(a,q){
+  const s=[...a].sort((x,y)=>x-y);
+  if(!s.length)return 0;
+  const i=(s.length-1)*q,lo=Math.floor(i),hi=Math.ceil(i);
+  return lo===hi?s[lo]:s[lo]+(i-lo)*(s[hi]-s[lo]);
+}
+/* comps: [supply, demand, platform, evidence days, revenue, fill, ecpm] */
+const RSL=[
+  {media:"CTV",ad:"video",integ:"Prebid Server",geo:"US",vet:"vetted",unfilled:4.10e6,
+   mix:[["Supply A",.58],["Supply B",.31],["Supply F",.11]],
+   comps:[["Supply A","Demand C","Platform One",28,41200,.108,19.0],
+          ["Supply A","Demand C","Platform Two",28,26900,.094,17.2],
+          ["Supply A","Demand D","Platform One",28,22400,.082,21.4],
+          ["Supply B","Demand E","Platform Two",21,9800,.0904,16.4]],
+   matches:[{d:"Demand C",imps:1.9e6,plats:["Platform One","Platform Two"],seen:28,ecpm:18.10},
+            {d:"Demand D",imps:6.4e5,plats:["Platform One"],seen:28,ecpm:21.40,tp:["Supply A"],miss:["Supply B","Supply F"]},
+            {d:"Demand G",imps:2.1e5,plats:["Platform Three"],seen:12,ecpm:17.90,tp:["Supply A"],miss:["Supply B"]},
+            {d:"Demand E",supp:true}]},
+  {media:"In-app",ad:"video",integ:"S2S",geo:"DE",vet:"vetted",unfilled:3.35e6,
+   mix:[["Supply B",.71],["Supply A",.29]],
+   comps:[["Supply B","Demand C","Platform Two",28,12400,.071,9.0],
+          ["Supply B","Demand C","Platform One",28,10900,.083,10.0],
+          ["Supply A","Demand E","Platform One",24,8600,.089,13.0]],
+   matches:[{d:"Demand C",imps:1.1e6,plats:["Platform One","Platform Two"],seen:28,ecpm:9.60},
+            {d:"Demand E",imps:4.8e5,plats:["Platform Two"],seen:26,ecpm:12.80,tp:["Supply B"],miss:["Supply A"]}]},
+  {media:"CTV",ad:"video",integ:"VAST tag",geo:"UK",vet:"vetted",unfilled:2.42e6,
+   mix:[["Supply A",.74],["Supply B",.26]],
+   comps:[["Supply A","Demand G","Platform Three",21,7300,.086,18.0],
+          ["Supply A","Demand C","Platform One",19,11200,.0742,15.4]],
+   matches:[{d:"Demand G",imps:1.9e5,plats:["Platform Three"],seen:21,ecpm:18.00,tp:["Supply A"],miss:["Supply B"]},
+            {d:"Demand C",imps:5.4e5,plats:["Platform One"],seen:19,ecpm:15.40}]},
+  {media:"In-app",ad:"banner",integ:"SDK",geo:"US",vet:"vetted",unfilled:5.90e6,
+   mix:[["Supply B",.54],["Supply A",.46]],
+   comps:[["Supply B","Demand E","Platform Two",28,9100,.096,4.6],
+          ["Supply A","Demand E","Platform One",26,6400,.089,3.9],
+          ["Supply B","Demand G","Platform Two",18,3100,.062,4.1]],
+   matches:[{d:"Demand E",imps:8.2e5,plats:["Platform One","Platform Two"],seen:28,ecpm:4.30},
+            {d:"Demand G",imps:1.8e5,plats:["Platform Two"],seen:18,ecpm:4.10,tp:["Supply B"],miss:["Supply A"]},
+            {d:"Demand D",supp:true}]},
+  {media:"CTV",ad:"video",integ:"Prebid Server",geo:"AU",vet:"vetted",unfilled:1.62e6,
+   mix:[["Supply B",.66],["Supply A",.34]],
+   comps:[["Supply B","Demand G","Platform Two",11,4300,.077,16.0]],
+   matches:[{d:"Demand G",imps:9.6e4,plats:["Platform Two"],seen:11,ecpm:16.00},
+            {d:"Demand C",imps:3.2e5,plats:["Platform One"],seen:28,ecpm:17.20,tp:["Supply A"],miss:["Supply B"]}]},
+  {media:"Web",ad:"video",integ:"Prebid.js",geo:"AU",vet:"vetted",unfilled:2.15e6,
+   mix:[["Supply F",.88],["Supply A",.12]],
+   comps:[["Supply F","Demand G","Platform Three",12,5600,.064,11.0]],
+   matches:[{d:"Demand G",imps:1.75e5,plats:["Platform Three"],seen:12,ecpm:11.00}]},
+  {media:"Web",ad:"video",integ:"Prebid.js",geo:"UK",vet:"unvetted",unfilled:7.80e6,
+   mix:[["Supply F",1.0]],
+   comps:[["Supply F","Demand C","Platform Three",9,4900,.021,8.0]],
+   matches:[{d:"Demand C",imps:2.6e5,plats:["Platform Three"],seen:9,ecpm:8.00},
+            {d:"Demand D",imps:1.4e5,plats:["Platform Three"],seen:14,ecpm:9.00,tp:["Supply F"],miss:["Supply A"]}]},
+  {media:"Web",ad:"display",integ:"Prebid.js",geo:"US",vet:"unvetted",unfilled:12.4e6,
+   mix:[["Supply F",.69],["Supply B",.31]],comps:[],matches:[]},
+  {media:"In-app",ad:"video",integ:"S2S",geo:"BR",vet:"unvetted",unfilled:6.05e6,
+   mix:[["Supply B",.82],["Supply A",.18]],comps:[],
+   matches:[{d:"Demand E",supp:true}]},
+  {media:"CTV",ad:"video",integ:"VAST tag",geo:"CA",vet:"vetted",unfilled:2.90e6,
+   mix:[["Supply A",.91],["Supply B",.09]],comps:[],matches:[]},
+];
+/* demand clearing well on a signature we barely feed — the supply shopping list */
+const RSTARVED=[
+  {d:"Demand D",sl:0,fill:8.20,ecpm:21.40,imps:6.4e5,app:86},
+  {d:"Demand E",sl:1,fill:8.90,ecpm:12.80,imps:4.8e5,app:74},
+  {d:"Demand C",sl:2,fill:7.42,ecpm:15.40,imps:5.4e5,app:68},
+  {d:"Demand G",sl:5,fill:6.40,ecpm:11.00,imps:1.75e5,app:51},
+  {d:"Demand G",sl:3,fill:6.20,ecpm:4.10,imps:1.8e5,app:37},
+];
+let RD={days:28,minOpps:1e6,sel:0,offer:null};
+const rLabel=s=>`${s.media} ${s.ad} · ${s.integ} · ${s.geo} · ${s.vet}`;
+/* sub-1% holders are noise in a three-name summary — drop them */
+const rMix=s=>s.mix.filter(([,sh])=>sh>=0.01).map(([n,sh])=>`${n} ${(sh*100).toFixed(0)}%`).join(" · ");
+/* A longer window is more evidence, not more inventory: comps can only be observed
+   for as many days as the window holds, and the daily gap drifts a little with it. */
+function rCompute(i){
+  const s=RSL[i],days=RD.days;
+  const comps=s.comps.map(([sup,dem,plat,d,rev,fill,ecpm])=>({sup,dem,plat,days:Math.min(d,days),
+    rev:rev*Math.min(d,days)/d,fill,ecpm}));
+  const evDays=comps.length?Math.max(...comps.map(c=>c.days)):0;
+  const medFill=comps.length?pctl(comps.map(c=>c.fill),.5):null;
+  const p25=comps.length?pctl(comps.map(c=>c.ecpm),.25):null;
+  const unfilled=s.unfilled*(1+(days-28)/28*0.06);
+  return {...s,id:i,comps,evDays,med_fill:medFill,p25_ecpm:p25,unfilled_day:unfilled,
+    recoverable:comps.length?unfilled*medFill*p25/1000:0,
+    tier:!comps.length?"unpriced":(comps.length>=2&&evDays>=14?"proven":"thin"),
+    dist:comps.length?{fill:[.25,.5,.75].map(q=>pctl(comps.map(c=>c.fill),q)),
+                       ecpm:[.25,.5,.75].map(q=>pctl(comps.map(c=>c.ecpm),q))}:null};
+}
+const rVisible=()=>RSL.map((_,i)=>rCompute(i))
+  .filter(g=>g.unfilled_day*RD.days>=RD.minOpps)
+  .sort((a,b)=>b.recoverable-a.recoverable||b.unfilled_day-a.unfilled_day);
+const rSel=()=>rCompute(RD.sel);
+const rDefOffer=g=>g.p25_ecpm==null?0:Math.round(g.p25_ecpm*0.9*100)/100;
+const rOfferVal=g=>RD.offer==null?rDefOffer(g):RD.offer;
+function rSetDays(v){RD.days=Number(v);RD.offer=null;sync();}
+function rSetFloor(v){RD.minOpps=Number(v);sync();}
+function rPick(i){RD.sel=i;RD.offer=null;sync();}
+function rQuote(v){RD.offer=parseFloat(v||"0");const el=$("#r-verdict");if(el)el.outerHTML=rVerdictHTML();}
+/* The cockpit filters on lane-level dims — geo and vetting are fact-level and
+   don't exist as lane filters, so the handoff carries the media type. */
+function rOpenAnalysis(){
+  const g=rSel();
+  S.tab="cockpit";S.mode="supply";S.dims=["lane"];S.grain="auto";S.th=null;
+  S.filt=[{dim:"media",val:{CTV:"CTV","In-app":"In-app",Web:"Web video"}[g.media]}];
+  sync();window.scrollTo(0,0);
+  toast(`Analysis filtered to ${g.media} — geo and vetting are fact-level dims the lane view can't filter yet`);
+}
+function rVerdictHTML(){
+  const g=rSel();
+  if(!g.comps.length)return `<div class="verdict" id="r-verdict">Unpriced slice — no clearing evidence, so any quote here is a bet, not a valuation.</div>`;
+  const offer=rOfferVal(g),at=cpm=>g.unfilled_day*g.med_fill*cpm/1000;
+  const mine=at(g.p25_ecpm),theirs=at(offer);
+  if(offer>=g.p25_ecpm)return `<div class="verdict good" id="r-verdict"><b>Take it.</b> ${rusd(offer)} is at or above your p25 clearing price (${rusd(g.p25_ecpm)}). At ${rpct(g.med_fill)} comparable fill this lane returns <b>${rusd(theirs)}/day</b>.</div>`;
+  return `<div class="verdict bad" id="r-verdict"><b>Counter.</b> ${rusd(offer)} sits below your p25 clearing price (${rusd(g.p25_ecpm)}) — ${rusd(theirs)}/day vs ${rusd(mine)}/day, leaving <b>${rusd(mine-theirs)}/day</b> on the table. Open at ${rusd(g.p25_ecpm*1.15)}.</div>`;
+}
+function pageRadar(){
+  const rows=rVisible(),g=rSel();
+  const T=(t,k)=>rows.filter(r=>r.tier===t).reduce((a,r)=>a+r[k],0);
+  const N=t=>rows.filter(r=>r.tier===t).length;
+  const gapRows=rows.length?rows.map(r=>`
+    <tr class="rrow ${r.id===RD.sel?"rsel":""} ${r.tier==="unpriced"?"runpriced":""}" onclick="rPick(${r.id})">
+      <td><div class="rslice">${rLabel(r)}</div><div class="rmix">${rMix(r)}</div></td>
+      <td class="num">${fmtM(r.unfilled_day)}</td>
+      <td class="num">${r.comps.length?rpct(r.med_fill):"—"}</td>
+      <td class="num">${r.comps.length?rusd(r.p25_ecpm):"—"}</td>
+      <td class="num">${r.comps.length?`<span class="rmoney${r.tier==="thin"?" dim":""}">${rusd(r.recoverable)}</span>`:`<span class="rhint">no evidence</span>`}</td>
+      <td><span class="tier ${r.tier}">${r.tier}</span><div class="rmix">${r.comps.length?`${r.comps.length} lane${r.comps.length>1?"s":""} · ${r.evDays}d`:"no comparable lane"}</div></td>
+    </tr>`).join("")
+    :`<tr><td colspan="6" class="rhint">No slices above the opportunity floor in this window.</td></tr>`;
+  const starved=RSTARVED.map(s=>{const sl=RSL[s.sl];return `
+    <tr class="rrow ${s.sl===RD.sel?"rsel":""}" onclick="rPick(${s.sl})">
+      <td><div class="rslice">${s.d}</div><div class="rmix">${rLabel(sl)}</div></td>
+      <td class="num">${s.fill.toFixed(2)}%</td>
+      <td class="num">${rusd(s.ecpm)}</td>
+      <td class="num">${fmtM(s.imps)}</td>
+      <td class="num"><span class="rmoney" style="font-size:14px">${s.app}</span><div class="rbar"><i style="width:${s.app}%"></i></div></td>
+    </tr>`;}).join("");
+  const comps=g.comps.length?g.comps.map(c=>`
+    <div class="rcomp">
+      <div class="who"><b>${c.sup} × ${c.dem}</b><br><span>${c.plat} · ${c.days}d · ${rusd(c.rev)}</span></div>
+      <div class="num">${rpct(c.fill)}<br><span>${rusd(c.ecpm)}</span></div>
+    </div>`).join("")
+    :`<div class="rhint">No lane in the book has ever cleared this signature. Nothing to price against — the slice is listed as evidence-free and excluded from the headline total.</div>`;
+  const live=g.matches.filter(m=>!m.supp),supp=g.matches.filter(m=>m.supp);
+  const matchHTML=[
+    ...live.map(m=>`
+      <div class="rmatch">
+        <div class="body">
+          <div class="t">${m.d}${m.tp?`<span class="flag">Transplant</span>`:""}${m.seen<14?`<span class="flag grey">Thin</span>`:""}</div>
+          <div class="r">${m.tp
+            ? `Clears this slice via ${m.tp.join(", ")} — no lane with ${m.miss.join(", ")}.`
+            : `Already paired with every gap supplier — a volume conversation, not a wiring job.`}</div>
+          <div class="r" style="margin-top:3px">${fmtM(m.imps)} imps/day · ${m.plats.join(", ")} · ${m.seen}d</div>
+        </div>
+        <div class="n">${rusd(m.ecpm)}</div>
+      </div>`),
+    ...supp.map(m=>`
+      <div class="rmatch supp">
+        <div class="body">
+          <div class="t">${m.d}<span class="flag grey">Suppressed</span></div>
+          <div class="r">Offered this slice, never cleared the evidence floor.</div>
+        </div>
+        <div class="n">—</div>
+      </div>`),
+  ].join("");
+  return `<div class="pulse">
+    <div class="top">
+      <span class="lbl"><span class="pdot"></span>Unsold book</span>
+      <div style="margin-left:24px" class="pstat"><div class="k">Recoverable / day · proven</div><div class="v">${rusd(T("proven","recoverable"))}<small>${N("proven")} slices</small></div></div>
+      <div style="margin-left:24px" class="pstat"><div class="k">Thin evidence</div><div class="v">${rusd(T("thin","recoverable"))}<small>${N("thin")} slices</small></div></div>
+      <div style="margin-left:24px" class="pstat"><div class="k">Unpriced</div><div class="v">${fmtM(T("unpriced","unfilled_day"))}<small>opps / day · ${N("unpriced")} slices</small></div></div>
+      <div class="hint2" style="max-width:250px;text-align:right">Priced at p25 clearing eCPM × comparable median fill. Unpriced slices are never counted as opportunity.</div>
+    </div>
+  </div>
+  <div class="rgrid">
+    <div>
+      <div class="card">
+        <div class="h"><span class="t">Gap ledger — what I can't sell</span>
+          <span class="sub">— unfilled opportunity priced from lanes that already clear the same signature</span>
+          <span class="row" style="margin-left:auto">
+            <select onchange="rSetDays(this.value)">${[7,14,28,60,90].map(d=>`<option value="${d}" ${RD.days===d?"selected":""}>${d} days</option>`).join("")}</select>
+            <select onchange="rSetFloor(this.value)">${[[1e5,"≥100k opps"],[1e6,"≥1M opps"],[1e7,"≥10M opps"],[1e8,"≥100M opps"]].map(([v,l])=>`<option value="${v}" ${RD.minOpps===v?"selected":""}>${l}</option>`).join("")}</select>
+          </span></div>
+        <div class="tbl-wrap"><table class="rtbl">
+          <tr><th>Slice · supply mix</th><th class="num">Unfilled / day</th><th class="num">Comp. fill</th><th class="num">eCPM p25</th><th class="num">Recoverable / day</th><th>Evidence</th></tr>
+          ${gapRows}
+        </table></div>
+        <div class="note">Click a row to price it. A slice with no comparable lane stays unpriced — it is inventory, not money, until something clears it.</div>
+      </div>
+      <div class="card">
+        <div class="h"><span class="t">Starved demand — the mirror</span><span class="sub">— buyers clearing well on a signature we barely feed</span></div>
+        <div class="tbl-wrap"><table class="rtbl">
+          <tr><th>Demand · signature</th><th class="num">Fill</th><th class="num">eCPM</th><th class="num">Imps / day</th><th class="num">Appetite</th></tr>
+          ${starved}
+        </table></div>
+        <div class="note">This is a supply shopping list — the demand is already proven, the inventory isn't there to feed it.</div>
+      </div>
+    </div>
+    <div>
+      <div class="card">
+        <div class="h"><span class="t">Price book</span></div>
+        <div class="b">
+          <div class="rhint" style="margin-bottom:2px">${rLabel(g)}</div>
+          <div class="rlbl">Comparable clearing lanes</div>
+          ${comps}
+          <div class="rlbl">Distribution</div>
+          <div class="rkv"><span>Fill rate — p25 / p50 / p75</span><span class="n">${g.dist?g.dist.fill.map(rpct).join(" / "):"—"}</span></div>
+          <div class="rkv"><span>eCPM sell — p25 / p50 / p75</span><span class="n">${g.dist?g.dist.ecpm.map(rusd).join(" / "):"—"}</span></div>
+          <div class="rlbl">Quote check</div>
+          <div class="row"><span class="rhint">Partner offers</span>
+            <input type="number" value="${rOfferVal(g).toFixed(2)}" step="0.05" min="0" style="width:90px" oninput="rQuote(this.value)">
+            <span class="rhint">CPM</span></div>
+          ${rVerdictHTML()}
+          <div style="margin-top:10px"><span class="evlink" onclick="rOpenAnalysis()">Open this slice in Analysis →</span></div>
+        </div>
+      </div>
+      <div class="card">
+        <div class="h"><span class="t">Match list — who do I call</span></div>
+        <div class="b">${matchHTML||`<div class="rhint">No demand in the book touches this signature. A prospecting slice — worth an outbound conversation, not a wiring job.</div>`}</div>
+      </div>
+    </div>
+  </div>
+  <div class="note" style="padding:0 4px">Every number traces to lanes that actually ran. Slices inherit coverage from their contributing lanes; unresolved entities fragment comparables — keep the alias review queue clean.</div>`;
+}
+
 /* ============ shell ============ */
 function setTab(t){S.tab=t;sync();window.scrollTo(0,0);}
 function headerRight(){
-  const NAV=[["partners","Partners"],["whitelist","Whitelists"],["ops","Ops board →"],["mapper","Mapper"],["cockpit","Operations cockpit"]];
+  const NAV=[["radar","Radar"],["partners","Partners"],["whitelist","Whitelists"],["ops","Ops board →"],["mapper","Mapper"],["cockpit","Operations cockpit"]];
   const mins=((Date.now()/60000|0)%38)+5; // fake data age
   const now=new Date();
   const hm=String(now.getUTCHours()).padStart(2,"0")+":"+String(now.getUTCMinutes()).padStart(2,"0");
@@ -1212,7 +1490,7 @@ function headerRight(){
 }
 function render(){
   $("#hdr").innerHTML=headerRight();
-  $("#main").innerHTML=({cockpit:pageCockpit,ops:pageOps,whitelist:pageWhitelist,partners:pagePartners,mapper:pageMapper})[S.tab]();
+  $("#main").innerHTML=({cockpit:pageCockpit,ops:pageOps,whitelist:pageWhitelist,partners:pagePartners,mapper:pageMapper,radar:pageRadar})[S.tab]();
   if(S.tab==="cockpit"){bindBandHover("pulse");bindBandHover("daily");}
 }
 loadHash();
