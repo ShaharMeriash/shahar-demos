@@ -107,8 +107,9 @@ th.num,td.num{text-align:right;font-family:var(--fd);font-weight:600}
 .chip.on{background:var(--forest);border-color:var(--forest);color:#fff}
 /* kanban */
 .kb{display:flex;gap:12px;overflow-x:auto;padding-bottom:8px;align-items:flex-start}
-.kcol{background:#f5f5f2;border:1px solid var(--rule);border-radius:2px;min-width:215px;width:215px;flex-shrink:0}
-.kcol.over{border-color:var(--forest);box-shadow:0 0 0 1px var(--forest) inset}
+.kcol{background:#f5f5f2;border:1px solid var(--rule);border-radius:2px;min-width:215px;width:215px;flex-shrink:0;transition:box-shadow .12s,background .12s}
+/* drop target glows in the stage's own colour (--sc, set per column) */
+.kcol.over{background:rgba(10,79,50,.06);box-shadow:inset 0 0 0 2px var(--sc,var(--forest))}
 .kcol .kh{padding:10px 12px;border-bottom:1px solid var(--rule);display:flex;align-items:center;justify-content:space-between;gap:6px}
 .kcol .kh .sum{font-family:var(--fd);font-weight:600;font-size:11px;color:var(--muted);white-space:nowrap}
 .kcards{padding:9px;display:flex;flex-direction:column;gap:8px;min-height:70px}
@@ -119,6 +120,7 @@ th.num,td.num{text-align:right;font-family:var(--fd);font-weight:600}
 .kcard .v{font-family:var(--fd);font-weight:700;font-size:15px;color:var(--forest)}
 .kcard .mv{display:flex;gap:6px;margin-top:8px;border-top:1px solid rgba(10,79,50,.08);padding-top:8px;flex-wrap:wrap}
 .kcard[draggable=true]{cursor:grab}
+.kcard.dragging{opacity:.4}
 input.search,select.inp,input.inp,textarea.inp{border:1px solid var(--rule);border-radius:2px;padding:7px 12px;font-family:var(--fb);font-size:13px;background:var(--surface);outline:none;color:var(--ink)}
 input.search{min-width:220px}
 input.search:focus,.inp:focus{border-color:var(--forest)}
@@ -532,7 +534,8 @@ function pageDash(){
 
 /* ============================ pipeline ============================ */
 let dragId=null;
-function dragOpp(ev,id){if(!canEdit()){ev.preventDefault();return;}dragId=id;ev.dataTransfer.setData("text/plain",id);ev.dataTransfer.effectAllowed="move";}
+function dragOpp(ev,id){if(!canEdit()){ev.preventDefault();return;}dragId=id;ev.dataTransfer.setData("text/plain",id);ev.dataTransfer.effectAllowed="move";ev.currentTarget.classList.add("dragging");}
+function dragEndOpp(ev){ev.currentTarget.classList.remove("dragging");dragId=null;document.querySelectorAll(".kcol.over").forEach(c=>c.classList.remove("over"));}
 function dropOpp(ev,stage,el){ev.preventDefault();el.classList.remove("over");if(!canEdit()||!dragId)return;setStage(dragId,stage);dragId=null;}
 function setStage(id,st){const o=O(id);if(o.stage===st)return render();o.stage=st;if(st==="closed-won")o.prob=100;if(st==="closed-lost")o.prob=0;render();toast(`${o.name} → ${stageOf(st)[1]}`);}
 function movePipe(id,dir){const o=O(id);const i=STAGES.findIndex(s=>s[0]===o.stage);setStage(id,STAGES[Math.min(Math.max(i+dir,0),STAGES.length-1)][0]);}
@@ -563,9 +566,9 @@ function pagePipe(){
   }
   return head+`<div class="kb">${STAGES.map(([id,label,cls,color])=>{
     const list=opps.filter(o=>o.stage===id), sum=list.reduce((a,o)=>a+o.value,0);
-    return `<div class="kcol" ondragover="if(canEdit()){event.preventDefault();this.classList.add('over')}" ondragleave="this.classList.remove('over')" ondrop="dropOpp(event,'${id}',this)">
+    return `<div class="kcol" style="--sc:${color}" ondragover="if(canEdit()){event.preventDefault();event.dataTransfer.dropEffect='move';this.classList.add('over')}" ondragleave="if(!this.contains(event.relatedTarget))this.classList.remove('over')" ondrop="dropOpp(event,'${id}',this)">
       <div class="kh"><span class="badge ${cls}">${label}</span><span class="sum">${sum?fmt$(sum)+" · ":""}${list.length}</span></div>
-      <div class="kcards">${list.map(o=>`<div class="kcard" draggable="${canEdit()}" ondragstart="dragOpp(event,'${o.id}')" onclick="openOpp('${o.id}')">
+      <div class="kcards">${list.map(o=>`<div class="kcard" draggable="${canEdit()}" ondragstart="dragOpp(event,'${o.id}')" ondragend="dragEndOpp(event)" onclick="openOpp('${o.id}')">
         <div class="n">${esc(o.name)}</div><div class="p">${esc(P(o.pid)?.name||"—")} · ${o.prob}%</div><div class="v">${fmt$(o.value)}</div>
         ${o.close?`<div style="font-size:11px;color:var(--muted);margin-top:4px">Close ${fmtDate(o.close)}</div>`:""}
         ${o.tags.length?`<div style="display:flex;gap:4px;margin-top:6px;flex-wrap:wrap">${o.tags.slice(0,2).map(t=>`<span class="tag-chip">${esc(t)}</span>`).join("")}</div>`:""}

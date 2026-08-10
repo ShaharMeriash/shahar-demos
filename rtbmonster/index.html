@@ -101,7 +101,7 @@ select:focus,input:focus,textarea:focus{outline:none;border-color:var(--forest);
 textarea{width:100%;min-height:110px;padding:8px 10px;border:1px solid rgba(10,79,50,.2);border-radius:2px;font-family:ui-monospace,Menlo,monospace;font-size:12px;background:#fff;color:var(--ink)}
 table{width:100%;border-collapse:collapse;font-size:12.5px}
 th{background:#f5f5f2;font-family:var(--fd);font-weight:600;font-size:10.5px;letter-spacing:.12em;text-transform:uppercase;color:var(--muted);text-align:left;padding:8px 12px;border-bottom:1px solid var(--rule);white-space:nowrap}
-th.sortable{cursor:pointer}
+th.sortable{cursor:pointer;user-select:none}
 th.num,td.num{text-align:right;font-family:ui-monospace,Menlo,monospace;font-variant-numeric:tabular-nums;font-size:11.5px}
 td{padding:8px 12px;border-bottom:1px solid rgba(10,79,50,.08);white-space:nowrap}
 td.mono{font-family:ui-monospace,Menlo,monospace;font-size:11.5px}
@@ -234,7 +234,7 @@ function mulberry(a){return function(){a|=0;a=a+0x6D2B79F5|0;let t=Math.imul(a^a
 let rnd=mulberry(1337);
 const fmt$=n=>n==null?"–":"$"+Math.round(n).toLocaleString();
 const usd2=n=>n==null?"–":"$"+Number(n).toFixed(2);
-const pct=n=>n==null?"–":(n*100).toFixed(1)+"%";
+const pct=n=>n==null?"–":(n*100).toFixed(2)+"%";
 const pct2=n=>n==null?"–":(n*100).toFixed(2)+"%";
 const fmtM=n=>n==null?"–":n>=1e6?(n/1e6).toFixed(1)+"M":n>=1e3?(n/1e3).toFixed(0)+"k":Math.round(n).toLocaleString();
 const $=s=>document.querySelector(s);
@@ -297,38 +297,54 @@ for(const l of LANES){
 const MEDIA=["In-app","CTV","Web video"];
 const MEDIA_LABEL={"In-app":"In-app","CTV":"CTV","Web video":"Web"};
 const MEDIA_SHORT={"In-app":"inapp","CTV":"ctv","Web video":"web"};
-function hourSeriesM(dayIdx,upto,media){
-  const base={rev:[],req:[],imp:[],fil:[]};
-  const rows=FACTS.filter(r=>r.idx===dayIdx&&r.media===media);
-  const tot={revenue:0,requests:0,impressions:0,fills:0};
-  for(const r of rows){tot.revenue+=r.revenue;tot.requests+=r.requests;tot.impressions+=r.impressions;tot.fills+=r.fills;}
+/* Bases are keyed media × platform so the media chips and the platform chips
+   filter the same series. cost rides the series so profit is a real sum. */
+const PLATFORMS=[...new Set(LANES.map(l=>l.platform))];
+const mpKey=(m,pf)=>m+"¦"+pf;
+function hourSeriesM(dayIdx,upto,media,platform){
+  const base={rev:[],req:[],imp:[],fil:[],cost:[]};
+  const rows=FACTS.filter(r=>r.idx===dayIdx&&r.media===media&&r.platform===platform);
+  const tot={revenue:0,requests:0,impressions:0,fills:0,cost:0};
+  for(const r of rows){tot.revenue+=r.revenue;tot.requests+=r.requests;tot.impressions+=r.impressions;tot.fills+=r.fills;tot.cost+=r.cost;}
   const full=dayIdx===NDAYS-1?(24/(HOUR+1)):1; // today totals are partial; scale hourly split
   for(let h=0;h<=upto;h++){
     const w=SHAPE[h]/SHSUM*(0.88+rnd()*0.24);
     const j=()=>0.92+rnd()*0.16; // independent per-measure jitter so rates aren't flat
     base.rev.push(tot.revenue*full*w*j());base.req.push(tot.requests*full*w*j());
     base.imp.push(tot.impressions*full*w*j());base.fil.push(tot.fills*full*w*j());
+    base.cost.push(tot.cost*full*w*j());
   }
   return base;
 }
 const HOUR_M={};
-for(const m of MEDIA)HOUR_M[m]={t:hourSeriesM(NDAYS-1,HOUR,m),y:hourSeriesM(NDAYS-2,23,m)};
+for(const m of MEDIA)for(const pf of PLATFORMS)
+  HOUR_M[mpKey(m,pf)]={t:hourSeriesM(NDAYS-1,HOUR,m,pf),y:hourSeriesM(NDAYS-2,23,m,pf)};
 const DAYTOT={};
-for(const m of MEDIA)DAYTOT[m]=[...Array(NDAYS)].map(()=>({rev:0,req:0,imp:0,fil:0,cost:0}));
-for(const r of FACTS){const d=DAYTOT[r.media][r.idx];d.rev+=r.revenue;d.req+=r.requests;d.imp+=r.impressions;d.fil+=r.fills;d.cost+=r.cost;}
+for(const m of MEDIA)for(const pf of PLATFORMS)
+  DAYTOT[mpKey(m,pf)]=[...Array(NDAYS)].map(()=>({rev:0,req:0,imp:0,fil:0,cost:0}));
+for(const r of FACTS){const d=DAYTOT[mpKey(r.media,r.platform)][r.idx];d.rev+=r.revenue;d.req+=r.requests;d.imp+=r.impressions;d.fil+=r.fills;d.cost+=r.cost;}
+const SER_KEYS=["rev","req","imp","fil","cost"];
 function sumSeries(list){
   const n=list[0].rev.length;
-  const out={rev:Array(n).fill(0),req:Array(n).fill(0),imp:Array(n).fill(0),fil:Array(n).fill(0)};
-  for(const b of list)for(const k of ["rev","req","imp","fil"])for(let i=0;i<n;i++)out[k][i]+=b[k][i];
+  const out={};for(const k of SER_KEYS)out[k]=Array(n).fill(0);
+  for(const b of list)for(const k of SER_KEYS)for(let i=0;i<n;i++)out[k][i]+=b[k][i];
   return out;
 }
-const hourBase=(media,side)=>sumSeries(media.map(m=>HOUR_M[m][side]));
-function dayBase(media,win){
+// platform is an OPT-IN filter: [] means "all platforms"
+const platsOf=sel=>sel.length?sel:PLATFORMS;
+function hourBase(media,plats,side){
+  const list=[];
+  for(const m of media)for(const pf of plats)list.push(HOUR_M[mpKey(m,pf)][side]);
+  return sumSeries(list);
+}
+function dayBase(media,plats,win){
   const slice=(from,to)=>{
     const out={rev:[],req:[],imp:[],fil:[],cost:[],dates:[]};
     for(let i=from;i<=to;i++){
       let rev=0,req=0,imp=0,fil=0,cost=0;
-      for(const m of media){const d=DAYTOT[m][i];rev+=d.rev;req+=d.req;imp+=d.imp;fil+=d.fil;cost+=d.cost;}
+      for(const m of media)for(const pf of plats){
+        const d=DAYTOT[mpKey(m,pf)][i];rev+=d.rev;req+=d.req;imp+=d.imp;fil+=d.fil;cost+=d.cost;
+      }
       out.rev.push(rev);out.req.push(req);out.imp.push(imp);out.fil.push(fil);out.cost.push(cost);
       out.dates.push(dISO(NDAYS-1-i));
     }
@@ -370,7 +386,8 @@ const kd=(c,p)=>(c-p)/p;
 
 /* ============ derived metric math ============ */
 function derive(s){
-  s.fill_rate=s.requests>0?s.fills/s.requests:null;
+  // canonical §4.3 fill rate: requests when the platform reports them, else opportunities
+  s.fill_rate=s.requests>0?s.fills/s.requests:(s.opportunities>0?s.fills/s.opportunities:null);
   s.ecpm_sell=s.impressions>0?s.revenue/s.impressions*1000:null;
   s.ecpm_buy=s.impressions>0?s.cost/s.impressions*1000:null;
   s.margin=s.revenue-s.cost;
@@ -394,16 +411,18 @@ function agg(rows,keys){
 /* ============ mode definitions (labels match the real product) ============ */
 const MODE_COLS={
   margin:[["requests","Requests",fmtM],["fills","Fills",fmtM],["fill_rate","Fill %",pct],["ecpm_sell","eCPM sell",usd2],["revenue","Revenue",fmt$],["cost","Cost",fmt$],["margin","Margin",fmt$],["margin_pct","Margin %",pct]],
-  supply:[["inventories","Inventories",fmtM],["opportunities","Opportunities",fmtM],["requests","Requests",fmtM],["responses","Responses",fmtM],["fills","Fills",fmtM],["impressions","Impressions",fmtM],["ecpm_sell","eCPM",usd2],["revenue","Revenue",fmt$]],
-  demand:[["requests","Requests",fmtM],["bids","Bids",fmtM],["wins","Wins",fmtM],["bid_rate","Bid rate",pct],["win_rate","Win rate",pct],["impressions","Impressions",fmtM],["cost","Cost",fmt$],["cost_cpm","Cost CPM",usd2]],
+  supply:[["inventories","Inventories",fmtM],["opportunities","Opportunities",fmtM],["requests","Requests",fmtM],["responses","Responses",fmtM],["fills","Fills",fmtM],["impressions","Impressions",fmtM],["fill_rate","Fill rate",pct],["ecpm_sell","eCPM",usd2],["revenue","Revenue",fmt$]],
+  demand:[["requests","Requests",fmtM],["bids","Bids",fmtM],["wins","Wins",fmtM],["bid_rate","Bid rate",pct],["fill_rate","Fill rate",pct],["win_rate","Win rate",pct],["impressions","Impressions",fmtM],["cost","Cost",fmt$],["cost_cpm","Cost CPM",usd2]],
 };
 const MODE_LABEL={margin:"Margin",supply:"Supply detail",demand:"Demand detail"};
 const DIMS=[["lane","Lane"],["platform","Platform"],["media","Media type"],["geo","Geo"]];
 const dimLabel=k=>({lane:"Lane",platform:"Platform",media:"Media type",geo:"Geo",date:"Date",hour:"Hour"})[k]||k;
 
 /* ============ view state (serialized into location.hash) ============ */
-let S={tab:"cockpit",mode:"margin",dims:["lane"],grain:"auto",th:null,filt:[],sort:{k:"revenue",asc:false},
-  pm:["revenue"],dm:["revenue","requests"],pmedia:[...MEDIA],dmedia:[...MEDIA],dwin:14,kwin:7};
+// sortc: up to two keys, so "supply partner, then date within partner" is one
+// shift-click away. k = a metric key, or "d_<dim>" for a dimension column.
+let S={tab:"cockpit",mode:"margin",dims:["lane"],grain:"auto",th:null,filt:[],sortc:[{k:"revenue",dir:-1}],
+  pm:["revenue"],dm:["revenue","requests"],pmedia:[...MEDIA],dmedia:[...MEDIA],pplat:[],dplat:[],dwin:14,kwin:7};
 let suppressHash=false;
 function pushHash(){
   const h="#"+encodeURIComponent(JSON.stringify({tab:S.tab,mode:S.mode,dims:S.dims,grain:S.grain,th:S.th,filt:S.filt}));
@@ -573,7 +592,7 @@ function tgPmed(m){toggleList(S.pmedia,m,1);} function tgDmed(m){toggleList(S.dm
 function setDwin(n){S.dwin=n;render();}
 function setKwin(n){S.kwin=Number(n);render();}
 function bandRefresh(){toast("Refreshed — micro-cache bypassed");render();}
-function chipRow(active,base,upto,toggler,mediaSel,mediaToggler,withWin){
+function chipRow(active,base,upto,toggler,mediaSel,mediaToggler,withWin,platSel,platToggler){
   const s=arr=>arr.slice(0,upto+1).reduce((a,v)=>a+(v??0),0);
   const val=k=>{
     if(k==="revenue")return fmt$(s(base.rev));
@@ -585,10 +604,26 @@ function chipRow(active,base,upto,toggler,mediaSel,mediaToggler,withWin){
     `<span class="pchk ${active.includes(k)?'':'off'}" style="${active.includes(k)?'border-color:'+def.color:''}" onclick="${toggler}('${k}')"><span class="sw" style="background:${def.color}"></span>${def.label} <b>${val(k)}</b></span>`).join("");
   const medChips=MEDIA.map(m=>
     `<span class="pchk ${mediaSel.includes(m)?'':'off'}" onclick="${mediaToggler}('${m}')">${MEDIA_LABEL[m]}</span>`).join("");
+  // Platform chips are opt-in: an empty selection means "all", so every chip
+  // reads on until you narrow. Only worth showing with more than one platform.
+  const platChips=PLATFORMS.length>1?`<span class="psep"></span>`+PLATFORMS.map(pf=>{
+    const on=platSel.length===0||platSel.includes(pf);
+    return `<span class="pchk ${on?'':'off'}" onclick="${platToggler}('${pf}')">${esc(pf)}</span>`;
+  }).join(""):"";
   const winChips=withWin?`<span class="psep"></span>`+[7,14,30].map(d=>
     `<span class="pchk ${S.dwin===d?'':'off'}" style="${S.dwin===d?'border-color:var(--gold)':''}" onclick="setDwin(${d})">${d}d</span>`).join(""):"";
-  return `<div class="pctl">${mChips}<span class="psep"></span>${medChips}${winChips}</div>`;
+  return `<div class="pctl">${mChips}<span class="psep"></span>${medChips}${platChips}${winChips}</div>`;
 }
+// Expand the "all" sentinel ([]) before editing, then collapse back to [] when
+// everything is on again, so the selection stays meaningful.
+function tgPlat(key,pf){
+  const cur0=S[key].length?S[key].slice():PLATFORMS.slice();
+  const cur=cur0.includes(pf)?cur0.filter(x=>x!==pf):[...new Set([...cur0,pf])];
+  if(!cur.length)return; // an empty chart helps nobody
+  S[key]=cur.length===PLATFORMS.length?[]:cur;
+  render();
+}
+function tgPplat(pf){tgPlat("pplat",pf);} function tgDplat(pf){tgPlat("dplat",pf);}
 function moverClick(lane){
   S.tab="cockpit";S.mode="margin";S.dims=["lane","platform"];S.filt=[{dim:"lane",val:lane}];S.th=null;
   sync();scrollToBreakdown();
@@ -596,12 +631,18 @@ function moverClick(lane){
 function scrollToBreakdown(){setTimeout(()=>{const el=document.getElementById("breakdown-card");if(el)el.scrollIntoView({behavior:"smooth",block:"start"});},60);}
 
 function pulseBand(){
-  const t=hourBase(S.pmedia,"t"),y=hourBase(S.pmedia,"y");
+  const plats=platsOf(S.pplat);
+  const t=hourBase(S.pmedia,plats,"t"),y=hourBase(S.pmedia,plats,"y");
   BANDS.pulse={t,y,n:24,upto:HOUR,metrics:S.pm,
     pointLabel:i=>`${String(i).padStart(2,"0")}:00–${String(i).padStart(2,"0")}:59`,colLabel:()=>"today · yday"};
-  const revT=t.rev.reduce((a,b)=>a+b,0),revY=y.rev.slice(0,HOUR+1).reduce((a,b)=>a+b,0);
-  const mFor=idx=>{let rev=0,cost=0;for(const m of S.pmedia){const d=DAYTOT[m][idx];rev+=d.rev;cost+=d.cost;}return rev>0?1-cost/rev:0;};
-  const profT=revT*mFor(NDAYS-1),profY=revY*mFor(NDAYS-2);
+  // Both days are capped at the current hour, so every delta is a like-for-like
+  // pace vs the SAME hour yesterday — never partial-day vs whole-day. Fill is a
+  // true ratio of the summed parts, not an average of hourly rates.
+  const s=arr=>arr.slice(0,HOUR+1).reduce((a,v)=>a+(v??0),0);
+  const revT=s(t.rev),revY=s(y.rev);
+  const profT=revT-s(t.cost),profY=revY-s(y.cost);
+  const reqT=s(t.req),reqY=s(y.req);
+  const fillT=reqT>0?s(t.fil)/reqT:null,fillY=reqY>0?s(y.fil)/reqY:null;
   const ticks=[[0,"00"],[6,"06"],[12,"12"],[18,"18"],[23,"23"]];
   const series=S.pm.map(k=>({color:CHART_METRICS[k].color,
     cur:[...Array(HOUR+1)].map((_,i)=>metricOf(t,i,k)),pri:[...Array(24)].map((_,i)=>metricOf(y,i,k))}));
@@ -611,17 +652,19 @@ function pulseBand(){
       <span class="lbl"><span class="pdot"></span>Live · today so far</span>
       <span class="pstat"><span class="k">Revenue</span><br><span class="v">${fmt$(revT)}${paceTag(revT,revY)}</span></span>
       <span class="pstat"><span class="k">Profit</span><br><span class="v">${fmt$(profT)}${paceTag(profT,profY)}</span></span>
-      <span class="hint2">hourly benchmarks · today (solid) vs yesterday (dashed) · through ${String(HOUR).padStart(2,"0")}:59 UTC</span>
+      <span class="pstat"><span class="k">Requests</span><br><span class="v">${Math.round(reqT).toLocaleString()}${paceTag(reqT,reqY)}</span></span>
+      <span class="pstat"><span class="k">Fill rate</span><br><span class="v">${pct(fillT)}${paceTag(fillT,fillY)}</span></span>
+      <span class="hint2">hourly · today (solid) vs same time yesterday (dashed) · deltas vs same hour · through ${String(HOUR).padStart(2,"0")}:59 UTC</span>
       <span class="prefresh" onclick="bandRefresh()" title="Refresh now">↻ <span class="st">${nowStamp()}</span></span>
     </div>
-    ${chipRow(S.pm,t,HOUR,"tgPm",S.pmedia,"tgPmed",false)}
+    ${chipRow(S.pm,t,HOUR,"tgPm",S.pmedia,"tgPmed",false,S.pplat,"tgPplat")}
     <div class="pchart">${multiSpark(series,HOUR,24,ticks)}<div class="pguide"></div><div class="ptip"></div></div>
     <div class="pmovers">${movers}</div>
   </div>`;
 }
 function dailyBand(){
   const n=S.dwin;
-  const {cur,pri}=dayBase(S.dmedia,n);
+  const {cur,pri}=dayBase(S.dmedia,platsOf(S.dplat),n);
   BANDS.daily={t:cur,y:pri,n,upto:n-1,metrics:S.dm,
     pointLabel:i=>fmtDay(cur.dates[i]),colLabel:i=>`vs ${fmtDay(pri.dates[i])}`};
   const sum=a=>a.reduce((x,b)=>x+b,0);
@@ -640,7 +683,7 @@ function dailyBand(){
       <span class="hint2">${fmtDay(cur.dates[0])}–${fmtDay(cur.dates[n-1])} (solid) vs the ${n} days before (dashed) · complete days only</span>
       <span class="prefresh" onclick="bandRefresh()" title="Refresh now">↻ <span class="st">${nowStamp()}</span></span>
     </div>
-    ${chipRow(S.dm,cur,n-1,"tgDm",S.dmedia,"tgDmed",true)}
+    ${chipRow(S.dm,cur,n-1,"tgDm",S.dmedia,"tgDmed",true,S.dplat,"tgDplat")}
     <div class="pchart">${multiSpark(series,n-1,n,ticks)}<div class="pguide"></div><div class="ptip"></div></div>
   </div>`;
 }
@@ -686,7 +729,7 @@ function kpiStrip(){
   </div>`;
 }
 /* breakdown */
-function setMode(m){S.mode=m;S.sort={k:MODE_COLS[m][MODE_COLS[m].length-2][0],asc:false};S.th=null;sync();}
+function setMode(m){S.mode=m;S.sortc=[];S.th=null;sync();}
 function toggleDim(d){
   const i=S.dims.indexOf(d);
   if(i>=0){if(S.dims.length>1)S.dims.splice(i,1);else{toast("Keep at least one dimension");return;}}
@@ -706,7 +749,22 @@ function applyTh(){
   S.th=m&&v!==""?{m,op,v:Number(v)}:null;
   sync();
 }
-function setSort(k){if(S.sort.k===k)S.sort.asc=!S.sort.asc;else S.sort={k,asc:false};render();}
+const SORT_TIP="click: sort · shift-click: secondary sort";
+function sortMark(k){
+  const i=S.sortc.findIndex(s=>s.k===k);
+  if(i<0)return "";
+  return (S.sortc[i].dir<0?" ↓":" ↑")+(S.sortc.length>1?(i===0?"¹":"²"):"");
+}
+function setSort(k,ev){
+  const i=S.sortc.findIndex(s=>s.k===k);
+  const def=k.startsWith("d_")?1:-1; // dims read A→Z / oldest-first; metrics biggest-first
+  if(ev&&ev.shiftKey&&S.sortc.length&&S.sortc[0].k!==k){
+    // shift-click: attach (or flip) this key UNDER the current primary
+    if(i>0)S.sortc[i].dir*=-1; else S.sortc=[S.sortc[0],{k,dir:def}];
+  }else if(i===0){S.sortc[0].dir*=-1;}
+  else S.sortc=[{k,dir:def}];
+  render();
+}
 function breakdownRows(){
   const grain=S.grain==="hour"?"hour":S.grain==="day"?"date":null;
   let facts=(grain==="hour"?HFACTS:FACTS.filter(r=>r.idx>=NDAYS-7));
@@ -719,8 +777,18 @@ function breakdownRows(){
     rows=rows.filter(r=>{const v=r[t.m];if(v==null)return false;
       return t.op===">"?v>t.v:t.op==="<"?v<t.v:Math.abs(v-t.v)<Math.max(Math.abs(t.v)*0.005,1e-9);});
   }
-  const sk=S.sort.k;
-  rows.sort((a,b)=>((a[sk]??-1e18)-(b[sk]??-1e18))*(S.sort.asc?1:-1));
+  // Drop chain keys whose column left the view; default to money, biggest first.
+  const kidx={};keys.forEach((kk,i)=>kidx["d_"+kk]=i);
+  const colKeys=MODE_COLS[S.mode].map(c=>c[0]);
+  S.sortc=S.sortc.filter(s=>s.k.startsWith("d_")?(s.k in kidx):colKeys.includes(s.k));
+  if(!S.sortc.length)S.sortc=[{k:colKeys.includes("revenue")?"revenue":colKeys.includes("cost")?"cost":colKeys[0],dir:-1}];
+  // Dims compare as strings on the RAW value (ISO dates, canonical names), so
+  // display formatting never skews order; metrics compare numerically.
+  const cmpBy=s=>s.k.startsWith("d_")
+    ? (a,b)=>String(a._k[kidx[s.k]]??"").localeCompare(String(b._k[kidx[s.k]]??""),undefined,{numeric:true})*s.dir
+    : (a,b)=>((a[s.k]??-1e18)-(b[s.k]??-1e18))*s.dir;
+  const cmps=S.sortc.map(cmpBy);
+  rows.sort((a,b)=>{for(const c of cmps){const r=c(a,b);if(r)return r;}return 0;});
   return {rows,totals,keys,grain};
 }
 function breakdownCard(){
@@ -734,8 +802,9 @@ function breakdownCard(){
   const chips=S.filt.map((f,i)=>`<span class="fchip"><b>${dimLabel(f.dim)}</b> = ${esc(f.val)} <span class="x" onclick="rmFilter(${i})">×</span></span>`).join("")
     +(S.th?`<span class="fchip th"><b>${S.th.m.replace(/_/g," ")}</b> ${esc(S.th.op)} ${S.th.v} <span class="x" onclick="rmTh()">×</span></span>`:"");
   const best=S.mode==="margin"&&!grain?Math.max(...rows.map(r=>r.margin??-1e18)):null;
-  const th=(k,l)=>`<th class="num sortable" onclick="setSort('${k}')">${l}${S.sort.k===k?(S.sort.asc?" ▲":" ▼"):""}</th>`;
-  const head=(grain?`<th>${dimLabel(grain)}</th>`:"")+S.dims.map(d=>`<th>${dimLabel(d)}</th>`).join("")+cols.map(([k,l])=>th(k,l)).join("");
+  const th=(k,l)=>`<th class="num sortable" title="${SORT_TIP}" onclick="setSort('${k}',event)">${l}${sortMark(k)}</th>`;
+  const thD=(k,l)=>`<th class="sortable" title="${SORT_TIP}" onclick="setSort('d_${k}',event)">${l}${sortMark("d_"+k)}</th>`;
+  const head=(grain?thD(grain,dimLabel(grain)):"")+S.dims.map(d=>thD(d,dimLabel(d))).join("")+cols.map(([k,l])=>th(k,l)).join("");
   const cell=(k,v,f)=>{
     const cls=(k==="margin"||k==="margin_pct")?(v>=(k==="margin_pct"?0.10:0)?"pos":"neg"):"";
     return `<td class="num ${cls}">${f(v)}</td>`;
