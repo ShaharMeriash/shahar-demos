@@ -1194,7 +1194,7 @@ function pageClicks(){
   const p=P();
   const rows=clicksShown();
   const showPub=p.type!=="advertiser";
-  const nCols=8+(showPub?1:0)+(p.rev?1:0)+(p.pay?1:0)+1;
+  const nCols=8+(showPub?1:0)+(p.rev?1:0)+(p.pay?1:0)+(p.seesVisitor?1:0)+1;
   return `
   <div class="controls">
     <span class="chiprow">${[["today","Today"],["yesterday","Yesterday"],["7d","Last 7d"]].map(([k,l])=>`<span class="chip ${ckPreset===k?"on":""}" onclick="setCkPreset('${k}')">${l}</span>`).join("")}</span>
@@ -1221,6 +1221,7 @@ function pageClicks(){
       <tr><th>Time</th><th>Click ID</th><th>Geo</th>
       <th>Quality${tipMark("IVT screening","Every inbound click runs through the IVT screen ported from vane-edge: the user agent against a 1,500-pattern crawler corpus, and the IP's network against a hosting heuristic. Flagged clicks still redirect; blocked ones divert to the fallback URL. "+IVT_FLAG_NOTE)}</th>
       <th>Incent${tipMark("Incent pool",INCENT_NOTE)}</th>
+      ${p.seesVisitor?`<th>Referrer${tipMark("Referrer","Captured at the click edge from the Referer header. This is what the incent pool matches on — a rewards site sends real people on real browsers, so the referrer domain is the only tell. Internal accounts only, like IP and user agent.")}</th>`:""}
       <th>Offer</th>${showPub?"<th>Publisher</th>":""}<th>Sub ID</th><th>Conversion</th>${p.rev?'<th class="num">Revenue</th>':""}${p.pay?'<th class="num">Payout</th>':""}<th>Postback</th></tr>
       ${rows.slice(0,60).map((c,i)=>`
       <tr style="cursor:pointer;${c.test?"opacity:.6":""}" onclick="openClick=openClick==='${c.id}'?null:'${c.id}';render()">
@@ -1229,6 +1230,7 @@ function pageClicks(){
         <td style="font-family:var(--mono);font-size:11px">${c.geo}</td>
         <td>${ivtBadge(c)}</td>
         <td>${incentBadge(c)}</td>
+        ${p.seesVisitor?`<td style="font-family:var(--mono);font-size:11px" title="${esc(c.referer||"")}">${c.referer?`<span${incentDomainOf(c)?' style="color:#B48AD6"':''}>${esc(refererHost(c.referer)||c.referer)}</span>`:'<span style="color:var(--t3)">—</span>'}</td>`:""}
         <td>${esc(c.offName)}</td>
         ${showPub?`<td>${esc(c.pubName)}</td>`:""}
         <td style="font-family:var(--mono);font-size:11px">${esc(c.sub_id)}</td>
