@@ -127,6 +127,11 @@ input[type="date"].inp{color-scheme:dark}
 .popover input[type=checkbox]{accent-color:var(--forest)}
 input[type=checkbox]{accent-color:var(--forest)}
 .lbl{display:flex;align-items:center;gap:6px;font-size:12px;color:var(--t2);cursor:pointer;white-space:nowrap}
+[data-tip]{cursor:help}
+.tipmark{color:var(--t3);font-size:10px;margin-left:3px;border:1px solid var(--line);border-radius:50%;width:13px;height:13px;display:inline-flex;align-items:center;justify-content:center;font-family:var(--fb);font-style:normal;vertical-align:1px}
+.dotted{border-bottom:1px dotted var(--t3)}
+#tipfloat{position:fixed;display:none;z-index:120;background:#0E1D14;border:1px solid var(--line);border-left:3px solid var(--gold);border-radius:2px;padding:9px 12px;font-size:11.5px;line-height:1.5;color:var(--t2);box-shadow:0 12px 34px rgba(0,0,0,.65);pointer-events:none;font-family:var(--fb);font-weight:400;text-transform:none;letter-spacing:0;text-align:left;white-space:normal}
+#tipfloat .tiplabel{display:block;font-family:var(--fd);font-weight:600;font-size:10px;letter-spacing:.18em;text-transform:uppercase;color:var(--gold);margin-bottom:4px}
 #toasts{position:fixed;right:16px;bottom:16px;z-index:99;display:flex;flex-direction:column;gap:8px;max-width:340px}
 .toast{background:var(--card);border:1px solid rgba(79,181,132,.4);border-left:3px solid var(--forest);border-radius:2px;padding:9px 13px;font-size:12.5px;color:var(--ink);box-shadow:0 8px 24px rgba(0,0,0,.5);animation:tin .18s ease-out}
 @keyframes tin{from{transform:translateY(8px);opacity:0}to{transform:none;opacity:1}}
@@ -150,6 +155,7 @@ height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
 <main id="main"></main>
 <div id="drawer"></div>
 <div id="toasts"></div>
+<div id="tipfloat"></div>
 <script>
 "use strict";
 // ═══════════════ seeded RNG ═══════════════
@@ -174,6 +180,8 @@ let DB = {
         revenues:[{country:"US",revenue:280},{country:"CA",revenue:240},{country:"AU",revenue:260},{country:"DE",revenue:220},{country:"UK",revenue:250}] },
       { id:22, name:"BetPeak Sports", event_name:"ftd", default_revenue:75, offer_url:"https://betpeak.example/join?cid={click_id}&s1={sub_id}&s3={sub3}",
         revenues:[{country:"US",revenue:90},{country:"CA",revenue:70},{country:"AU",revenue:85},{country:"DE",revenue:60},{country:"UK",revenue:80}] },
+      { id:23, name:"Nimbus Sweeps", event_name:"ftd", default_revenue:null, payout_model:"revshare", offer_url:"https://nimbus-sweeps.example/go?cid={click_id}&s1={sub_id}",
+        revenues:[] },
     ]},
   ],
   publishers: [
@@ -197,7 +205,44 @@ function pubById(id){ return DB.publishers.find(p=>p.id===id) || null; }
   const defs = [[41,11,1],[42,11,2],[43,12,1],[44,12,3],[45,21,2],[46,21,3],[47,22,1],[48,22,2]];
   DB.products = defs.map(([id,off,pub])=>({ id, offer_id:off, publisher_id:pub,
     payouts:(offerById(off).revenues||[]).map(r=>({country:r.country, payout:defPayout(r.revenue)})) }));
+  // The revshare offer: the advertiser sends the amount on the postback, so no
+  // rate card — the product carries the agreed publisher share instead.
+  DB.products.push({ id:49, offer_id:23, publisher_id:3, payouts:[], revshare_pct:80 });
 })();
+
+// ═══════════════ fraud: IVT screening + incent pool ═══════════════
+// What each verdict means in words, because "hosting_asn" is jargon and the
+// person reading it is deciding whether to argue with a publisher about it.
+const IVT_COPY = {
+  declared_bot: { label:"bot",
+    why:"the user agent identifies itself as a crawler or automation tool. Matched against the 1,500-pattern crawler corpus ported from vane-edge — replacing the 16-word regex the click path used to run." },
+  no_ua: { label:"no UA",
+    why:"the request carried no user agent at all, which no real browser does." },
+  hosting_asn: { label:"datacenter",
+    why:"the IP belongs to a hosting network rather than a consumer ISP — a server, a VPN or a proxy, not a phone on a carrier. Deliberately does NOT set bot=1: someone on a VPN is a person." },
+};
+const IVT_FLAG_NOTE  = "Flagged only; the click still redirected. Nothing blocks until an operator names the reason in the ivt_block_reasons setting.";
+const IVT_BLOCK_NOTE = "This click was blocked and never reached the advertiser — diverted to the fallback URL rather than a 404, so a misjudged human still lands somewhere real.";
+const INCENT_NOTE = "Incent traffic is not invalid traffic — the visitor is a real person on a real browser paid to click; most casino CPA terms prohibit that. Clicks are matched on the referrer's domain against a hand-curated pool — there is no signal to automate it on.";
+let INCENT_POOL = [
+  { domain:"flexrewards.net",  note:"cashback / rewards portal" },
+  { domain:"prizehamster.com", note:"paid-to-click sweepstakes" },
+];
+// The host of a referrer, or null when there isn't one.
+function refererHost(referer){
+  const v = (referer||"").trim(); if (!v) return null;
+  try { return new URL(v.includes("://")?v:"https://"+v).hostname.toLowerCase().replace(/^www\./,""); } catch(e){ return null; }
+}
+function normaliseDomain(input){
+  const host = refererHost(input);
+  return host && host.includes(".") ? host : null;
+}
+// A pool entry covers its subdomains — go.flexrewards.net is the same operation.
+function incentDomainOf(c){
+  const host = refererHost(c.referer); if (!host) return null;
+  for (const e of INCENT_POOL) if (host===e.domain || host.endsWith("."+e.domain)) return e.domain;
+  return null;
+}
 
 // ═══════════════ users & permissions (Admin) ═══════════════
 let USERS = [
@@ -276,18 +321,21 @@ function genFacts(){
     const day=dstrOf(dt), wknd=[0,6].includes(dt.getDay())?1.25:1;
     for (const pr of DB.products){
       const off=offerById(pr.offer_id); if(!off) continue;
-      const offW = {11:1.7,12:1.1,21:0.55,22:1.3}[off.id]||1;
+      const offW = {11:1.7,12:1.1,21:0.55,22:1.3,23:0.6}[off.id]||1;
+      const isRS = off.payout_model==="revshare";
       for (const g of GEOS){
         const geoW = g==="US"?1.6:g==="UK"?1.15:1;
         const daily = (18+rnd()*70) * offW * geoW * wknd;
-        const cr = {11:0.024,12:0.018,21:0.009,22:0.028}[off.id]||0.02;
+        const cr = {11:0.024,12:0.018,21:0.009,22:0.028,23:0.02}[off.id]||0.02;
         for (let h=0; h<24; h++){
           const clicks = Math.round(daily*HOURW[h]/HOURSUM*(0.7+rnd()*0.6));
           if (!clicks) continue;
           const exp_ = clicks*cr*(0.7+rnd()*0.6);
           const conv = Math.floor(exp_) + (rnd() < exp_%1 ? 1 : 0);
-          const revenue = conv * geoRev(off,g) * (0.92+rnd()*0.16);
-          const payout  = conv * geoPay(pr,g);
+          // Revshare: the advertiser values each conversion individually and
+          // sends the amount; payout = revenue × share, rounded to the cent.
+          const revenue = conv * (isRS ? 45*(0.6+rnd()*0.9) : geoRev(off,g)*(0.92+rnd()*0.16));
+          const payout  = isRS ? Math.round(revenue*(pr.revshare_pct||0))/100 : conv * geoPay(pr,g);
           FACTS.push({day, hour:h, prod:pr.id, off:off.id, pub:pr.publisher_id, geo:g, clicks, conv, revenue, payout});
         }
       }
@@ -302,37 +350,55 @@ const UAS = [
   "Mozilla/5.0 (Macintosh; Intel Mac OS X 14_5) AppleWebKit/605.1.15 Version/17.5 Safari/605.1.15",
 ];
 const REFS = ["https://www.facebook.com/","https://t.co/x9dQ2","https://news.clickforge.example/top-offers","https://www.google.com/", null, null];
+const BOT_UAS = [
+  "Mozilla/5.0 (compatible; Googlebot/2.1; +http://www.google.com/bot.html)",
+  "python-requests/2.31.0",
+  "Mozilla/5.0 (compatible; AhrefsBot/7.0; +http://ahrefs.com/robot/)",
+];
+const HOSTING = [[16276,"OVH SAS"],[14061,"DigitalOcean, LLC"],[24940,"Hetzner Online GmbH"]];
+const INCENT_REFS = ["https://go.flexrewards.net/task/8821","https://flexrewards.net/offers/casino","https://www.prizehamster.com/earn/click?id=44"];
+const FALLBACK_URL = "https://vane-labs.com/offers";
 const hex = n => [...Array(n)].map(()=>Math.floor(rnd()*16).toString(16)).join("");
 function genClicks(){
   CLICKS = [];
   const now = Date.now();
   for (let i=0;i<150;i++){
     const pr = pick(DB.products), off = offerById(pr.offer_id), pub = pubById(pr.publisher_id), adv = advOfOffer(pr.offer_id);
+    const isRS = off.payout_model==="revshare";
     const g = pick(GEOS);
     const t = now - rnd()*3*864e5;
     const id = "c"+hex(15);
     const sub = "fb_"+Math.floor(1000+rnd()*9000);
     const sub3 = pick(["creative_a","creative_b","story_v2","banner_728",null]);
     const gclid = rnd()<0.3 ? "EAIaIQ"+hex(12) : null;
-    const bot = rnd()<0.06;
+    // ── IVT screen + incent seeding ──
+    let ivt_reason=null, ivt_severity=null, ua=pick(UAS), asn=null, as_org=null, referer=pick(REFS), blocked=false;
+    if (i<3)       { ivt_reason="declared_bot"; ivt_severity="flag"; ua=pick(BOT_UAS); }
+    else if (i<5)  { ivt_reason="no_ua"; ivt_severity="flag"; ua=null; }
+    else if (i<8)  { ivt_reason="hosting_asn"; ivt_severity="flag"; [asn,as_org]=HOSTING[i-5]; }
+    else if (i===8){ ivt_reason="declared_bot"; ivt_severity="block"; ua=BOT_UAS[1]; blocked=true; }
+    else if (i<14) { referer=INCENT_REFS[(i-9)%INCENT_REFS.length]; }
+    const bot = ivt_reason==="declared_bot" || ivt_reason==="no_ua";   // hosting deliberately does not set bot=1
     const test = false;
-    const conv = !bot && rnd()<0.22;
+    const conv = !bot && !blocked && rnd()<0.22;
     const params = {product:String(pr.id), sub_id:sub};
     if (sub3) params.sub3 = sub3;
     if (gclid) params.gclid = gclid;
     const qs = Object.entries(params).map(([k,v])=>k+"="+v).join("&");
     const request_url  = `https://${pub.click_host}/click?${qs}`;
-    const redirect_url = (off.offer_url||"https://advertiser.example/lp?cid={click_id}")
-      .replace("{click_id}",id).replace("{sub_id}",sub).replace("{sub3}",sub3||"");
-    const rev = conv ? geoRev(off,g)*(0.92+rnd()*0.16) : null;
-    const pay = conv ? geoPay(pr,g) : null;
+    const redirect_url = blocked ? FALLBACK_URL
+      : (off.offer_url||"https://advertiser.example/lp?cid={click_id}")
+        .replace("{click_id}",id).replace("{sub_id}",sub).replace("{sub3}",sub3||"");
+    const rev = conv ? (isRS ? 45*(0.6+rnd()*0.9) : geoRev(off,g)*(0.92+rnd()*0.16)) : null;
+    const pay = conv ? (isRS ? Math.round(rev*(pr.revshare_pct||0))/100 : geoPay(pr,g)) : null;
     const hasPb = !!(pub.postback_url||"").trim();
     const pbFail = conv && hasPb && rnd()<0.08;
     CLICKS.push({
       id, t, prod:pr.id, offName:off.name, advName:adv.name, pubName:pub.name, geo:g,
-      ip:`203.0.113.${10+Math.floor(rnd()*200)}`, ua:pick(UAS), referer:pick(REFS),
+      ip:`203.0.113.${10+Math.floor(rnd()*200)}`, ua, referer,
       bot, test, gclid, sub_id:sub, sub3, sub4:null, sub5:rnd()<0.15?"aud_"+Math.floor(rnd()*90):null, sub6:null, sub7:null,
       request_url, redirect_url, params,
+      ivt_reason, ivt_severity, asn, as_org, is_fallback:blocked,
       conv, event: conv?off.event_name:null, conv_at: conv? t+rnd()*3600e3*5 : null,
       revenue:rev, payout:pay,
       pb_sent: conv && hasPb && !pbFail, pb_attempts: conv ? (hasPb ? (pbFail?3:1) : 0) : 0,
@@ -341,9 +407,21 @@ function genClicks(){
   CLICKS.sort((a,b)=>b.t-a.t);
 }
 function eventFromClick(c){
+  // Raw postbacks stored verbatim — never reconstructed from today's template.
+  const predates = rnd()<0.12;
+  const raw_in = predates ? null
+    : `https://api.traquery.tech/postback?click_id=${c.id}&key=•••&event=${c.event}&payout=${(c.revenue||0).toFixed(2)}`;
+  const raw_in2 = !predates && rnd()<0.15 ? raw_in : null;   // a duplicate arrived; both raws kept
+  const pub = DB.publishers.find(p=>p.name===c.pubName);
+  const raw_out = predates || !c.pb_attempts ? null
+    : (pub&&pub.postback_url?pub.postback_url:"https://publisher.example/s2s?cid={sub_id}&payout={payout}")
+      .replace("{click_id}",c.id).replace("{sub_id}",c.sub_id).replace("{payout}",(c.payout||0).toFixed(2))
+      .replace("{event}",c.event).replace("{country}",c.geo);
   return { id:"e"+hex(12), t:c.conv_at, event:c.event, offName:c.offName, advName:c.advName, pubName:c.pubName,
     geo:c.geo, click_id:c.id, gclid:c.gclid, sub_id:c.sub_id, sub3:c.sub3, sub4:c.sub4, sub5:c.sub5, sub6:c.sub6, sub7:c.sub7,
-    revenue:c.revenue, payout:c.payout, referrer:c.referer, google: !!c.gclid, is_test:false };
+    revenue:c.revenue, payout:c.payout, referrer:c.referer, google: !!c.gclid, is_test:false,
+    raw_in, raw_in2, raw_out, out_resp: c.pb_sent ? "1" : null,
+    out_sent: c.pb_sent, out_attempts: c.pb_attempts };
 }
 function genEvents(){
   EVENTS = CLICKS.filter(c=>c.conv).map(eventFromClick);
@@ -445,6 +523,34 @@ function copyText(txt,msg){
 }
 const esc = s => String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/"/g,"&quot;");
 
+// ═══════════════ reusable hover-popup explainer ═══════════════
+// One floating popover for every ⓘ / badge on the page: hover shows it,
+// tap toggles it (mobile), and position:fixed keeps it clear of the
+// table scroll containers that would clip an inline popover.
+function tipAttr(label, body){ return `data-tip="1" data-tiplabel="${esc(label)}" data-tipbody="${esc(body)}"`; }
+function tipMark(label, body){ return `<i class="tipmark" ${tipAttr(label, body)}>i</i>`; }
+let tipEl = null;
+function showTipFor(el){
+  const tf = document.getElementById("tipfloat");
+  tipEl = el;
+  tf.innerHTML = `<span class="tiplabel">${esc(el.dataset.tiplabel)}</span>${esc(el.dataset.tipbody)}`;
+  tf.style.display = "block";
+  const r = el.getBoundingClientRect(), w = Math.min(290, innerWidth-16);
+  tf.style.width = w+"px";
+  tf.style.left = Math.min(Math.max(8, r.left + r.width/2 - w/2), innerWidth-w-8)+"px";
+  const h = tf.offsetHeight;
+  tf.style.top = (r.top - h - 8 < 8 ? r.bottom + 8 : r.top - h - 8)+"px";
+}
+function hideTip(){ tipEl = null; const tf = document.getElementById("tipfloat"); if (tf) tf.style.display = "none"; }
+document.addEventListener("mouseover", e => {
+  const t = e.target.closest && e.target.closest("[data-tip]");
+  if (t) showTipFor(t); else if (tipEl) hideTip();
+});
+document.addEventListener("click", e => {
+  const t = e.target.closest && e.target.closest("[data-tip]");
+  if (t) { tipEl === t ? hideTip() : showTipFor(t); }
+}, true);
+
 // ═══════════════ UI state ═══════════════
 let tab = "dashboard";
 // dashboard
@@ -459,7 +565,7 @@ let VIEWS = [
 let selView="", saveName="", schedEmails=["demo@vane-labs.com"], schedHour=9, nextViewId=3;
 // events
 let evPreset="7d", evRange=rangeFor("7d"), evFilter="", evColFilters={}, evSortK=null, evSortAsc=true;
-let colSelOpen=false, expandedEv=null, testOpen=false, rejectsOpen=false, testProd=41, TESTLOG=[];
+let colSelOpen=false, expandedEv=null, testOpen=false, rejectsOpen=false, testProd=41, TESTLOG=[], refireArm=null;
 const EV_COLS = [
   ["t","Time"],["event","Event"],["offer","Offer"],["country","Country"],["source","Publisher"],
   ["click_id","Click ID"],["gclid","gclid"],["sub_id","Sub ID"],["sub3","Sub3"],["sub4","Sub4"],
@@ -469,7 +575,7 @@ const EV_COLS = [
 const EV_DEFAULT = ["t","event","offer","country","source","click_id","revenue","payout"];
 let evCols=[...EV_DEFAULT];
 // clicks
-let ckPreset="7d", ckConvOnly=false, ckBots=false, ckSearch="", openClick=null;
+let ckPreset="7d", ckConvOnly=false, ckBots=false, ckIvt="all", ckIncent="all", ckSearch="", openClick=null;
 // hierarchy
 let hOpenAdv={}, hAdvParams={}, hPubParams={}, editOffer=null, addOfferFor=null, addAdvOpen=false, prodOpen={}, npOffer="", npPub="";
 // admin
@@ -835,6 +941,52 @@ function toggleEvCol(k){
 function resetEvCols(){ evCols=[...EV_DEFAULT]; render(); }
 function toggleColSel(){ colSelOpen=!colSelOpen; render(); }
 function toggleEv(id){ expandedEv=expandedEv===id?null:id; render(); }
+// Re-fire reaches a partner's live ledger, so it is admin-only and two-click.
+function refire(id){
+  const ev=EVENTS.find(e=>e.id===id); if(!ev) return;
+  ev.out_attempts=(ev.out_attempts||0)+1; ev.out_sent=true; ev.out_resp="1";
+  const pub=DB.publishers.find(p=>p.name===ev.pubName);
+  ev.raw_out=((pub&&pub.postback_url)||"https://publisher.example/s2s?cid={sub_id}&payout={payout}")
+    .replace("{click_id}",ev.click_id||"").replace("{sub_id}",ev.sub_id||"")
+    .replace("{payout}",(ev.payout||0).toFixed(2)).replace("{event}",ev.event||"").replace("{country}",ev.geo||"");
+  refireArm=null;
+  toast(`✓ Re-fired — delivered on attempt ${ev.out_attempts}, rebuilt from the publisher's current postback URL`);
+  render();
+}
+function pbTrace(ev){
+  const p=P();
+  if(p.type!=="internal") return "";
+  const cap = u => u ? `<span style="font-family:var(--mono);font-size:11px;color:var(--t2);word-break:break-all">${esc(u)}</span>`
+    : `<span style="color:var(--t3)">not captured — this event predates the raw-postback log</span>`;
+  const st = ev.out_sent ? `<span class="pos">delivered</span>`
+    : ev.out_attempts ? `<span class="neg">failed after ${ev.out_attempts} attempt(s)</span>`
+    : ev.is_test ? `<span style="color:var(--t3)">not sent — test conversion</span>`
+    : `<span style="color:var(--t3)">not sent</span>`;
+  return `
+  <div style="margin-top:10px">
+    <b>Raw postbacks${tipMark("Postback trace","Both legs of the conversion, stored verbatim at the moment they happened — deliberately never reconstructed from the publisher's current postback template, which gets corrected over time and would show today's URL for yesterday's call.")}</b>
+    <div style="background:var(--card);border-radius:2px;padding:6px 10px;margin-top:4px">
+      <div style="font-size:11px;color:var(--t3)">← inbound · from the advertiser <span style="color:var(--t3)">(key masked)</span></div>
+      ${cap(ev.raw_in)}
+    </div>
+    ${ev.raw_in2?`<div style="background:var(--card);border-radius:2px;padding:6px 10px;margin-top:4px">
+      <div style="font-size:11px;color:#E0B968">← inbound · duplicate — dropped, logged verbatim</div>
+      ${cap(ev.raw_in2)}
+    </div>`:""}
+    <div style="background:var(--card);border-radius:2px;padding:6px 10px;margin-top:4px">
+      <div style="font-size:11px;color:var(--t3)">→ outbound · to the publisher · ${st}</div>
+      ${cap(ev.raw_out)}
+      ${ev.out_resp?`<div style="font-size:11px;font-family:var(--mono);color:var(--t3)">answered: ${esc(ev.out_resp)}</div>`:""}
+    </div>
+    ${p.admin&&!viewAs&&ev.click_id?`<div style="margin-top:6px">
+      ${refireArm===ev.id?`
+        <div style="font-size:11px;color:#E0B968;margin-bottom:4px">Sends the publisher another conversion, rebuilt from their current postback URL. It does not replace the one they already have — expect either a duplicate or a rejection, and tell them either way.</div>
+        <button class="abtn confirm" onclick="event.stopPropagation();refire('${ev.id}')">Send it</button>
+        <button class="abtn" onclick="event.stopPropagation();refireArm=null;render()">Cancel</button>`
+      :`<button class="abtn" ${tipAttr("Re-fire publisher postback","Admin-only. Some conversions reach the partner in the wrong shape — an empty sum, a stale template. This sends the conversion again through the normal delivery path, rebuilt from the publisher's CURRENT template, and records it like any other send.")} onclick="event.stopPropagation();refireArm='${ev.id}';render()">Re-fire this postback</button>`}
+    </div>`:""}
+  </div>`;
+}
 function markTest(id){
   const ev=EVENTS.find(e=>e.id===id); if(!ev) return;
   ev.is_test=!ev.is_test;
@@ -845,9 +997,13 @@ function fireTest(){
   const pr=DB.products.find(p=>p.id===testProd)||DB.products[0]; if(!pr){ toast("No products — add one in Hierarchy"); return; }
   const off=offerById(pr.offer_id), pub=pubById(pr.publisher_id), adv=advOfOffer(pr.offer_id);
   const id="c"+hex(15), g="US";
+  const isRS=off.payout_model==="revshare";
+  const rev=isRS?45:geoRev(off,g), pay=isRS?Math.round(rev*(pr.revshare_pct||0))/100:geoPay(pr,g);
   EVENTS.unshift({ id:"e"+hex(12), t:Date.now(), event:off.event_name||"conv", offName:off.name, advName:adv.name, pubName:pub.name,
     geo:g, click_id:id, gclid:null, sub_id:"test-"+hex(4), sub3:"test-site", sub4:null, sub5:null, sub6:null, sub7:null,
-    revenue:geoRev(off,g), payout:geoPay(pr,g), referrer:null, google:false, is_test:true });
+    revenue:rev, payout:pay, referrer:null, google:false, is_test:true,
+    raw_in:`https://api.traquery.tech/postback?click_id=${id}&key=•••&event=${off.event_name||"conv"}`, raw_in2:null,
+    raw_out:null, out_resp:null, out_sent:false, out_attempts:0 });
   TESTLOG.unshift({ ts:Date.now(), label:`${off.name} @ ${pub.name}`, clickId:id, ok:true, detail:"200 ok — stored (TEST)", ms:Math.round(60+Math.random()*180) });
   toast("⚡ Test conversion fired — flagged TEST, excluded from dashboard & P&L figures");
   render();
@@ -887,7 +1043,7 @@ function pageEvents(){
     ? `<button class="abtn" onclick="testOpen=true;render()">⚡ Test Event</button>`
     : `<div class="panelbox" style="width:100%">
         <div class="ph"><span style="font-weight:600;font-size:13px">⚡ Test Event</span>
-          <span style="font-size:11px;color:var(--t3)">fires the real loop in production: /click mints a click_id, then /postback fires with the advertiser's key — flagged TEST, never counted in P&amp;L</span>
+          <span style="font-size:11px;color:var(--t3)">fires the real loop in production: /click mints a click_id, then /postback fires with the advertiser's key — flagged <span class="dotted" ${tipAttr("Test-conversion hygiene","A test conversion is flagged is_test, excluded from every dashboard and P&L figure — and it does not fire the publisher's postback, so a rehearsal never lands in a partner's ledger. The admin re-fire button is unaffected.")}>TEST, never counted in P&amp;L, and never notifies the publisher</span></span>
           <button class="abtn" style="margin-left:auto" onclick="testOpen=false;render()">✕</button></div>
         <div class="b" style="padding:12px 14px">
           <div class="controls" style="margin-bottom:${TESTLOG.length?"10px":"0"}">
@@ -911,7 +1067,7 @@ function pageEvents(){
   const rejectsPanel = !p.canEdit ? "" : (!rejectsOpen
     ? `<button class="abtn" onclick="rejectsOpen=true;render()">🔍 Integration debugger</button>`
     : `<div class="panelbox" style="width:100%">
-        <div class="ph"><span style="font-weight:600;font-size:13px">🔍 Integration debugger</span>
+        <div class="ph"><span style="font-weight:600;font-size:13px">🔍 Integration debugger${tipMark("Postback authentication","Each advertiser has its own secret postback key. A postback carrying a wrong key or an unknown click_id is rejected and logged here with the raw params that arrived — never booked. During partner onboarding this is where misconfigured macros surface instead of vanishing as silent 400s.")}</span>
           <span style="font-size:11px;color:var(--t3)">rejected postbacks &amp; clicks — last 100</span>
           <button class="abtn" style="margin-left:auto" onclick="rejectsOpen=false;render()">✕</button></div>
         <div class="tbl-wrap"><table>
@@ -966,6 +1122,7 @@ function pageEvents(){
             <span class="${e.google?"pos":""}" style="${e.google?"":"color:var(--t3)"}">${e.google?"✓ conversion sent":"— not sent (no gclid)"}</span>
             ${e.gclid?`<span style="color:var(--t3);font-family:var(--mono)">gclid: ${esc(e.gclid)}</span>`:""}
           </div>
+          ${pbTrace(e)}
         </td></tr>`:""}`).join("")}
     </table></div>
     ${!rows.length?`<div class="note" style="text-align:center;padding:24px">No events match the current filters.</div>`:""}
@@ -984,10 +1141,48 @@ function clicksShown(){
   const r=rangeFor(ckPreset);
   let rows=CLICKS.filter(c=>{ const d=dstrOf(new Date(c.t)); return d>=r.from&&d<=r.to; });
   if(ckConvOnly) rows=rows.filter(c=>c.conv);
-  if(!ckBots) rows=rows.filter(c=>!c.bot);
+  // "Screened only" overrides the bot exclusion — you asked to see them.
+  if(!ckBots && ckIvt!=="1") rows=rows.filter(c=>!c.bot);
+  if(ckIvt==="1") rows=rows.filter(c=>c.ivt_reason);
+  else if(ckIvt==="0") rows=rows.filter(c=>!c.ivt_reason);
+  if(ckIncent==="1") rows=rows.filter(c=>incentDomainOf(c));
+  else if(ckIncent==="0") rows=rows.filter(c=>!incentDomainOf(c));
   const s=ckSearch.trim().toLowerCase();
   if(s) rows=rows.filter(c=>[c.id,c.geo,c.ip,c.sub_id,c.gclid,c.offName,c.pubName,c.redirect_url,c.request_url,c.event].some(v=>(v??"").toString().toLowerCase().includes(s)));
   return rows;
+}
+function ivtBadge(c){
+  if(!c.ivt_reason) return `<span style="color:var(--t3);font-size:10px">—</span>`;
+  const copy=IVT_COPY[c.ivt_reason]||{label:c.ivt_reason,why:""};
+  const blocked=c.ivt_severity==="block";
+  return `<span class="badge ${blocked?"no":"amber"}" ${tipAttr("IVT screen — "+copy.label, copy.why+" "+(blocked?IVT_BLOCK_NOTE:IVT_FLAG_NOTE))}>${blocked?"⛔":"⚑"} ${copy.label}</span>`;
+}
+function incentBadge(c){
+  const d=incentDomainOf(c);
+  if(!d) return `<span style="color:var(--t3);font-size:10px">—</span>`;
+  return `<span class="badge purple" ${tipAttr("Incent pool — "+d, "Referrer matched "+d+" in the incent pool. "+INCENT_NOTE)}>⛃ incent</span>`;
+}
+function exportClicks(){
+  const p=P(), sv=p.seesVisitor, rows=clicksShown();
+  const cols=[
+    ["Time",c=>new Date(c.t).toISOString()],["Click ID",c=>c.id],["Country",c=>c.geo],
+    ...(sv?[["IP",c=>c.ip]]:[]),
+    ["Advertiser",c=>maskAdv(c.advName)],["Offer",c=>c.offName],["Publisher",c=>c.pubName],["Product ID",c=>c.prod],
+    ["Sub ID",c=>c.sub_id],["sub3",c=>c.sub3],["gclid",c=>c.gclid],
+    ["Raw request URL",c=>c.request_url],["Redirect URL",c=>c.redirect_url],
+    ...(sv?[["User agent",c=>c.ua],["Referer",c=>c.referer]]:[]),
+    ["Bot",c=>c.bot?"yes":"no"],
+    ["IVT reason",c=>c.ivt_reason],["Incent",c=>{const d=incentDomainOf(c);return d?`yes (${d})`:"no";}],["IVT severity",c=>c.ivt_severity],
+    ...(sv?[["ASN",c=>c.asn],["Network",c=>c.as_org]]:[]),
+    ["Test",c=>c.test?"yes":"no"],["Converted",c=>c.conv?"yes":"no"],["Event",c=>c.event],
+    ["Converted at",c=>c.conv_at?new Date(c.conv_at).toISOString():""],
+    ...(p.rev?[["Revenue",c=>c.revenue!=null?c.revenue.toFixed(2):""]]:[]),
+    ...(p.pay?[["Payout",c=>c.payout!=null?c.payout.toFixed(2):""]]:[]),
+    ["Postback",c=>!c.conv?"":c.pb_sent?"fired":c.pb_attempts?"failed":"none"],
+    ["Postback attempts",c=>c.pb_attempts],
+  ];
+  csvDownload(`traquery-clicks-${dstrOf(new Date())}.csv`, cols.map(x=>x[0]), rows.map(c=>cols.map(x=>x[1](c)??"")));
+  toast("✓ CSV downloaded — "+rows.length+" rows");
 }
 function pbChip(c){
   if(!c.conv) return `<span style="color:var(--t3)">—</span>`;
@@ -999,27 +1194,45 @@ function pageClicks(){
   const p=P();
   const rows=clicksShown();
   const showPub=p.type!=="advertiser";
-  const nCols=6+(showPub?1:0)+(p.rev?1:0)+(p.pay?1:0)+1;
+  const nCols=8+(showPub?1:0)+(p.rev?1:0)+(p.pay?1:0)+1;
   return `
   <div class="controls">
     <span class="chiprow">${[["today","Today"],["yesterday","Yesterday"],["7d","Last 7d"]].map(([k,l])=>`<span class="chip ${ckPreset===k?"on":""}" onclick="setCkPreset('${k}')">${l}</span>`).join("")}</span>
-    <input id="f-cksearch" class="inp" style="width:220px" placeholder="search click id, sub, country, URL…" value="${esc(ckSearch)}" oninput="ckSearch=this.value;render()">
+    <input id="f-cksearch" class="inp" style="width:200px" placeholder="search click id, sub, country, URL…" value="${esc(ckSearch)}" oninput="ckSearch=this.value;render()">
     <span class="chip ${ckConvOnly?"on":""}" onclick="ckConvOnly=!ckConvOnly;render()">Converted only</span>
     <label class="lbl"><input type="checkbox" ${ckBots?"checked":""} onchange="ckBots=this.checked;render()"> Include bots</label>
-    <span style="margin-left:auto;font-size:11.5px;color:var(--t3)">${rows.length.toLocaleString()} clicks</span>
+    <select class="inp" title="the IVT screen's verdict" onchange="ckIvt=this.value;render()">
+      <option value="all" ${ckIvt==="all"?"selected":""}>Any traffic quality</option>
+      <option value="1" ${ckIvt==="1"?"selected":""}>Screened only</option>
+      <option value="0" ${ckIvt==="0"?"selected":""}>Clean only</option>
+    </select>
+    <select class="inp" title="whether the referrer is in the incent pool" onchange="ckIncent=this.value;render()">
+      <option value="all" ${ckIncent==="all"?"selected":""}>Any source</option>
+      <option value="1" ${ckIncent==="1"?"selected":""}>Incent only</option>
+      <option value="0" ${ckIncent==="0"?"selected":""}>Non-incent only</option>
+    </select>
+    <span style="margin-left:auto;display:flex;align-items:center;gap:10px">
+      <span style="font-size:11.5px;color:var(--t3)">${rows.length.toLocaleString()} clicks</span>
+      <button class="abtn" onclick="exportClicks()">⬇ Export CSV</button>
+    </span>
   </div>
   <div class="card">
     <div class="tbl-wrap"><table>
-      <tr><th>Time</th><th>Click ID</th><th>Geo</th><th>Offer</th>${showPub?"<th>Publisher</th>":""}<th>Sub ID</th><th>Conversion</th>${p.rev?'<th class="num">Revenue</th>':""}${p.pay?'<th class="num">Payout</th>':""}<th>Postback</th></tr>
+      <tr><th>Time</th><th>Click ID</th><th>Geo</th>
+      <th>Quality${tipMark("IVT screening","Every inbound click runs through the IVT screen ported from vane-edge: the user agent against a 1,500-pattern crawler corpus, and the IP's network against a hosting heuristic. Flagged clicks still redirect; blocked ones divert to the fallback URL. "+IVT_FLAG_NOTE)}</th>
+      <th>Incent${tipMark("Incent pool",INCENT_NOTE)}</th>
+      <th>Offer</th>${showPub?"<th>Publisher</th>":""}<th>Sub ID</th><th>Conversion</th>${p.rev?'<th class="num">Revenue</th>':""}${p.pay?'<th class="num">Payout</th>':""}<th>Postback</th></tr>
       ${rows.slice(0,60).map((c,i)=>`
       <tr style="cursor:pointer;${c.test?"opacity:.6":""}" onclick="openClick=openClick==='${c.id}'?null:'${c.id}';render()">
         <td style="white-space:nowrap"><span style="color:var(--t3);font-size:10px">${openClick===c.id?"▼":"▶"}</span> <span style="font-family:var(--mono);font-size:11px">${fmtDT(c.t)}</span></td>
         <td style="font-family:var(--mono);font-size:11px">${c.id.slice(0,12)}…</td>
         <td style="font-family:var(--mono);font-size:11px">${c.geo}</td>
+        <td>${ivtBadge(c)}</td>
+        <td>${incentBadge(c)}</td>
         <td>${esc(c.offName)}</td>
         ${showPub?`<td>${esc(c.pubName)}</td>`:""}
         <td style="font-family:var(--mono);font-size:11px">${esc(c.sub_id)}</td>
-        <td>${c.bot?'<span class="badge no">bot</span>':c.conv?`<span class="badge ok">✓ ${c.event}</span>`:'<span style="color:var(--t3)">—</span>'}</td>
+        <td>${c.is_fallback?`<span class="badge amber" ${tipAttr("Fallback","The click could not serve — blocked by the IVT screen or its product paused — so the visitor went to the fallback URL instead of a 404. Logged, badged, never counted as offer traffic.")}>⤳ fallback</span>`:c.conv?`<span class="badge ok">✓ ${c.event}</span>`:'<span style="color:var(--t3)">—</span>'}</td>
         ${p.rev?`<td class="num">${c.revenue!=null?"$"+c.revenue.toFixed(2):"—"}</td>`:""}
         ${p.pay?`<td class="num gold">${c.payout!=null?"$"+c.payout.toFixed(2):"—"}</td>`:""}
         <td>${pbChip(c)}</td>
@@ -1040,8 +1253,11 @@ function pageClicks(){
           <div><b>Request</b>
             <div class="kv"><span class="k">Country</span><span class="v">${c.geo}</span></div>
             ${p.seesVisitor?`<div class="kv"><span class="k">IP</span><span class="v" style="font-family:var(--mono)">${c.ip}</span></div>
-            <div class="kv"><span class="k">User agent</span><span class="v" style="font-family:var(--mono);font-size:11px">${esc(c.ua)}</span></div>
-            <div class="kv"><span class="k">Referer</span><span class="v">${c.referer?esc(c.referer):"—"}</span></div>`:`<div class="kv"><span class="k">IP / UA / referer</span><span class="v" style="color:var(--t3)">internal accounts only</span></div>`}
+            ${c.as_org?`<div class="kv"><span class="k">Network</span><span class="v" style="font-family:var(--mono)">AS${c.asn} ${esc(c.as_org)}</span></div>`:""}
+            <div class="kv"><span class="k">User agent</span><span class="v" style="font-family:var(--mono);font-size:11px">${c.ua?esc(c.ua):"— none sent —"}</span></div>
+            <div class="kv"><span class="k">Referer</span><span class="v">${c.referer?esc(c.referer):"—"}</span></div>`:`<div class="kv"><span class="k">IP / UA / network</span><span class="v" style="color:var(--t3)">internal accounts only</span></div>`}
+            <div class="kv"><span class="k">IVT screen</span><span class="v">${c.ivt_reason?`${(IVT_COPY[c.ivt_reason]||{}).label||c.ivt_reason} (${c.ivt_severity}) — ${(IVT_COPY[c.ivt_reason]||{}).why||""}`:"clean"}</span></div>
+            <div class="kv"><span class="k">Incent</span><span class="v">${incentDomainOf(c)?`referrer matched ${incentDomainOf(c)} in the incent pool`:"no"}</span></div>
             <div class="kv"><span class="k">Bot</span><span class="v">${c.bot?"yes — excluded from figures":"no"}</span></div>
             <div class="kv"><span class="k">Test</span><span class="v">${c.test?"yes — excluded from books":"no"}</span></div>
             ${c.gclid?`<div class="kv"><span class="k">gclid</span><span class="v" style="font-family:var(--mono)">${esc(c.gclid)}</span></div>`:""}
@@ -1108,10 +1324,20 @@ function saveOffer(id){
   const g=id2=>document.getElementById(id2);
   o.name=(g("eo-name").value||o.name).trim()||o.name;
   o.event_name=g("eo-event").value||null;
+  o.payout_model=g("eo-model").value==="revshare"?"revshare":"geo";
   const rev=g("eo-rev").value; o.default_revenue=rev!==""?parseFloat(rev):null;
   o.offer_url=g("eo-url").value.trim()||null;
   o.revenues=parseGeoAmounts(g("eo-geo").value).map(({country,amount})=>({country,revenue:amount}));
   editOffer=null; toast("✓ Offer saved"); render();
+}
+function saveShare(prId){
+  const pr=DB.products.find(p=>p.id===prId); if(!pr) return;
+  const el=document.getElementById("rs-"+prId); const v=(el&&el.value||"").trim();
+  const n=v===""?null:parseFloat(v);
+  if(n!=null&&(!Number.isFinite(n)||n<0||n>100)){ toast("a share is between 0 and 100"); return; }
+  pr.revshare_pct=n;
+  toast(n==null?"⚠ Share cleared — this product now books revenue and pays nothing, and raises an alert on its first conversion":"✓ Share saved — payout = revenue × "+n+"%, rounded to the nearest cent");
+  render();
 }
 function delOffer(id){
   const o=offerById(id); if(!o) return;
@@ -1146,6 +1372,13 @@ function addProduct(){
   if(DB.products.some(p=>p.offer_id===off&&p.publisher_id===pub)){ toast("That offer already runs on this publisher"); return; }
   const id=Math.max(40,...DB.products.map(p=>p.id))+1;
   const o=offerById(off);
+  if(o.payout_model==="revshare"){
+    // No rate card to seed from — start on the standard 80% split so the two
+    // pricing models default to the same economics.
+    DB.products.push({id,offer_id:off,publisher_id:pub,payouts:[],revshare_pct:80});
+    npOffer=""; npPub="";
+    toast(`✓ Product #${id} created — revshare, publisher share starts on the standard 80% split`); render(); return;
+  }
   DB.products.push({id,offer_id:off,publisher_id:pub,payouts:(o.revenues||[]).map(r=>({country:r.country,payout:defPayout(r.revenue)}))});
   npOffer=""; npPub="";
   toast(`✓ Product #${id} created — payouts defaulted to 20% margin, rounded down`); render();
@@ -1208,6 +1441,11 @@ function offerRowHtml(o){
             <option value="">— none (every postback paid)</option>
             ${DB.event_names.map(ev=>`<option value="${ev.param}" ${o.event_name===ev.param?"selected":""}>${ev.param} — ${esc(ev.name)}</option>`).join("")}
           </select></span>
+        <span style="width:190px"><span class="slab" style="display:block;margin-bottom:3px">Payout model${tipMark("Revshare pricing","The rate card assumes a conversion is worth the same every time. Under revshare, the advertiser values each conversion individually and sends the amount on the postback; the only fixed term is the publisher's share, agreed per product. Payout = revenue × share, rounded to the nearest cent.")}</span>
+          <select id="eo-model" class="inp" style="width:100%">
+            <option value="geo" ${o.payout_model!=="revshare"?"selected":""}>Rate card — fixed per geo</option>
+            <option value="revshare" ${o.payout_model==="revshare"?"selected":""}>Revshare — share of revenue</option>
+          </select></span>
         <span style="width:130px"><span class="slab" style="display:block;margin-bottom:3px">Default revenue ($)</span>
           <input id="eo-rev" class="inp" type="number" step="0.01" style="width:100%" value="${o.default_revenue!=null?o.default_revenue:""}" placeholder="0.00"></span>
       </div>
@@ -1226,6 +1464,7 @@ function offerRowHtml(o){
     <span style="flex:1;font-weight:500">${esc(o.name)}</span>
     <span style="font-size:11px;color:var(--t3)">ID #${o.id}</span>
     ${o.event_name?`<span class="badge ok" style="font-family:var(--mono)" title="paid event">${o.event_name}</span>`:""}
+    ${o.payout_model==="revshare"?`<span class="badge purple" ${tipAttr("Revshare — share of revenue","The advertiser values each conversion individually and sends the amount on the postback; there is no rate card to build. The only fixed term is the publisher's share, agreed on each product.")}>revshare</span>`:""}
     ${(o.revenues||[]).length?`<span class="badge ok" style="font-family:var(--mono)" title="${(o.revenues||[]).map(r=>r.country+":"+r.revenue).join("  ")}">rev ×${o.revenues.length}</span>`:""}
     <button class="abtn" onclick="editOffer=${o.id};render()">Edit</button>
     <button class="abtn danger" onclick="delOffer(${o.id})">Delete</button>
@@ -1270,7 +1509,7 @@ function pageHierarchy(){
         <span class="tag p">P</span>
         <span style="width:140px;font-weight:500">${esc(p.name)}</span>
         <span style="font-size:11px;color:var(--t3)">ID #${p.id}</span>
-        <span class="urlchip" title="resolved click-domain pool — click links are minted on this host" onclick="copyText('${p.click_host}')">${p.click_host}</span>
+        <span class="urlchip" ${tipAttr("Click-domain pool","Click links are minted on a burnable browser-facing domain pool, kept separate from the S2S/API domain. Burning a domain auto-promotes the oldest matching standby, and every newly copied link uses it immediately — links already placed must be re-placed on the publisher's side.")} onclick="copyText('${p.click_host}')">${p.click_host}</span>
         <input id="pu-${p.id}" class="inp mono" style="flex:1;min-width:220px" value="${esc(p.postback_url||"")}" placeholder="s2s URL — {click_id} {sub_id} {payout} {event} {country}">
         <button class="abtn" onclick="savePub(${p.id})">Save</button>
         <button class="abtn" onclick="hPubParams[${p.id}]=!hPubParams[${p.id}];render()">${params?"Hide params":"Params ("+Object.keys(p.param_map||{}).length+")"}</button>
@@ -1295,13 +1534,27 @@ function pageHierarchy(){
       <div class="hr-head">
         <span class="pid" title="Product ID — use in the click link">#${pr.id}</span>
         <span><span style="color:#E0B968">${esc(o?o.name:"offer #"+pr.offer_id)}</span><span style="color:var(--t3)"> @ </span><span style="color:#B48AD6">${esc(pb?pb.name:"pub #"+pr.publisher_id)}</span></span>
-        <span class="badge ok" style="font-family:var(--mono)">payout ×${pr.payouts.length}</span>
+        ${o&&o.payout_model==="revshare"
+          ? `<span class="badge purple" ${tipAttr("Publisher share",`Payout on this product is revenue × ${pr.revshare_pct!=null?pr.revshare_pct:"—"}%, rounded to the nearest cent — a stated share is a term of the deal and the publisher is owed the arithmetic. New revshare products start on the standard 80% split.`)}>share ${pr.revshare_pct!=null?pr.revshare_pct+"%":"—"}</span>`
+          : `<span class="badge ok" style="font-family:var(--mono)">payout ×${pr.payouts.length}</span>`}
         <span style="flex:1"></span>
         <span class="urlchip" title="${esc(url)} — click to copy" onclick="copyText('${url.replace(/'/g,"")}','✓ Click URL copied — this is what the publisher places')">click URL</span>
-        <button class="abtn" onclick="prodOpen[${pr.id}]=!prodOpen[${pr.id}];render()">${open?"Hide payouts":"Payouts"}</button>
+        <button class="abtn" onclick="prodOpen[${pr.id}]=!prodOpen[${pr.id}];render()">${open?"Hide payouts":o&&o.payout_model==="revshare"?"Share":"Payouts"}</button>
         <button class="abtn danger" onclick="delProduct(${pr.id})">Delete</button>
       </div>
-      ${open?`<div class="hr-body">
+      ${open?(o&&o.payout_model==="revshare"?`<div class="hr-body">
+        <div style="display:flex;align-items:flex-end;gap:8px;flex-wrap:wrap">
+          <span><span class="gh" style="display:block;margin-bottom:3px;font-family:var(--fd);font-size:9.5px;letter-spacing:.15em;text-transform:uppercase;color:var(--t3)">Publisher share</span>
+            <span style="display:inline-flex;align-items:center;gap:4px">
+              <input id="rs-${pr.id}" class="inp mono" type="number" step="0.01" min="0" max="100" style="width:90px;color:var(--forest)" value="${pr.revshare_pct!=null?pr.revshare_pct:""}" placeholder="80">
+              <span style="font-size:12px;color:var(--t3)">%</span>
+            </span></span>
+          <button class="abtn confirm" onclick="saveShare(${pr.id})">Save share</button>
+        </div>
+        <div style="font-size:11px;color:var(--t3);margin-top:6px">${pr.revshare_pct!=null
+          ?"Payout = revenue × share, rounded to the nearest cent. The advertiser sends the amount on the postback — there is no rate card to fill in."
+          :"No share set — this product books revenue and pays nothing, and raises an alert on its first conversion. New revshare products start at 80%; an empty field means someone cleared it."}</div>
+      </div>`:`<div class="hr-body">
         <div class="geo-grid">
           <span class="gh">Geo</span><span class="gh">Revenue (advertiser)</span><span class="gh">Payout (publisher)</span>
           ${countries.map(c=>`
@@ -1311,7 +1564,7 @@ function pageHierarchy(){
         </div>
         ${countries.length?"":`<span style="font-size:11px;color:var(--t3)">No geo rows — add revenue countries on the offer first.</span>`}
         <div style="display:flex;justify-content:flex-end;margin-top:8px"><button class="abtn confirm" onclick="savePayouts(${pr.id})">Save payouts</button></div>
-      </div>`:""}
+      </div>`):""}
     </div>`;
   }).join("");
 
@@ -1387,6 +1640,16 @@ function updUser(uid,patch){
   }
   render();
 }
+function addIncent(){
+  const d=document.getElementById("inc-domain"), n=document.getElementById("inc-note");
+  const dom=normaliseDomain((d&&d.value)||"");
+  if(!dom){ toast("Enter a domain — a full URL works too"); return; }
+  if(INCENT_POOL.some(e=>e.domain===dom)){ toast("Already pooled"); return; }
+  INCENT_POOL.push({domain:dom, note:((n&&n.value)||"").trim()});
+  toast("✓ "+dom+" pooled — every click that ever came from it now flags, past and future");
+  render();
+}
+function rmIncent(dom){ INCENT_POOL=INCENT_POOL.filter(e=>e.domain!==dom); toast("✓ Removed from the pool"); render(); }
 function delUser(uid){
   const u=USERS.find(x=>x.uid===uid); if(!u) return;
   if(!confirm(`Delete ${u.email}?\n\nThis removes the account and its grants. It does not ban the address — signing in again re-creates it as pending with no permissions.`)) return;
@@ -1518,7 +1781,26 @@ function drawerHtml(){
         <div class="sect" style="margin:0"><div class="sh"><span class="st">Users &amp; permissions</span><span class="ss">nothing is granted by default — every capability is explicit</span></div>
           <div class="sb">${userRows}${inviteRows}${composer}</div>
         </div>
-        <div class="note" style="padding:0">Tip: hit <b style="display:inline;color:var(--t2)">View as</b> on anna@northwindmedia.com (publisher) — revenue vanishes everywhere and advertiser names mask; the rep@northstar row shows the advertiser side. In production this also drives click-domain pools, fallback URLs and alerting from this drawer.</div>
+        <div class="sect" style="margin:0"><div class="sh"><span class="st">Incent pool${tipMark("Incent pool",INCENT_NOTE+" Matching runs per query, so adding a domain flags every click that ever came from it — a compliance list that only worked going forward would be useless the day you discover a source.")}</span><span class="ss">referrer domains known to send incentivised traffic</span></div>
+          <div class="sb">
+            <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+              <input id="inc-domain" class="inp mono" style="flex:1;min-width:170px" placeholder="flexrewards.net" onkeydown="if(event.key==='Enter')addIncent()">
+              <input id="inc-note" class="inp" style="flex:1;min-width:170px" placeholder="what it is (optional)" onkeydown="if(event.key==='Enter')addIncent()">
+              <button class="abtn confirm" onclick="addIncent()">Add</button>
+            </div>
+            ${INCENT_POOL.length===0?`<span style="font-size:11px;color:var(--t3)">Nothing pooled yet.</span>`
+              :INCENT_POOL.map(e=>{
+                const n=CLICKS.filter(c=>{const h=refererHost(c.referer);return h&&(h===e.domain||h.endsWith("."+e.domain));}).length;
+                return `<div style="display:flex;gap:10px;align-items:center;background:rgba(26,47,35,.5);border:1px solid rgba(39,64,47,.6);border-radius:2px;padding:6px 10px">
+                  <span style="font-family:var(--mono);font-size:12px;color:#B48AD6">${esc(e.domain)}</span>
+                  ${e.note?`<span style="font-size:11px;color:var(--t3);overflow:hidden;text-overflow:ellipsis">${esc(e.note)}</span>`:""}
+                  <span style="margin-left:auto;font-size:11px;color:var(--t3);white-space:nowrap">${n.toLocaleString()} click${n===1?"":"s"}</span>
+                  <button class="abtn danger" onclick="rmIncent('${e.domain}')">Remove</button>
+                </div>`;}).join("")}
+            <span style="font-size:11px;color:var(--t3)">Nothing is blocked — the value is finding out before the advertiser does. Subdomains match automatically: go.flexrewards.net is the same operation.</span>
+          </div>
+        </div>
+        <div class="note" style="padding:0">Tip: hit <b style="display:inline;color:var(--t2)">View as</b> on anna@northwindmedia.com (publisher) — revenue vanishes everywhere and advertiser names mask; the rep@northstar row shows the advertiser side. In production this drawer also drives click-domain pools, fallback URLs and alerting.</div>
       </div>
     </div>
   </div>`;
