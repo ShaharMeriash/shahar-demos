@@ -575,7 +575,7 @@ const EV_COLS = [
 const EV_DEFAULT = ["t","event","offer","country","source","click_id","revenue","payout"];
 let evCols=[...EV_DEFAULT];
 // clicks
-let ckPreset="7d", ckConvOnly=false, ckBots=false, ckIvt="all", ckIncent="all", ckSearch="", openClick=null;
+let ckPreset="7d", ckRange=rangeFor("7d"), ckConvOnly=false, ckBots=false, ckIvt="all", ckIncent="all", ckSearch="", openClick=null;
 // hierarchy
 let hOpenAdv={}, hAdvParams={}, hPubParams={}, editOffer=null, addOfferFor=null, addAdvOpen=false, prodOpen={}, npOffer="", npPub="";
 // admin
@@ -1136,9 +1136,13 @@ function pageEvents(){
 }
 
 // ═══════════════ clicks ═══════════════
-function setCkPreset(p){ ckPreset=p; render(); }
+function setCkPreset(p){ ckPreset=p; if(p!=="custom") ckRange=rangeFor(p); render(); }
+// Typing a date IS choosing a custom range: leaving the preset lit while the
+// dates disagree with it is the kind of small lie that costs an hour later.
+function setCkFrom(v){ if(v){ ckPreset="custom"; ckRange={...ckRange,from:v}; render(); } }
+function setCkTo(v){   if(v){ ckPreset="custom"; ckRange={...ckRange,to:v};   render(); } }
 function clicksShown(){
-  const r=rangeFor(ckPreset);
+  const r=ckRange;
   let rows=CLICKS.filter(c=>{ const d=dstrOf(new Date(c.t)); return d>=r.from&&d<=r.to; });
   if(ckConvOnly) rows=rows.filter(c=>c.conv);
   // "Screened only" overrides the bot exclusion — you asked to see them.
@@ -1198,6 +1202,9 @@ function pageClicks(){
   return `
   <div class="controls">
     <span class="chiprow">${[["today","Today"],["yesterday","Yesterday"],["7d","Last 7d"]].map(([k,l])=>`<span class="chip ${ckPreset===k?"on":""}" onclick="setCkPreset('${k}')">${l}</span>`).join("")}</span>
+    <input type="date" class="inp" style="width:132px" value="${ckRange.from}" max="${ckRange.to}" onchange="setCkFrom(this.value)">
+    <span style="font-size:11.5px;color:var(--t3)">to</span>
+    <input type="date" class="inp" style="width:132px" value="${ckRange.to}" min="${ckRange.from}" onchange="setCkTo(this.value)">
     <input id="f-cksearch" class="inp" style="width:200px" placeholder="search click id, sub, country, URL…" value="${esc(ckSearch)}" oninput="ckSearch=this.value;render()">
     <span class="chip ${ckConvOnly?"on":""}" onclick="ckConvOnly=!ckConvOnly;render()">Converted only</span>
     <label class="lbl"><input type="checkbox" ${ckBots?"checked":""} onchange="ckBots=this.checked;render()"> Include bots</label>

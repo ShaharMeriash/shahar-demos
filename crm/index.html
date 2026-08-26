@@ -270,20 +270,49 @@ const O=id=>opps.find(o=>o.id===id);
 
 let revenueEntries=[];let _rid=0;
 function seedRE(){
-  const push=(ago,type,amount,cat,desc,pid,tags)=>revenueEntries.push({id:"r"+(++_rid),date:mISO(ago,12),type,amount,currency:"USD",category:cat,description:desc,pid:pid||null,tags:tags||[]});
+  const push=(ago,type,amount,cat,desc,pid,tags,scope)=>revenueEntries.push({id:"r"+(++_rid),date:mISO(ago,12),type,amount,currency:"USD",category:cat,description:desc,pid:pid||null,tags:tags||[],scope:scope||null});
   const NL=[22000,26000,30000,34000,31000,41500],SF=[14000,15500,17000,18200,15500,16000],BP=[6000,6500,7000,7300,7000,8000],MED=[12000,13500,15000,16500,14000,16000];
   for(let i=0;i<6;i++){const m=5-i;
-    push(m,"revenue",NL[i],"programmatic","Northlight DSP — programmatic","p1");
-    push(m,"revenue",SF[i],"app-monetization","Skyfield Media — app monetization","p2",i>=4?["ctv"]:[]);
-    push(m,"revenue",BP[i],"lead-gen","Brightpath Leads — lead-gen share","p3");
-    if(m<=1) push(m,"revenue",m===1?10750:12000,"programmatic","Quantus Exchange — pilot spend","p4",["apac"]);
+    push(m,"revenue",NL[i],"programmatic","Northlight DSP — programmatic","p1",["rtb-monster"]);
+    push(m,"revenue",SF[i],"app-monetization","Skyfield Media — app monetization","p2",i>=4?["rtb-monster","ctv"]:["rtb-monster"]);
+    push(m,"revenue",BP[i],"lead-gen","Brightpath Leads — lead-gen share","p3",["traquery"]);
+    if(m<=1) push(m,"revenue",m===1?10750:12000,"programmatic","Quantus Exchange — pilot spend","p4",["rtb-monster","apac"]);
     push(m,"revenue",3000,"consulting","Helio Consulting — retainer","p6");
-    push(m,"cost",18000,"payroll","Team payroll");
-    push(m,"cost",3300,"hosting","AWS + infra");
-    push(m,"cost",MED[i],"media","Media buying");
+    // Supply payouts carry a partner so the P&L can approve them as payables.
+    push(m,"cost",Math.round(MED[i]*.62),"media","Skyfield Media — supply payout","p2",["rtb-monster"]);
+    push(m,"cost",MED[i]-Math.round(MED[i]*.62),"media","Veridian Apps — supply payout","p5",["rtb-monster"]);
+    push(m,"cost",18000,"payroll","Team payroll",null,["xero"]);
+    push(m,"cost",3300,"hosting","AWS + infra",null,["xero"]);
   }
 }
 seedRE();
+/* Platform attribution and P&L scope — mirrors the real Revenue page.
+   operational = trading money (Business P&L); expense = running costs that
+   only hit the Corp P&L. An explicit scope wins; otherwise it is derived. */
+const EXPENSE_CATEGORIES=["payroll","hosting","tools","travel"];
+function platformOf(e){
+  if(e.tags.includes("rtb-monster"))return "RTB Monster";
+  if(e.tags.includes("traquery"))return "TraQuery";
+  if(e.tags.includes("xero"))return "Xero";
+  if(e.tags.includes("wise"))return "Wise";
+  return "Manual";
+}
+function scopeOf(e){
+  if(e.scope)return e.scope;
+  if(e.type==="cost"&&(e.tags.includes("xero")||e.tags.includes("wise")))return "expense";
+  if(e.tags.includes("rtb-monster")||e.tags.includes("traquery"))return "operational";
+  if(e.type==="cost"&&EXPENSE_CATEGORIES.includes(e.category))return "expense";
+  return "operational";
+}
+/* Deterministic payment id — approving the same month twice can't duplicate. */
+const payId=(dir,pid,month)=>`pay-${dir==="receivable"?"rec":"pay"}-${pid}-${month}`;
+const monthOf=ago=>mISO(ago,1).slice(0,7);
+let payments=[
+  {id:payId("receivable","p1",monthOf(2)),pid:"p1",month:monthOf(2),dir:"receivable",amount:34000,currency:"USD",status:"paid",due:dISO(-38),paidAt:dISO(-33),platforms:["RTB Monster"]},
+  {id:payId("receivable","p1",monthOf(1)),pid:"p1",month:monthOf(1),dir:"receivable",amount:31000,currency:"USD",status:"pending",due:dISO(-6),paidAt:null,platforms:["RTB Monster"]},
+  {id:payId("payable","p2",monthOf(1)),pid:"p2",month:monthOf(1),dir:"payable",amount:8680,currency:"USD",status:"pending",due:dISO(9),paidAt:null,platforms:["RTB Monster"]},
+];
+const isOverdue=p=>p.status==="pending"&&p.due<todayISO();
 const revenueOf=pid=>revenueEntries.filter(e=>e.pid===pid&&e.type==="revenue").reduce((a,e)=>a+e.amount,0);
 const costOf=pid=>revenueEntries.filter(e=>e.pid===pid&&e.type==="cost").reduce((a,e)=>a+e.amount,0);
 
@@ -376,7 +405,7 @@ let users=[
 let page="dash", q="", role="admin";
 let pipeView="board", pipeSort={key:"value",dir:"desc"};
 let pFilter={type:"",cat:"",status:""};
-let revFilter="", revTab="monthly";
+let revFilter="", revTab="monthly", revPageTab="pnl", revView="business", revGroupBy="partner", revFilterCat="", revFilterPid="", revFilterScope="";
 let xeroTab="reconcile";
 let showResolved=false;
 let calY=new Date().getFullYear(), calM=new Date().getMonth();
@@ -407,6 +436,7 @@ const ICON_PATHS={
   dashboard:'<rect x="3" y="3" width="7" height="9" rx="1"/><rect x="14" y="3" width="7" height="5" rx="1"/><rect x="14" y="12" width="7" height="9" rx="1"/><rect x="3" y="16" width="7" height="5" rx="1"/>',
   building:'<path d="M6 22V4a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v18Z"/><path d="M6 12H4a2 2 0 0 0-2 2v8h4"/><path d="M18 9h2a2 2 0 0 1 2 2v11h-4"/><path d="M10 6h4"/><path d="M10 10h4"/><path d="M10 14h4"/><path d="M10 18h4"/>',
   trending:'<polyline points="22 7 13.5 15.5 8.5 10.5 2 17"/><polyline points="16 7 22 7 22 13"/>',
+  globe:'<circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/>',
   file:'<path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/>',
   bell:'<path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/>',
   check:'<polyline points="9 11 12 14 22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/>',
@@ -423,7 +453,7 @@ const ICON_PATHS={
 const icon=(n,s=15)=>`<svg width="${s}" height="${s}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${ICON_PATHS[n]}</svg>`;
 /* Real Layout.tsx grouping: Dashboard standalone; Documents lives under Business */
 const NAVG=[
-  ["Business",[["partners","Partners","building"],["pipe","Pipeline","trending"],["docs","Documents","file"]]],
+  ["Business",[["partners","Partners","building"],["pipe","Pipeline","trending"],["au","AU Market","globe"],["docs","Documents","file"]]],
   ["Work",[["notifications","Notifications","bell"],["tasks","Tasks","check"],["calendar","Calendar","calendar"],["notes","Notes","note"]]],
   ["Finance",[["revenue","Revenue","dollar"],["xero","Xero","landmark"],["wise","Wise","wallet"]]],
   ["Admin",[["users","Users","users"],["settings","Settings","settings"]]]];
@@ -460,7 +490,7 @@ function nav(p){page=p;render();}
 function lock(msg){return `<div class="lockwrap"><div style="text-align:center;color:var(--muted)">
   <svg width="38" height="38" viewBox="0 0 24 24" fill="none" stroke="#0A4F32" stroke-width="1.6" style="opacity:.35"><path d="M12 2 4 5v6c0 5 3.4 9.4 8 11 4.6-1.6 8-6 8-11V5l-8-3z"/></svg>
   <h3>Admin Only</h3><p style="font-size:13px;margin:0">${msg}</p></div></div>`;}
-const pageHead=(eyebrow,title,actions="")=>`<div class="phead"><div><div class="eyebrow">${esc(eyebrow)}</div><h1 class="pt">${esc(title)}</h1></div><div class="actions">${actions}</div></div>`;
+const pageHead=(eyebrow,title,actions="",sub="")=>`<div class="phead"><div><div class="eyebrow">${esc(eyebrow)}</div><h1 class="pt">${esc(title)}</h1>${sub?`<div style="margin-top:10px">${sub}</div>`:""}</div><div class="actions">${actions}</div></div>`;
 
 /* ============================ modal core ============================ */
 let DR=null;
@@ -931,65 +961,284 @@ function applyCustomN(){
   applyRes(n,{stage:d.stage,value:d.value,close:d.close},contactsSel,io);
 }
 
-/* ============================ revenue ============================ */
+/* ============================ revenue — P&L workbench ============================ */
+const opEntries=()=>revenueEntries.filter(e=>scopeOf(e)==="operational");
+const expEntries=()=>revenueEntries.filter(e=>scopeOf(e)==="expense");
+const mLabel=m=>new Date(m+"-01T00:00").toLocaleDateString("en-US",{month:"short",year:"2-digit"});
+const mLabelLong=m=>new Date(m+"-01T00:00").toLocaleDateString("en-US",{month:"long",year:"numeric"});
+
+/* Business series: operational trading only. */
+function monthlyBusiness(){
+  const m={};
+  opEntries().forEach(e=>{const k=e.date.slice(0,7);if(!m[k])m[k]={month:k,revenue:0,cost:0,expenses:0};m[k][e.type==="revenue"?"revenue":"cost"]+=e.amount;});
+  return Object.values(m).sort((a,b)=>a.month.localeCompare(b.month)).map(r=>({...r,profit:r.revenue-r.cost,label:mLabel(r.month)}));
+}
+/* Corp series: operational rev/cost + business expenses + corp net. */
+function monthlyCorp(){
+  const m={},b=k=>(m[k]||(m[k]={month:k,revenue:0,cost:0,expenses:0}));
+  opEntries().forEach(e=>{const r=b(e.date.slice(0,7));if(e.type==="revenue")r.revenue+=e.amount;else r.cost+=e.amount;});
+  expEntries().forEach(e=>{const r=b(e.date.slice(0,7));if(e.type==="revenue")r.revenue+=e.amount;else r.expenses+=e.amount;});
+  return Object.values(m).sort((a,b2)=>a.month.localeCompare(b2.month)).map(r=>({...r,profit:r.revenue-r.cost-r.expenses,label:mLabel(r.month)}));
+}
+/* P&L breakdown: month → partner|platform rows, newest month first. */
+function buildBreakdown(groupBy){
+  const byMonth=new Map();
+  for(const e of opEntries()){
+    const month=e.date.slice(0,7), platform=platformOf(e);
+    const key=groupBy==="partner"?(e.pid||"—"):platform;
+    const name=groupBy==="partner"?(P(e.pid)?.name||"Unassigned"):platform;
+    if(!byMonth.has(month))byMonth.set(month,new Map());
+    const rows=byMonth.get(month);
+    if(!rows.has(key))rows.set(key,{key,name,pid:groupBy==="partner"?e.pid:null,platforms:[],revenue:0,cost:0});
+    const row=rows.get(key);
+    if(!row.platforms.includes(platform))row.platforms.push(platform);
+    if(e.type==="revenue")row.revenue+=e.amount;else row.cost+=e.amount;
+  }
+  return [...byMonth.entries()].sort((a,b)=>b[0].localeCompare(a[0])).map(([month,rows])=>{
+    const list=[...rows.values()].sort((a,b)=>(b.revenue+b.cost)-(a.revenue+a.cost));
+    return {month,rows:list,revenue:list.reduce((a,r)=>a+r.revenue,0),cost:list.reduce((a,r)=>a+r.cost,0)};
+  });
+}
+/* Corp-view expense block: month → category rows. */
+function buildExpenseBlocks(){
+  const byMonth=new Map();
+  for(const e of expEntries()){
+    const month=e.date.slice(0,7), platform=platformOf(e);
+    if(!byMonth.has(month))byMonth.set(month,new Map());
+    const rows=byMonth.get(month);
+    if(!rows.has(e.category))rows.set(e.category,{name:e.category,platforms:[],cost:0});
+    const row=rows.get(e.category);
+    if(!row.platforms.includes(platform))row.platforms.push(platform);
+    row.cost+=e.amount;
+  }
+  const out=new Map();
+  for(const [month,rows] of byMonth){
+    const list=[...rows.values()].sort((a,b)=>b.cost-a.cost);
+    out.set(month,{rows:list,total:list.reduce((a,r)=>a+r.cost,0)});
+  }
+  return out;
+}
+const overduePayments=()=>payments.filter(isOverdue);
+
+function approvePay(dir,pid,month,amount,platforms){
+  const id=payId(dir,pid,month);
+  if(payments.some(p=>p.id===id))return;
+  const terms=P(pid)?.terms??30;
+  const [y,mo]=month.split("-").map(Number);
+  const d=new Date(Date.UTC(y,mo,0));                       // last day of the month
+  d.setUTCDate(d.getUTCDate()+terms);
+  payments.push({id,pid,month,dir,amount:Math.round(amount*100)/100,currency:"USD",status:"pending",due:d.toISOString().slice(0,10),paidAt:null,platforms});
+  render();toast(`Approved ${fmt$(amount)} — payment due ${fmtDate(d.toISOString().slice(0,10))} on ${P(pid)?.name}'s ${terms}-day terms`);
+}
+function payMark(id,paid){const p=payments.find(x=>x.id===id);if(!p)return;p.status=paid?"paid":"pending";p.paidAt=paid?todayISO():null;render();toast(paid?"Marked paid":"Payment reopened");}
+function payDue(id,v){const p=payments.find(x=>x.id===id);if(p&&v){p.due=v;render();}}
+function payDelete(id){payments=payments.filter(p=>p.id!==id);render();toast("Payment removed — the revenue entries behind it stay untouched");}
+function setRevTabPage(t){revPageTab=t;render();}
+
+function approveCell(row,month,dir){
+  const amount=dir==="receivable"?row.revenue:row.cost;
+  if(!amount)return "";
+  if(!row.pid)return `<span title="Assign these entries to a partner to approve" style="font-size:10.5px;color:var(--t3)">no partner</span>`;
+  const ex=payments.find(p=>p.id===payId(dir,row.pid,month));
+  if(ex){
+    const od=isOverdue(ex);
+    const color=ex.status==="paid"?"#1f7a00":od?"var(--danger)":"var(--gold-d)";
+    const text=ex.status==="paid"?"Paid":od?"Overdue":"Approved";
+    const icon=ex.status==="paid"?"✓":od?"⚠":"◔";
+    return `<button type="button" onclick="setRevTabPage('payments')" title="${text} — due ${fmtDate(ex.due)}. Click to open Payments."
+      style="border:0;background:transparent;cursor:pointer;padding:0;font-family:var(--fd);font-weight:700;font-size:10.5px;letter-spacing:.08em;text-transform:uppercase;color:${color}">${icon} ${text}</button>`;
+  }
+  if(!canEdit())return "";
+  return `<button type="button" class="ce" onclick="approvePay('${dir}','${row.pid}','${month}',${amount},${JSON.stringify(row.platforms).replace(/"/g,"&quot;")})"
+    title="Approve ${fmt$(amount)} as ${dir} — creates a payment due per net terms"
+    style="font-family:var(--fd);font-weight:700;font-size:10.5px;letter-spacing:.08em;text-transform:uppercase;padding:2px 8px;border:1px solid rgba(10,79,50,.3);border-radius:2px;background:var(--surface);cursor:pointer;color:var(--forest)">Approve</button>`;
+}
+const money=(v,color,sign)=>v===0?`<span style="color:#B9C2BE">—</span>`:`<span style="font-family:var(--fd);font-weight:700;font-size:13.5px;color:${color}">${sign}${fmt$(v)}</span>`;
+
 function pageRevenue(){
-  const rev=revenueEntries.filter(e=>e.type==="revenue").reduce((a,e)=>a+e.amount,0);
-  const cost=revenueEntries.filter(e=>e.type==="cost").reduce((a,e)=>a+e.amount,0);
-  const md=monthlyData();
-  const list=[...revenueEntries].sort((a,b)=>b.date.localeCompare(a.date)).filter(e=>!revFilter||e.type===revFilter);
-  const maxM=Math.max(...md.map(m=>Math.max(m.revenue,m.cost,m.profit)));
-  const W=640,H=210,PD=44,bw=Math.min(16,(W-PD-20)/(md.length*3.6));
+  const corp=revView==="corp";
+  const md=corp?monthlyCorp():monthlyBusiness();
+  const rev=md.reduce((a,m)=>a+m.revenue,0), cost=md.reduce((a,m)=>a+m.cost,0), exp=md.reduce((a,m)=>a+m.expenses,0);
+  const opProfit=rev-cost, corpProfit=opProfit-exp;
+  const od=overduePayments();
+  const tabs=[["pnl","P&L"],["payments","Payments"],["transactions","Transactions"]];
+  const head=pageHead("Financial","Revenue",
+    `<button class="btn btn-ghost ce" onclick="toast('Sync pulls the month\\'s booked revenue from RTB Monster into the ledger — keyed endpoint, admin only')">⟳ Sync RTB Monster</button>
+     <button class="btn btn-ghost ce" onclick="toast('Sync pulls TraQuery advertiser revenue and publisher payout into the ledger — keyed endpoint, admin only')">⟳ Sync TraQuery</button>
+     <button class="btn btn-primary ce" onclick="newEntry()">+ Add Entry</button>`,
+    `<div style="display:flex;gap:4px;align-items:center;flex-wrap:wrap">
+      ${tabs.map(([k,l])=>`<button class="btn btn-sm" style="${revPageTab===k?"background:var(--forest);color:#fff;border:1px solid var(--forest)":"background:transparent;color:var(--muted);border:1px solid rgba(10,79,50,.2)"};display:inline-flex;align-items:center;gap:6px" onclick="setRevTabPage('${k}')">${l}${k==="payments"&&od.length?`<span style="background:var(--danger);color:#fff;border-radius:8px;font-size:10px;font-weight:700;padding:0 6px;line-height:15px">${od.length}</span>`:""}</button>`).join("")}
+      ${revPageTab==="pnl"?`<span style="display:flex;gap:4px;margin-left:14px;padding-left:14px;border-left:1px solid rgba(10,79,50,.15)">
+        ${[["business","Business P&L","Operational trading only — platform &amp; partner money"],["corp","Corp P&L","Includes business expenses (Xero/Wise bills, payroll, hosting…)"]].map(([k,l,t])=>
+          `<button class="btn btn-sm" title="${t}" style="${revView===k?"background:var(--gold-d);color:#fff;border:1px solid var(--gold-d)":"background:transparent;color:var(--muted);border:1px solid rgba(189,140,61,.4)"}" onclick="revView='${k}';render()">${l}</button>`).join("")}
+      </span>`:""}
+    </div>`);
+
+  const overdueBanner=od.length?`<div onclick="setRevTabPage('payments')" title="Open Payments" style="cursor:pointer;padding:10px 14px;background:#FDF3F2;border:1px solid rgba(192,57,43,.3);border-radius:2px;font-size:13px;color:var(--danger);font-weight:500;display:flex;align-items:center;gap:8px;margin-bottom:16px">
+    ⚠ ${od.length} payment${od.length>1?"s":""} overdue — ${od.map(p=>`${esc(P(p.pid)?.name||"?")} ${fmt$(p.amount)}`).join(", ")}</div>`:"";
+
+  if(revPageTab==="payments")      return head+overdueBanner+revPayments();
+  if(revPageTab==="transactions")  return head+overdueBanner+revTransactions();
+
+  /* ---------------- P&L tab ---------------- */
+  const kpis=corp?[
+    ["Operating Profit",fmt$(opProfit),opProfit>=0?"var(--forest)":"var(--danger)"],
+    ["Business Expenses",fmt$(exp),"#E67E22"],
+    ["Corp Net Profit",fmt$(corpProfit),corpProfit>=0?"var(--forest)":"var(--danger)"],
+    ["Corp Margin",rev?(100*corpProfit/rev).toFixed(1)+"%":"—","var(--gold-d)"],
+  ]:[
+    ["Revenue",fmt$(rev),"var(--forest)"],
+    ["Operating Cost",fmt$(cost),"var(--danger)"],
+    ["Operating Profit",fmt$(opProfit),opProfit>=0?"var(--forest)":"var(--danger)"],
+    ["Op Margin",rev?(100*opProfit/rev).toFixed(1)+"%":"—","var(--gold-d)"],
+  ];
+
+  const series=corp
+    ?[["revenue","Revenue","#0A4F32",1],["cost","Op Cost","#C0392B",.75],["expenses","Expenses","#E67E22",.85],["profit","Corp Net","#BD8C3D",1]]
+    :[["revenue","Revenue","#0A4F32",1],["cost","Cost","#C0392B",.75],["profit","Profit","#BD8C3D",1]];
+  const maxM=Math.max(1,...md.map(m=>Math.max(...series.map(s=>Math.abs(m[s[0]])))));
+  const W=640,H=210,PD=44,bw=Math.min(14,(W-PD-20)/(md.length*(series.length+1.2)));
   const gx=i=>PD+(W-PD-16)*(i+.5)/md.length, gy=v=>H-28-(H-52)*v/maxM;
+  const bx=(i,s)=>gx(i)-(series.length*bw)/2+s*bw;
   const chart= revTab==="monthly"
     ?`<div style="padding:6px 4px;overflow-x:auto"><svg class="chart" viewBox="0 0 ${W} ${H}" style="width:100%;min-width:460px">
       ${[0,.25,.5,.75,1].map(f=>`<line x1="${PD}" x2="${W-8}" y1="${gy(maxM*f).toFixed(1)}" y2="${gy(maxM*f).toFixed(1)}" stroke="rgba(10,79,50,.08)" stroke-dasharray="3 3"/><text x="${PD-6}" y="${(gy(maxM*f)+4).toFixed(1)}" text-anchor="end">$${Math.round(maxM*f/1000)}k</text>`).join("")}
-      ${md.map((m,i)=>{const x=gx(i);return `
-        <rect x="${(x-bw*1.6).toFixed(1)}" y="${gy(m.revenue).toFixed(1)}" width="${bw}" height="${(H-28-gy(m.revenue)).toFixed(1)}" fill="#0A4F32" rx="1"/>
-        <rect x="${(x-bw*.5).toFixed(1)}" y="${gy(m.cost).toFixed(1)}" width="${bw}" height="${(H-28-gy(m.cost)).toFixed(1)}" fill="#C0392B" opacity=".75" rx="1"/>
-        <rect x="${(x+bw*.6).toFixed(1)}" y="${gy(Math.max(m.profit,0)).toFixed(1)}" width="${bw}" height="${(H-28-gy(Math.max(m.profit,0))).toFixed(1)}" fill="#BD8C3D" rx="1"/>
-        <text x="${x.toFixed(1)}" y="${H-9}" text-anchor="middle">${m.label}</text>`;}).join("")}
+      ${md.map((m,i)=>series.map(([k,,color,op],s)=>{const v=Math.max(m[k],0);return `<rect x="${bx(i,s).toFixed(1)}" y="${gy(v).toFixed(1)}" width="${(bw-1).toFixed(1)}" height="${(H-28-gy(v)).toFixed(1)}" fill="${color}" opacity="${op}" rx="1"/>`;}).join("")
+        +`<text x="${gx(i).toFixed(1)}" y="${H-9}" text-anchor="middle">${m.label}</text>`).join("")}
       </svg>
-      <div style="display:flex;gap:16px;padding:2px 10px 8px;font-family:var(--fd);font-size:10.5px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted)">
-        <span><span style="display:inline-block;width:9px;height:9px;background:#0A4F32;border-radius:1px;margin-right:5px"></span>Revenue</span>
-        <span><span style="display:inline-block;width:9px;height:9px;background:#C0392B;opacity:.75;border-radius:1px;margin-right:5px"></span>Cost</span>
-        <span><span style="display:inline-block;width:9px;height:9px;background:#BD8C3D;border-radius:1px;margin-right:5px"></span>Profit</span></div></div>`
+      <div style="display:flex;gap:16px;padding:2px 10px 8px;font-family:var(--fd);font-size:10.5px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);flex-wrap:wrap">
+        ${series.map(([,label,color,op])=>`<span><span style="display:inline-block;width:9px;height:9px;background:${color};opacity:${op};border-radius:1px;margin-right:5px"></span>${label}</span>`).join("")}</div></div>`
     :`<div class="two" style="padding:16px 18px">${[["Revenue by Category",byCategory("revenue"),"#0A4F32"],["Cost by Category",byCategory("cost"),"#C0392B"]].map(([label,data,color])=>{
-        const mx=Math.max(...data.map(d=>d.value));
+        const mx=Math.max(1,...data.map(d=>d.value));
         return `<div><div style="font-family:var(--fd);font-weight:600;font-size:13px;margin-bottom:10px">${label}</div>
         ${data.map(d=>`<div style="display:flex;align-items:center;gap:10px;margin-bottom:7px">
           <span style="font-family:var(--fd);font-weight:600;font-size:11px;text-transform:uppercase;letter-spacing:.06em;width:120px;flex-shrink:0;color:var(--ink)">${esc(d.name)}</span>
           <div style="flex:1;background:rgba(10,79,50,.06);border-radius:1px;height:12px"><div style="width:${(100*d.value/mx).toFixed(1)}%;height:100%;background:${color};border-radius:1px"></div></div>
           <span style="font-family:var(--fd);font-weight:600;font-size:12px;color:var(--muted);width:64px;text-align:right">${fmt$(d.value)}</span></div>`).join("")}</div>`;}).join("")}</div>`;
-  return pageHead("Financial","Revenue",`<button class="btn btn-primary ce" onclick="newEntry()">+ Add Entry</button>`)+`
+
+  const breakdown=buildBreakdown(revGroupBy), blocks=buildExpenseBlocks();
+  const months=corp?[...new Set([...breakdown.map(s=>s.month),...blocks.keys()])].sort((a,b)=>b.localeCompare(a))
+                   :breakdown.map(s=>s.month);
+  const secOf=m=>breakdown.find(s=>s.month===m)||{month:m,rows:[],revenue:0,cost:0};
+
+  return head+overdueBanner+`
   <div class="kpis" style="grid-template-columns:repeat(auto-fit,minmax(160px,1fr))">
-    <div class="kpi"><div class="l">Total Revenue</div><div class="v">${fmt$(rev)}</div></div>
-    <div class="kpi"><div class="l">Total Cost</div><div class="v" style="color:var(--danger)">${fmt$(cost)}</div></div>
-    <div class="kpi"><div class="l">Net Profit</div><div class="v" style="color:${rev-cost>=0?"var(--forest)":"var(--danger)"}">${fmt$(rev-cost)}</div></div>
-    <div class="kpi"><div class="l">Margin</div><div class="v" style="color:var(--gold-d)">${rev?(100*(rev-cost)/rev).toFixed(1)+"%":"—"}</div></div>
+    ${kpis.map(([l,v,c])=>`<div class="kpi"><div class="l">${l}</div><div class="v" style="color:${c}">${v}</div></div>`).join("")}
   </div>
   <div class="card"><div class="h"><span class="t">Analytics</span>
     <span style="margin-left:auto;display:inline-flex;gap:4px">
       <button class="btn btn-sm" style="${revTab==="monthly"?"background:var(--forest);color:#fff;border:1px solid var(--forest)":"background:transparent;color:var(--muted);border:1px solid rgba(10,79,50,.2)"}" onclick="revTab='monthly';render()">Monthly Trend</button>
       <button class="btn btn-sm" style="${revTab==="category"?"background:var(--forest);color:#fff;border:1px solid var(--forest)":"background:transparent;color:var(--muted);border:1px solid rgba(10,79,50,.2)"}" onclick="revTab='category';render()">By Category</button></span></div>
     ${chart}</div>
-  <div class="card"><div class="h">
-    <div class="chips"><span class="cl">Type</span>
-      <button class="chip${revFilter===""?" on":""}" onclick="revFilter='';render()">All</button>
-      <button class="chip${revFilter==="revenue"?" on":""}" onclick="revFilter='revenue';render()">Revenue</button>
-      <button class="chip${revFilter==="cost"?" on":""}" onclick="revFilter='cost';render()">Cost</button></div></div>
+
+  <div class="card"><div class="h"><span class="t">Monthly Breakdown</span>
+    <span style="margin-left:auto;display:inline-flex;gap:4px">
+      ${["partner","platform"].map(g=>`<button class="btn btn-sm" style="${revGroupBy===g?"background:var(--forest);color:#fff;border:1px solid var(--forest)":"background:transparent;color:var(--muted);border:1px solid rgba(10,79,50,.2)"}" onclick="revGroupBy='${g}';render()">By ${g==="partner"?"Partner":"Platform"}</button>`).join("")}</span></div>
+  <div class="tbl-wrap">
+    ${months.map(m=>{
+      const sec=secOf(m), blk=corp?blocks.get(m):null;
+      const opNet=sec.revenue-sec.cost, corpNet=opNet-(blk?blk.total:0);
+      return `<div style="border-bottom:1px solid rgba(10,79,50,.08)">
+        <div style="padding:11px 16px;background:rgba(10,79,50,.045);display:flex;align-items:baseline;gap:14px;flex-wrap:wrap">
+          <span style="font-family:var(--fd);font-weight:700;font-size:14px;color:var(--forest);letter-spacing:.04em">${mLabelLong(m)}</span>
+          <span style="font-size:12px;color:var(--muted)">
+            rev <b style="color:var(--forest)">${sec.revenue?fmt$(sec.revenue):"—"}</b> · cost <b style="color:var(--danger)">${sec.cost?fmt$(sec.cost):"—"}</b>
+            ${corp?` · op net <b style="color:${opNet>=0?"var(--forest)":"var(--danger)"}">${fmt$(opNet)}</b> · expenses <b style="color:#E67E22">${blk?fmt$(blk.total):"—"}</b> · corp net <b style="color:${corpNet>=0?"var(--forest)":"var(--danger)"}">${fmt$(corpNet)}</b>`
+                 :` · net <b style="color:${opNet>=0?"var(--forest)":"var(--danger)"}">${fmt$(opNet)}</b>`}
+          </span></div>
+        <table>
+          ${sec.rows.map(r=>`<tr>
+            <td style="font-weight:500;width:26%">${esc(r.name)}${revGroupBy==="partner"&&r.platforms.length?`<span style="margin-left:8px">${r.platforms.map(pl=>`<span class="tag-chip" style="margin-right:3px;font-size:9.5px">${esc(pl)}</span>`).join("")}</span>`:""}</td>
+            <td style="width:18%">${money(r.revenue,"var(--forest)","+")}</td>
+            <td style="width:10%">${revGroupBy==="partner"?approveCell(r,m,"receivable"):""}</td>
+            <td style="width:18%">${money(r.cost,"var(--danger)","–")}</td>
+            <td style="width:10%">${revGroupBy==="partner"?approveCell(r,m,"payable"):""}</td>
+            <td class="num" style="width:18%;padding-right:18px">${money(r.revenue-r.cost,(r.revenue-r.cost)>=0?"var(--forest)":"var(--danger)","")}</td></tr>`).join("")}
+          ${blk?blk.rows.map(er=>`<tr style="background:rgba(230,126,34,.04)">
+            <td style="width:26%;color:#8A6220"><span style="font-family:var(--fd);font-weight:700;font-size:10px;letter-spacing:.08em;text-transform:uppercase;color:#E67E22;margin-right:8px">Expense</span>${esc(er.name)}
+              <span style="margin-left:8px">${er.platforms.map(pl=>`<span class="tag-chip" style="margin-right:3px;font-size:9.5px">${esc(pl)}</span>`).join("")}</span></td>
+            <td style="width:18%"><span style="color:#B9C2BE">—</span></td><td style="width:10%"></td>
+            <td style="width:18%">${money(er.cost,"#E67E22","–")}</td><td style="width:10%"></td>
+            <td class="num" style="width:18%;padding-right:18px">${money(er.cost,"#E67E22","–")}</td></tr>`).join(""):""}
+          ${!sec.rows.length&&!(blk&&blk.rows.length)?`<tr><td colspan="6" style="color:var(--t3);font-size:12.5px">No activity</td></tr>`:""}
+        </table></div>`;}).join("")}
+  </div>
+  ${revGroupBy==="partner"?`<div class="note">Approve a month's revenue or cost to create a tracked payment — the due date comes from the partner's net terms, and the id is derived from partner + month so approving twice can't duplicate it.</div>`:""}
+  </div>`;
+}
+
+function revPayments(){
+  const pend=payments.filter(p=>p.status==="pending");
+  const rec=pend.filter(p=>p.dir==="receivable").reduce((a,p)=>a+p.amount,0);
+  const pay=pend.filter(p=>p.dir==="payable").reduce((a,p)=>a+p.amount,0);
+  const od=overduePayments();
+  const list=[...payments].sort((a,b)=>a.status===b.status?a.due.localeCompare(b.due):a.status==="pending"?-1:1);
+  return `
+  <div class="kpis" style="grid-template-columns:repeat(auto-fit,minmax(160px,1fr))">
+    <div class="kpi"><div class="l">Outstanding Receivable</div><div class="v" style="color:var(--forest)">${rec?fmt$(rec):"—"}</div></div>
+    <div class="kpi"><div class="l">Outstanding Payable</div><div class="v" style="color:var(--danger)">${pay?fmt$(pay):"—"}</div></div>
+    <div class="kpi"><div class="l">Overdue</div><div class="v" style="color:${od.length?"var(--danger)":"var(--muted)"}">${od.length}</div></div>
+  </div>
+  <div class="card"><div class="h"><span class="t">Payments</span></div>
+  ${list.length?`<div class="tbl-wrap"><table>
+    <tr><th>Partner</th><th>Month</th><th>Direction</th><th class="num">Amount</th><th>Due</th><th>Status</th><th>Invoice / Approval</th><th></th></tr>
+    ${list.map(p=>{const o=isOverdue(p),r=p.dir==="receivable";return `<tr style="${o?"background:rgba(192,57,43,.05)":""}">
+      <td style="font-weight:500">${esc(P(p.pid)?.name||"—")}${(p.platforms||[]).map(pl=>`<span class="tag-chip" style="margin-left:5px;font-size:9.5px">${esc(pl)}</span>`).join("")}</td>
+      <td style="color:var(--muted);font-size:12.5px">${mLabelLong(p.month)}</td>
+      <td><span style="font-family:var(--fd);font-weight:700;font-size:11px;text-transform:uppercase;letter-spacing:.08em;color:${r?"var(--forest)":"var(--danger)"}">${r?"Receivable":"Payable"}</span></td>
+      <td class="num" style="color:${r?"var(--forest)":"var(--danger)"}">${fmt$(p.amount)}</td>
+      <td>${p.status==="paid"?`<span style="color:var(--muted);font-size:12.5px">${fmtDate(p.due)}</span>`
+        :`<input class="inp" type="date" value="${p.due}" onchange="payDue('${p.id}',this.value)" style="width:140px;padding:4px 8px;font-size:12px;${o?"border-color:var(--danger);color:var(--danger);font-weight:600":""}">`}
+        ${o?`<span style="margin-left:6px;font-family:var(--fd);font-weight:700;font-size:10px;color:var(--danger);text-transform:uppercase;letter-spacing:.08em">Overdue</span>`:""}</td>
+      <td>${p.status==="paid"
+        ?`<button type="button" title="Paid ${p.paidAt?fmtDate(p.paidAt):""} — click to reopen" onclick="payMark('${p.id}',false)" style="display:inline-flex;align-items:center;gap:5px;border:0;background:transparent;cursor:pointer;font-family:var(--fd);font-weight:700;font-size:11.5px;text-transform:uppercase;letter-spacing:.08em;color:#1f7a00;padding:0">✓ Paid ${p.paidAt?fmtDate(p.paidAt):""}</button>`
+        :`<button class="btn btn-sm btn-ghost ce" onclick="payMark('${p.id}',true)">Mark Paid</button>`}</td>
+      <td>${p.file?`<span class="tag-chip" title="Attached — downloads from Drive in production">📎 ${esc(p.file)}</span>`
+        :`<button class="btn-icon ce" title="Attach the invoice or approval — Google Drive when connected, otherwise a 5 MB fallback" onclick="attachDemo('${p.id}')">📎</button>`}</td>
+      <td><button class="btn-icon ce" title="Delete payment" onclick="payDelete('${p.id}')">🗑</button></td></tr>`;}).join("")}
+  </table></div>`
+  :`<div style="padding:28px 18px;color:var(--muted);font-size:13px">Nothing here yet — approve a month's numbers on the P&amp;L tab to create the first payment.</div>`}
+  </div>`;
+}
+function attachDemo(id){const p=payments.find(x=>x.id===id);if(!p)return;p.file="invoice.pdf";render();toast("Attached — in production the bytes go to Google Drive, with a 5 MB blob fallback when Drive isn't connected");}
+
+function revTransactions(){
+  let list=[...revenueEntries].sort((a,b)=>b.date.localeCompare(a.date));
+  if(revFilter)      list=list.filter(e=>e.type===revFilter);
+  if(revFilterCat)   list=list.filter(e=>e.category===revFilterCat);
+  if(revFilterPid)   list=list.filter(e=>e.pid===revFilterPid);
+  if(revFilterScope) list=list.filter(e=>scopeOf(e)===revFilterScope);
+  return `<div class="card"><div class="h" style="gap:10px;flex-wrap:wrap">
+    <select class="inp" style="width:130px" onchange="revFilter=this.value;render()">
+      <option value="" ${revFilter===""?"selected":""}>All Types</option>
+      <option value="revenue" ${revFilter==="revenue"?"selected":""}>Revenue</option>
+      <option value="cost" ${revFilter==="cost"?"selected":""}>Cost</option></select>
+    <select class="inp" style="width:150px" onchange="revFilterCat=this.value;render()">
+      <option value="">All Categories</option>${settings.revenueCategories.map(c=>`<option value="${esc(c)}"${revFilterCat===c?" selected":""}>${esc(c)}</option>`).join("")}</select>
+    <select class="inp" style="width:170px" onchange="revFilterPid=this.value;render()">
+      <option value="">All Partners</option>${partners.map(p=>`<option value="${p.id}"${revFilterPid===p.id?" selected":""}>${esc(p.name)}</option>`).join("")}</select>
+    <select class="inp" style="width:160px" title="Operational money trades; business expenses only hit the Corp P&amp;L" onchange="revFilterScope=this.value;render()">
+      <option value="">All Scopes</option>
+      <option value="operational"${revFilterScope==="operational"?" selected":""}>Operational</option>
+      <option value="expense"${revFilterScope==="expense"?" selected":""}>Business Expense</option></select>
+    <span style="margin-left:auto;font-size:11.5px;color:var(--t3)">${list.length} entries</span></div>
   <div class="tbl-wrap"><table>
-    <tr><th>Date</th><th>Type</th><th>Description</th><th>Category</th><th>Partner</th><th class="num">Amount</th><th>Tags</th></tr>
-    ${list.map(e=>{const isRev=e.type==="revenue";return `<tr>
+    <tr><th>Date</th><th>Type</th><th>Description</th><th>Category</th><th>Scope</th><th>Platform</th><th>Partner</th><th class="num">Amount</th><th>Tags</th></tr>
+    ${list.map(e=>{const isRev=e.type==="revenue",sc=scopeOf(e);return `<tr>
       <td style="color:var(--muted);font-size:12.5px">${fmtDate(e.date)}</td>
       <td><span style="font-family:var(--fd);font-weight:700;font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:${isRev?"var(--forest)":"var(--danger)"}">${isRev?"+ Rev":"– Cost"}</span></td>
       <td style="font-weight:600">${esc(e.description)}</td>
       <td><span class="badge b-muted">${esc(e.category)}</span></td>
+      <td><span style="font-family:var(--fd);font-weight:700;font-size:10px;letter-spacing:.08em;text-transform:uppercase;color:${sc==="expense"?"#E67E22":"var(--muted)"}">${sc==="expense"?"Expense":"Operational"}</span></td>
+      <td style="color:var(--muted);font-size:12.5px">${esc(platformOf(e))}</td>
       <td style="color:var(--muted);font-size:12.5px">${esc(P(e.pid)?.name||"—")}</td>
       <td class="num" style="color:${isRev?"var(--forest)":"var(--danger)"}">${isRev?"+":"–"}${fmt$(e.amount)}</td>
       <td>${e.tags.map(t=>`<span class="tag-chip">${esc(t)}</span>`).join(" ")||"—"}</td></tr>`;}).join("")}
-  </table></div></div>`;
+  </table></div>
+  <div class="note">Platform is derived from the entry's sync tag — RTB Monster and TraQuery entries arrive from their keyed stats endpoints; Xero and Wise from the accounting feeds; anything hand-added reads as Manual.</div></div>`;
 }
-function newEntry(){DR={id:null,type:"revenue",amount:0,currency:"USD",date:todayISO(),category:settings.revenueCategories[0],pid:"",description:"",tags:[]};modalEntry();}
+
+function newEntry(){DR={id:null,type:"revenue",amount:0,currency:"USD",date:todayISO(),category:settings.revenueCategories[0],pid:"",description:"",tags:[],scope:null};modalEntry();}
 function modalEntry(){
   openModal("Add Revenue / Cost Entry",`
     <div class="fg"><label class="label">Type</label><div style="display:flex;gap:8px">
@@ -1004,6 +1253,10 @@ function modalEntry(){
       <div class="fg"><label class="label">Category</label><select class="inp" onchange="DR.category=this.value">${selOpts(settings.revenueCategories,DR.category)}</select></div>
       <div class="fg"><label class="label">Partner (optional)</label><select class="inp" onchange="DR.pid=this.value">${partnerOpts(DR.pid)}</select></div>
     </div>
+    <div class="fg"><label class="label">P&amp;L Scope</label><div style="display:flex;gap:8px">
+      ${[[null,"Auto"],["operational","Operational"],["expense","Business Expense"]].map(([k,l])=>
+        `<button class="btn" style="flex:1;justify-content:center;${(DR.scope||null)===k?"background:var(--forest);color:#fff;border-color:var(--forest)":""}" onclick="DR.scope=${k===null?"null":`'${k}'`};modalEntry()">${l}</button>`).join("")}</div>
+      <div style="font-size:11.5px;color:var(--t3);margin-top:6px">Business expenses (Xero/Wise bills, payroll, hosting…) only hit the Corp P&amp;L. Auto detects from source and category.</div></div>
     <div class="fg"><label class="label">Description *</label><input class="inp" value="${esc(DR.description)}" oninput="DR.description=this.value" placeholder="Brief description of this entry"></div>
     <div class="fg"><label class="label">Tags (comma separated)</label><input class="inp" value="${esc(DR.tags.join(", "))}" oninput="DR._tags=this.value"></div>`,
     `<button class="btn btn-ghost" onclick="closeModal()">Cancel</button><button class="btn btn-primary" onclick="saveEntry()">Add Entry</button>`);
@@ -1012,8 +1265,197 @@ function saveEntry(){
   if(!DR.description.trim()||!(DR.amount>0))return toast("Description and a positive amount are required");
   if(DR._tags!==undefined)DR.tags=DR._tags.split(",").map(s=>s.trim()).filter(Boolean);
   delete DR._tags;DR.id=uid();DR.pid=DR.pid||null;
-  revenueEntries.push(DR);closeModal();render();toast("Entry added — partner revenue and KPIs recalculated");
+  revenueEntries.push(DR);closeModal();render();toast("Entry added — partner revenue, the P&L and KPIs recalculated");
 }
+/* ============================ AU market ============================
+   The businesses surfaced by an ads.txt structural analysis of the top
+   Australian ad-supported sites. Two views: a reach-out Pipeline and a
+   Companies register carrying the classification (band, tier, size,
+   position in the supply chain, top assets, contacts).
+   Every company, site and person below is invented for this demo.        */
+const AU_STAGES=[
+  ["identified","Identified","#4A5752"],["researching","Researching","#2980B9"],
+  ["contact-found","Contact found","#7D3C98"],["outreach","Outreach sent","#887B05"],
+  ["replied","Replied","#E67E22"],["in-talks","In talks","#0A4F32"],
+  ["integrating","Integrating","#117A65"],["live","Live","#0A4F32"],["passed","Passed","#C0392B"],
+];
+const AU_STAGE_LABEL=Object.fromEntries(AU_STAGES.map(([k,l])=>[k,l]));
+const BAND_COLORS={A:"#0A4F32",B:"#2980B9",C:"#887B05",D:"#4A5752"};
+const BAND_WHY={
+  A:"Australian, or a manager that controls AU publishers' ads.txt — one deal delivers several sites",
+  B:"Mid-tier with 8+ DIRECT relationships with Australian-owned publishers",
+  C:"Mid or small tier with a smaller Australian footprint",
+  D:"Incumbent — real player, but not winnable as a partnership",
+};
+const bandChip=b=>`<span title="${esc(BAND_WHY[b])}" style="font-family:var(--fd);font-weight:700;font-size:11px;letter-spacing:.06em;padding:1px 7px;border-radius:3px;color:#fff;background:${BAND_COLORS[b]}">${b}</span>`;
+
+let prospects=[
+  {id:"a1",company:"Southern Cross Media Sales",domain:"scmediasales.com.au",stage:"in-talks",band:"A",tier:"major",size:"large",chain:"Sell-side manager",hq:"AU",media:["display","video","CTV"],
+   controls:14,controlsTop1000:9,auSites:0,auDirect:0,reach:31,score:92,source:"gatekeeper-sweep",linkedinSearched:true,
+   intel:"Runs the ads.txt for most of the regional news group — the file is hosted on their domain, so a change here propagates to every masthead at once.",
+   assets:[{rank:18,site:"harbourpost.com.au",group:"Harbour Media Group",au:true},{rank:44,site:"outbackdaily.com.au",group:"Harbour Media Group",au:true},{rank:91,site:"reefandrange.com.au",group:"Harbour Media Group",au:true}],
+   contacts:[{name:"Elena Marsh",title:"Director of Programmatic",loc:"Sydney, AU",degree:"2nd",conf:"confirmed",why:"Owns the ads.txt and the SSP roster — the actual decision on adding a new demand path."},
+             {name:"Rhys Calder",title:"Head of Yield",loc:"Sydney, AU",degree:"3rd",conf:"likely",why:"Runs floor pricing; useful second voice once commercials are agreed."}],
+   owner:"Shahar",lastTouch:dISO(-4),next:"Send the CTV lane numbers Elena asked for after the intro call",tags:["gatekeeper","ctv"],notes:"Warm intro came through the Harbour Media connection."},
+  {id:"a2",company:"Wattle Digital Group",domain:"wattledigital.com.au",stage:"outreach",band:"A",tier:"mid",size:"mid",chain:"Publisher group",hq:"AU",media:["display","video"],
+   controls:6,controlsTop1000:4,auSites:0,auDirect:0,reach:12,score:78,source:"gatekeeper-sweep",linkedinSearched:true,
+   intel:"MANAGERDOMAIN entries point here for six lifestyle titles — smaller than Southern Cross but the whole roster moves together.",
+   assets:[{rank:63,site:"coastalliving.com.au",group:"Wattle Digital",au:true},{rank:120,site:"thekitchentable.com.au",group:"Wattle Digital",au:true}],
+   contacts:[{name:"Priya Nadar",title:"Commercial Director",loc:"Melbourne, AU",degree:"2nd",conf:"confirmed",why:"Named on the seller entries; signs the supply agreements."}],
+   owner:"Shahar",lastTouch:dISO(-9),next:"Follow up on the intro email — nine days out, one bump then park it",tags:["gatekeeper"],notes:""},
+  {id:"a3",company:"Meridian Exchange",domain:"meridianx.io",stage:"identified",band:"B",tier:"major",size:"enterprise",chain:"SSP",hq:"SG",media:["display","video","in-app"],
+   controls:0,controlsTop1000:0,auSites:11,auDirect:9,reach:47,score:71,source:"top-100",linkedinSearched:false,
+   intel:"",
+   assets:[{rank:7,site:"harbourpost.com.au",group:"Harbour Media Group",au:true},{rank:22,site:"pitchsideau.com.au",group:"Pitchside Sports",au:true},{rank:38,site:"gumleaf.com.au",group:"Independent",au:true}],
+   contacts:[],
+   owner:"",lastTouch:"",next:"Find the APAC supply lead on LinkedIn",tags:["apac"],notes:""},
+  {id:"a4",company:"Pitchside Sports Network",domain:"pitchsideau.com.au",stage:"contact-found",band:"A",tier:"mid",size:"mid",chain:"Publisher (direct)",hq:"AU",media:["video","CTV"],
+   controls:0,controlsTop1000:0,auSites:4,auDirect:4,reach:9,score:69,source:"top-100",linkedinSearched:true,
+   intel:"Sells its own inventory DIRECT on every line — no manager in the file, so the conversation is with them alone.",
+   assets:[{rank:22,site:"pitchsideau.com.au",group:"Pitchside Sports",au:true},{rank:140,site:"grassrootsfooty.com.au",group:"Pitchside Sports",au:true}],
+   contacts:[{name:"Dan Okonkwo",title:"Head of Digital Revenue",loc:"Brisbane, AU",degree:"3rd",conf:"likely",why:"Only revenue-side name attached to the domain; live-sport CTV is the fit."}],
+   owner:"Shahar",lastTouch:"",next:"Ask Elena Marsh for an intro — same Sydney circuit",tags:["ctv","sport"],notes:""},
+  {id:"a5",company:"Granite Reach",domain:"granitereach.com",stage:"researching",band:"C",tier:"small",size:"boutique",chain:"Reseller",hq:"NZ",media:["display"],
+   controls:0,controlsTop1000:0,auSites:6,auDirect:2,reach:14,score:41,source:"top-100",linkedinSearched:false,
+   intel:"",assets:[{rank:88,site:"gumleaf.com.au",group:"Independent",au:true}],
+   contacts:[],owner:"",lastTouch:"",next:"Check whether the AU lines are resold or direct",tags:[],notes:"Mostly RESELLER lines — margin likely thin."},
+  {id:"a6",company:"Continental Ad Cloud",domain:"continentalcloud.com",stage:"passed",band:"D",tier:"giant",size:"enterprise",chain:"SSP",hq:"US",media:["display","video","in-app","CTV"],
+   controls:0,controlsTop1000:0,auSites:38,auDirect:31,reach:96,score:88,source:"top-100",linkedinSearched:true,
+   intel:"Incumbent on nearly every AU top-100 file. Real, but there is no partnership shape here — they are the competition, not a route in.",
+   assets:[{rank:1,site:"harbourpost.com.au",group:"Harbour Media Group",au:true},{rank:3,site:"citypulse.com.au",group:"Citypulse Media",au:true},{rank:5,site:"thelanewaypost.com.au",group:"Laneway Publishing",au:true}],
+   contacts:[],owner:"",lastTouch:"",next:"",tags:[],notes:"Logged for completeness — band D, not worked."},
+  {id:"a7",company:"Laneway Publishing",domain:"thelanewaypost.com.au",stage:"live",band:"A",tier:"mid",size:"mid",chain:"Publisher (direct)",hq:"AU",media:["display","video"],
+   controls:0,controlsTop1000:0,auSites:3,auDirect:3,reach:7,score:74,source:"top-100",linkedinSearched:true,
+   intel:"First AU supply live through the Relay lane — the reference account for everything else on this board.",
+   assets:[{rank:5,site:"thelanewaypost.com.au",group:"Laneway Publishing",au:true},{rank:210,site:"innernorthguide.com.au",group:"Laneway Publishing",au:true}],
+   contacts:[{name:"Sophie Trent",title:"Publisher",loc:"Melbourne, AU",degree:"1st",conf:"confirmed",why:"Signed the original agreement; the reference call for new AU prospects."}],
+   owner:"Shahar",lastTouch:dISO(-16),next:"Quarterly check-in — ask about the second title",tags:["reference"],notes:""},
+];
+let auTab="pipeline", auQ="", auBand="", auChain="", auSize="", auFlag="";
+const AUP=id=>prospects.find(p=>p.id===id);
+
+function auFiltered(){
+  const q=auQ.trim().toLowerCase();
+  return prospects.filter(p=>{
+    if(auBand&&p.band!==auBand)return false;
+    if(auChain&&p.chain!==auChain)return false;
+    if(auSize&&p.size!==auSize)return false;
+    if(auFlag==="1"&&!p.controls)return false;
+    if(auFlag==="2"&&!p.contacts.length)return false;
+    if(auFlag==="3"&&p.linkedinSearched)return false;
+    if(q&&![p.company,p.domain,p.chain,p.hq,...p.media,...p.contacts.map(c=>c.name)].some(v=>String(v).toLowerCase().includes(q)))return false;
+    return true;
+  });
+}
+function auMove(id,stage){const p=AUP(id);if(p&&p.stage!==stage){p.stage=stage;render();toast(`${p.company} → ${AU_STAGE_LABEL[stage]}`);}}
+function auDrag(ev,id){if(!canEdit())return;ev.dataTransfer.setData("text/prospect-id",id);ev.dataTransfer.effectAllowed="move";ev.currentTarget.classList.add("dragging");}
+function auDragEnd(ev){ev.currentTarget.classList.remove("dragging");document.querySelectorAll(".kcol.over").forEach(c=>c.classList.remove("over"));}
+function auDrop(ev,stage,el){ev.preventDefault();el.classList.remove("over");const id=ev.dataTransfer.getData("text/prospect-id");if(id)auMove(id,stage);}
+
+function pageAU(){
+  const gate=prospects.filter(p=>p.controls>0).length;
+  const withC=prospects.filter(p=>p.contacts.length>0).length;
+  const auv=prospects.filter(p=>p.hq==="AU").length;
+  const head=pageHead("Australian open-web supply — ads.txt structural analysis","AU Market","",
+    `<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+      ${[["pipeline","▦ Pipeline"],["companies","☰ Companies"]].map(([k,l])=>
+        `<button class="btn btn-sm" style="${auTab===k?"background:var(--forest);color:#fff;border:1px solid var(--forest)":"background:transparent;color:var(--muted);border:1px solid rgba(10,79,50,.2)"}" onclick="auTab='${k}';render()">${l}</button>`).join("")}
+      <span style="margin-left:8px;font-size:12px;color:var(--muted)">${prospects.length} companies · ${gate} gatekeepers · ${withC} with contacts · ${auv} Australian</span>
+    </div>`);
+  return head+(auTab==="pipeline"?auBoard():auTable());
+}
+function auBoard(){
+  return `<div class="kb">${AU_STAGES.map(([id,label,color])=>{
+    const list=prospects.filter(p=>p.stage===id);
+    return `<div class="kcol" style="--sc:${color}" ondragover="if(canEdit()){event.preventDefault();event.dataTransfer.dropEffect='move';this.classList.add('over')}" ondragleave="if(!this.contains(event.relatedTarget))this.classList.remove('over')" ondrop="auDrop(event,'${id}',this)">
+      <div class="kh"><span style="font-family:var(--fd);font-weight:700;font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:${color}">${label}</span><span class="badge b-muted">${list.length}</span></div>
+      <div class="kcards">${list.map(p=>{const best=p.contacts.find(c=>c.conf==="confirmed")||p.contacts[0];return `
+        <div class="kcard" draggable="${canEdit()}" ondragstart="auDrag(event,'${p.id}')" ondragend="auDragEnd(event)" onclick="auDrawer('${p.id}')">
+          <div style="display:flex;gap:6px;align-items:center;margin-bottom:4px">${bandChip(p.band)}<span style="font-weight:500;font-size:13px;line-height:1.25">${esc(p.company)}</span></div>
+          <div style="font-size:11px;color:var(--muted);margin-bottom:6px">${esc(p.chain)} · ${esc(p.hq)}</div>
+          <div style="display:flex;justify-content:space-between;font-size:11.5px;color:var(--muted)">
+            ${p.controls?`<span title="Publishers whose ads.txt this firm controls">controls <b style="color:var(--forest)">${p.controls}</b>${p.controlsTop1000?` · ${p.controlsTop1000} top-1000`:""}</span>`
+                        :`<span><b style="color:var(--forest)">${p.auDirect}</b>/${p.auSites} AU direct</span>`}
+            <span>score ${p.score}</span></div>
+          ${best?`<div style="font-size:11px;color:var(--muted);margin-top:6px;border-top:1px solid rgba(10,79,50,.08);padding-top:6px">${esc(best.name)} · ${esc(best.title)}</div>`:""}
+        </div>`;}).join("")||`<div style="font-size:11.5px;color:var(--t3);text-align:center;padding:12px">Empty</div>`}</div></div>`;
+  }).join("")}</div>
+  <div class="note" style="padding-left:0">Drag a company between columns to move it through outreach. Band A is where one deal reaches several publishers — a manager that controls other people's ads.txt, or an Australian-owned group selling DIRECT.</div>`;
+}
+function auTable(){
+  const rows=auFiltered();
+  const chains=[...new Set(prospects.map(p=>p.chain))], sizes=[...new Set(prospects.map(p=>p.size))];
+  return `<div class="card"><div class="h" style="gap:10px;flex-wrap:wrap">
+    <input class="inp" style="width:230px" placeholder="Company, domain, contact, media…" value="${esc(auQ)}" oninput="auQ=this.value;render()">
+    <select class="inp" style="width:120px" onchange="auBand=this.value;render()"><option value="">All bands</option>${["A","B","C","D"].map(b=>`<option value="${b}"${auBand===b?" selected":""}>Band ${b}</option>`).join("")}</select>
+    <select class="inp" style="width:170px" onchange="auChain=this.value;render()"><option value="">All of the chain</option>${chains.map(c=>`<option value="${esc(c)}"${auChain===c?" selected":""}>${esc(c)}</option>`).join("")}</select>
+    <select class="inp" style="width:130px" onchange="auSize=this.value;render()"><option value="">Any size</option>${sizes.map(c=>`<option value="${esc(c)}"${auSize===c?" selected":""}>${esc(c)}</option>`).join("")}</select>
+    <select class="inp" style="width:210px" onchange="auFlag=this.value;render()">
+      <option value="">Everyone</option>
+      <option value="1"${auFlag==="1"?" selected":""}>Gatekeepers only (control ads.txt)</option>
+      <option value="2"${auFlag==="2"?" selected":""}>Has contacts</option>
+      <option value="3"${auFlag==="3"?" selected":""}>Needs LinkedIn search</option></select>
+    <span style="margin-left:auto;font-size:11.5px;color:var(--t3)">${rows.length} of ${prospects.length}</span></div>
+  <div class="tbl-wrap"><table>
+    <tr><th>Band</th><th>Company</th><th>Chain position</th><th>Tier</th><th>Size</th><th>HQ</th><th>Media</th>
+      <th class="num" title="Publishers whose ads.txt they control">Controls</th><th class="num">AU direct</th>
+      <th class="num">Reach</th><th class="num">Score</th><th>Top assets</th><th>Contacts</th><th>Stage</th></tr>
+    ${rows.map(p=>`<tr style="cursor:pointer" onclick="auDrawer('${p.id}')">
+      <td>${bandChip(p.band)}</td>
+      <td><div style="font-weight:500">${esc(p.company)}</div><div style="font-size:11px;color:var(--muted)">${esc(p.domain)}</div></td>
+      <td style="color:var(--muted)">${esc(p.chain)}</td><td>${esc(p.tier)}</td><td>${esc(p.size)}</td>
+      <td>${esc(p.hq)}${p.hq==="AU"?" 🇦🇺":""}</td>
+      <td style="max-width:150px"><div style="display:flex;gap:3px;flex-wrap:wrap">${p.media.slice(0,3).map(m=>`<span class="tag-chip" style="font-size:10.5px">${esc(m)}</span>`).join("")}</div></td>
+      <td class="num" style="font-weight:600;color:${p.controls?"var(--forest)":"var(--muted)"}">${p.controls?`${p.controls}<span style="font-weight:400;color:var(--muted)"> / ${p.controlsTop1000}</span>`:"—"}</td>
+      <td class="num">${p.auSites?`${p.auDirect}/${p.auSites}`:"—"}</td>
+      <td class="num">${p.reach}</td><td class="num">${p.score}</td>
+      <td style="font-size:11.5px;color:var(--muted);max-width:210px;white-space:normal">${p.assets.slice(0,3).map(a=>esc(a.site)).join(", ")||"—"}</td>
+      <td>${p.contacts.length?`<span class="badge b-accent">${p.contacts.length}</span>`:p.linkedinSearched?`<span class="badge b-muted">none</span>`:`<span class="badge b-warning">not searched</span>`}</td>
+      <td><span class="badge b-info">${AU_STAGE_LABEL[p.stage]}</span></td></tr>`).join("")}
+  </table></div>
+  ${rows.length?"":`<div style="text-align:center;padding:32px;color:var(--muted)">No companies match those filters.</div>`}
+  <div class="note">Reach counts every site whose ads.txt carries any line for this seller. "Controls" counts the publishers whose file they manage outright — that is the number that makes one conversation worth several integrations.</div></div>`;
+}
+function auDrawer(id){
+  const p=AUP(id);if(!p)return;
+  const CONF={confirmed:["b-accent","confirmed"],likely:["b-info","likely"],unconfirmed:["b-muted","unconfirmed"]};
+  const stat=(l,v,sub)=>`<div><div class="eyebrow">${l}</div><div style="font-family:var(--fd);font-weight:700;font-size:19px;color:var(--forest)">${v}</div><div style="font-size:11px;color:var(--muted)">${sub}</div></div>`;
+  const dis=canEdit()?"":"disabled";
+  openModal(p.company,`
+    <div style="display:flex;align-items:center;gap:8px;margin-bottom:14px">${bandChip(p.band)}
+      <span style="font-size:12.5px;color:var(--muted)">${esc(p.chain)} · ${esc(p.hq)} · ${esc(p.domain)}</span></div>
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:14px;margin-bottom:16px">
+      ${p.controls?stat("Controls ads.txt of",p.controls,`${p.controlsTop1000} in the AU top 1000`)
+                  :stat("AU sites DIRECT",`${p.auDirect}/${p.auSites}`,"of AU-owned top 100")}
+      ${stat("Reach (any signal)",p.reach,p.source==="top-100"?"top-100 sites":"sites across the AU top 5000")}
+      ${stat("Score",p.score,"weighted fit")}
+    </div>
+    ${p.controls?`<div style="background:rgba(10,79,50,.08);border-left:3px solid var(--forest);padding:9px 12px;border-radius:0 4px 4px 0;margin-bottom:14px;font-size:12.5px"><b>Gatekeeper.</b> They control the ads.txt of ${p.controls} publishers, so one deal reaches all of them. Approach the manager, not the individual publishers.</div>`:""}
+    ${p.intel?`<div style="background:rgba(41,128,185,.08);border-left:3px solid var(--info);padding:9px 12px;border-radius:0 4px 4px 0;margin-bottom:14px;font-size:12.5px">${esc(p.intel)}</div>`:""}
+    <div class="eyebrow" style="margin-bottom:6px">Top assets — publishers they already sell</div>
+    ${p.assets.length?`<div class="tbl-wrap" style="margin-bottom:16px"><table>
+      <tr><th>#</th><th>Site</th><th>Publisher group</th></tr>
+      ${p.assets.map(a=>`<tr><td>${a.rank}</td><td style="font-weight:500">${esc(a.site)} ${a.au?`<span class="badge b-purple">AU</span>`:""}</td><td style="color:var(--muted)">${esc(a.group||"—")}</td></tr>`).join("")}
+    </table></div>`:`<div style="font-size:12.5px;color:var(--muted);margin-bottom:16px">None recorded.</div>`}
+    <div class="eyebrow" style="margin-bottom:6px">Contacts ${p.contacts.length?`(${p.contacts.length})`:""}</div>
+    ${p.contacts.length?`<div class="tbl-wrap" style="margin-bottom:16px"><table>
+      <tr><th>Name</th><th>Title</th><th>Location</th><th>Degree</th><th>Confidence</th><th>Why this person</th></tr>
+      ${p.contacts.map(c=>`<tr><td style="font-weight:500">${esc(c.name)}</td><td>${esc(c.title)}</td><td style="color:var(--muted)">${esc(c.loc)}</td><td>${esc(c.degree)}</td>
+        <td><span class="badge ${(CONF[c.conf]||CONF.unconfirmed)[0]}">${(CONF[c.conf]||CONF.unconfirmed)[1]}</span></td>
+        <td style="white-space:normal;font-size:12px;color:var(--muted)">${esc(c.why)}</td></tr>`).join("")}
+    </table></div>`:`<div style="font-size:12.5px;color:var(--muted);margin-bottom:16px">${p.linkedinSearched?"Searched — no usable name yet.":"Not searched yet."}</div>`}
+    <div class="frow">
+      <div class="fg"><label class="label">Stage</label><select class="inp" ${dis} onchange="auSet('${p.id}','stage',this.value)">${AU_STAGES.map(([k,l])=>`<option value="${k}"${p.stage===k?" selected":""}>${esc(l)}</option>`).join("")}</select></div>
+      <div class="fg"><label class="label">Owner</label><input class="inp" ${dis} value="${esc(p.owner)}" placeholder="Who is driving this" oninput="auSet('${p.id}','owner',this.value,true)"></div>
+      <div class="fg"><label class="label">Last touch</label><input class="inp" type="date" ${dis} value="${p.lastTouch||""}" onchange="auSet('${p.id}','lastTouch',this.value,true)"></div>
+    </div>
+    <div class="fg"><label class="label">Next step</label><input class="inp" ${dis} value="${esc(p.next)}" placeholder="e.g. intro via the Harbour Media connection" oninput="auSet('${p.id}','next',this.value,true)"></div>
+    <div class="fg"><label class="label">Notes</label><textarea class="inp" rows="3" ${dis} oninput="auSet('${p.id}','notes',this.value,true)">${esc(p.notes)}</textarea></div>`,
+    `<button class="btn btn-ghost" onclick="closeModal()">Close</button>
+     <button class="btn btn-primary ce" onclick="closeModal();render();toast('Saved — the prospect record is updated')">Save</button>`);
+}
+/* quiet=true keeps the modal open while typing; a stage change re-renders the board behind it. */
+function auSet(id,k,v,quiet){const p=AUP(id);if(!p)return;p[k]=v;if(!quiet){auDrawer(id);render();toast(`${p.company} → ${AU_STAGE_LABEL[p.stage]}`);}}
 
 /* ============================ wise ============================ */
 function pageWise(){
@@ -1267,7 +1709,7 @@ function createQuick(){
 }
 
 /* ============================ render / init ============================ */
-const PAGES={dash:pageDash,partners:pagePartners,pipe:pagePipe,docs:pageDocs,notifications:pageNotifications,tasks:pageTasks,calendar:pageCalendar,notes:pageNotes,revenue:pageRevenue,xero:pageXero,wise:pageWise,users:pageUsers,settings:pageSettings};
+const PAGES={dash:pageDash,partners:pagePartners,pipe:pagePipe,au:pageAU,docs:pageDocs,notifications:pageNotifications,tasks:pageTasks,calendar:pageCalendar,notes:pageNotes,revenue:pageRevenue,xero:pageXero,wise:pageWise,users:pageUsers,settings:pageSettings};
 const LOCK_MSG={xero:"Accounting data is restricted to admins.",wise:"Treasury data is restricted to admins.",users:"User management is restricted to admins.",settings:"Settings are restricted to admins."};
 function render(){
   renderSide();

@@ -144,6 +144,27 @@ tr.winner td{background:rgba(10,79,50,.06)}
 .badge.win{background:rgba(10,79,50,.12);color:var(--forest)}
 .badge.warn{background:rgba(230,126,34,.14);color:var(--warning)}
 .note{font-size:11.5px;color:var(--muted);padding:9px 16px}
+/* feed stats: filter bar, multi-select chips, chart legend */
+.fbar{padding:11px 16px;border-bottom:1px solid var(--rule);display:flex;align-items:flex-end;gap:14px;flex-wrap:wrap}
+.fbar .ftitle{font-family:var(--fd);font-weight:600;font-size:11px;letter-spacing:.2em;text-transform:uppercase;color:var(--gold-d);align-self:center}
+.fbar .hint{font-size:11.5px;color:var(--muted);align-self:center}
+.fl{display:flex;flex-direction:column;gap:4px}
+.fl>span:first-child{font-family:var(--fd);font-weight:600;font-size:9.5px;letter-spacing:.16em;text-transform:uppercase;color:var(--muted)}
+.ms{position:relative}
+.ms-btn{font-family:inherit;font-size:12.5px;min-width:130px;text-align:left;padding:4px 9px;border:1px solid var(--rule);border-radius:2px;background:var(--surface);color:var(--ink);cursor:pointer}
+.ms-btn:hover{border-color:var(--forest)}
+.ms-btn .caret{float:right;opacity:.5;margin-left:8px}
+.ms-panel{display:none;position:absolute;z-index:20;top:calc(100% + 2px);left:0;min-width:190px;max-height:230px;overflow-y:auto;background:var(--surface);border:1px solid var(--rule);border-radius:2px;box-shadow:0 8px 22px rgba(7,51,31,.18);padding:4px}
+.ms.open .ms-panel{display:block}
+.ms-panel label{display:flex;flex-direction:row;align-items:center;gap:7px;font-size:12.5px;padding:3px 6px;cursor:pointer;white-space:nowrap}
+.ms-panel label:hover{background:rgba(10,79,50,.06)}
+.ms-panel input{margin:0}
+.ms-actions{display:flex;gap:10px;padding:3px 6px 5px;border-bottom:1px solid var(--rule);margin-bottom:3px}
+.ms-actions a{font-size:11px;color:var(--muted);cursor:pointer;text-decoration:underline}
+.ms-actions a:hover{color:var(--forest)}
+.flegend{display:flex;gap:16px;padding:8px 16px 0;font-family:var(--fd);font-size:10.5px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted)}
+.flegend .sw{width:9px;height:9px;border-radius:2px;display:inline-block;margin-right:5px}
+tr.totrow td{background:rgba(10,79,50,.06);font-weight:700}
 .note2{border-left:3px solid var(--gold);background:rgba(189,140,61,.07);padding:9px 12px;font-size:12.5px;margin:10px 16px}
 .verdict{font-size:13px;padding:8px 12px;border-radius:2px;background:rgba(10,79,50,.06);border:1px solid var(--rule)}
 .stats{display:flex;gap:22px;flex-wrap:wrap;align-items:baseline;padding:10px 16px 2px}
@@ -460,6 +481,8 @@ const dimLabel=k=>({lane:"Lane",platform:"Platform",media:"Media type",geo:"Geo"
 // sortc: up to two keys, so "supply partner, then date within partner" is one
 // shift-click away. k = a metric key, or "d_<dim>" for a dimension column.
 let S={tab:"cockpit",mode:"margin",dims:["lane"],grain:"auto",th:null,filt:[],sortc:[{k:"revenue",dir:-1}],
+  frange:"30d",ffrom:dISO(29),fto:dISO(0),fdims:["label"],fmetric:"revenue",fhours:8,frepull:false,
+  ff:{label:[],dsp:[],route:[],format:[],deal:[]},
   pm:["revenue"],dm:["revenue","requests"],pmedia:[...MEDIA],dmedia:[...MEDIA],pplat:[],dplat:[],dwin:14,kwin:7};
 let suppressHash=false;
 function pushHash(){
@@ -1600,10 +1623,333 @@ function pageRadar(){
   <div class="note" style="padding:0 4px">Every number traces to lanes that actually ran. Slices inherit coverage from their contributing lanes; unresolved entities fragment comparables — keep the alias review queue clean.</div>`;
 }
 
+/* ============ feed stats ============
+   Feed-grain reporting pulled straight from each partner platform's own stats
+   API and kept in a capture ledger, so a restated day replaces its statement
+   instead of stacking on top of it. Range + grouping + filters drive one
+   report; the live pulse below it reads the 10-minute captures.            */
+let FEED_PULSE=null;   // hover data for the live pulse, rebuilt each render
+const FEED_DSPS=["Demand C","Demand D","Demand E","Demand G"];
+const FEED_ROUTES=["direct","relay","reseller"];
+const FEED_FORMATS=["banner","video","native","CTV"];
+const FEED_DEALS=["open","PMP","PG"];
+const FEED_NAMES=[
+  ["Supply A · CTV prime","Supply A"],["Supply A · in-app run","Supply A"],
+  ["Supply B · EU display","Supply B"],["Supply B · US video","Supply B"],
+  ["Supply F · web video","Supply F"],["Supply F · AU tail","Supply F"],
+  ["Relay · house lane","Relay"],["Supply A · PMP deal","Supply A"],
+  ["Supply B · native mix","Supply B"],["Supply F · CTV test","Supply F"],
+];
+const FEEDS=FEED_NAMES.map(([label,partner],i)=>({
+  id:9100+i*7, label, partner,
+  dsp:FEED_DSPS[i%FEED_DSPS.length], route:FEED_ROUTES[i%FEED_ROUTES.length],
+  format:FEED_FORMATS[i%FEED_FORMATS.length], deal:FEED_DEALS[i%FEED_DEALS.length],
+  platform:PLATFORMS[i%PLATFORMS.length],
+  status:i===9?"paused":"active",
+  watch:i===3,          // flagged: numbers under suspicion, still reported
+  scale:(2.4-i*0.17)*1e6, ecpm:6+((i*3.7)%13), fr:0.045+((i*11)%9)/180, margin:0.09+((i*7)%13)/100,
+}));
+/* One row per feed per day. Cost is what we pay the partner; the platform's
+   own figure is carried alongside ours so the two can be reconciled. */
+let FEED_FACTS=[];
+for(const f of FEEDS){
+  for(let i=0;i<NDAYS;i++){
+    const back=NDAYS-1-i, dow=dDow(back), wk=(dow===0||dow===6)?0.79:1;
+    const part=back===0?(HOUR+1)/24:1;
+    const w=(0.85+rnd()*0.3)*wk*part*(f.status==="paused"&&back<9?0:1);
+    const requests=f.scale*w;
+    const responses=requests*(0.28+rnd()*0.1);
+    const impressions=requests*f.fr*(0.92+rnd()*0.16);
+    const revenue=impressions/1000*f.ecpm*(0.94+rnd()*0.12);
+    const cost=revenue*(1-f.margin+(rnd()-0.5)*0.02);
+    FEED_FACTS.push({feed:f.id,label:f.label,partner:f.partner,dsp:f.dsp,route:f.route,format:f.format,
+      deal:f.deal,platform:f.platform,status:f.status,date:dISO(back),idx:i,
+      requests,responses,impressions,revenue,cost,
+      // the platform's own revenue figure — a few basis points off ours, which
+      // is exactly the gap the reconciliation is there to surface
+      plat_revenue:revenue*(0.997+rnd()*0.007),
+      failures:Math.round(requests/1e5*(rnd()*3)),
+    });
+  }
+}
+const FEED_GROUPS=[["label","Name"],["dsp","DSP"],["partner","Partner"],["route","Route"],["feed","Feed"],
+                   ["format","Format"],["day","Day"],["month","Month"],["deal","Deal"],["status","Status"]];
+const FEED_COLS=[
+  ["feeds","Feeds",n=>Math.round(n).toLocaleString()],
+  ["requests","Requests",n=>Math.round(n).toLocaleString()],
+  ["impressions","Impr.",n=>Math.round(n).toLocaleString()],
+  ["fill","Fill",pct],
+  ["plat_revenue","Platform $",fmt$],
+  ["partner_revenue","Partner $",fmt$],
+  ["revenue","Revenue",fmt$],
+  ["cost","Cost",fmt$],
+  ["profit","Profit",fmt$],
+  ["margin","Margin",pct],
+  ["ecpm","eCPM",usd2],
+  ["failures","Fails",n=>Math.round(n).toLocaleString()],
+];
+function feedRange(){
+  const d=(back)=>dISO(back);
+  switch(S.frange){
+    case "today":     return {from:d(0),to:d(0)};
+    case "yesterday": return {from:d(1),to:d(1)};
+    case "7d":        return {from:d(6),to:d(0)};
+    case "30d":       return {from:d(29),to:d(0)};
+    case "month":     return {from:d(0).slice(0,8)+"01",to:d(0)};
+    case "lastmonth":{const t=d(0);const y=+t.slice(0,4),m=+t.slice(5,7);
+                      const py=m===1?y-1:y, pm=m===1?12:m-1;
+                      const last=new Date(Date.UTC(py,pm,0)).getUTCDate();
+                      const p=String(py)+"-"+String(pm).padStart(2,"0");
+                      return {from:p+"-01",to:p+"-"+last};}
+    case "all":       return {from:d(NDAYS-1),to:d(0)};
+    default:          return {from:S.ffrom,to:S.fto};
+  }
+}
+function feedRows(){
+  const r=feedRange();
+  return FEED_FACTS.filter(x=>x.date>=r.from&&x.date<=r.to
+    &&(!S.ff.label.length  ||S.ff.label.includes(x.label))
+    &&(!S.ff.dsp.length    ||S.ff.dsp.includes(x.dsp))
+    &&(!S.ff.route.length  ||S.ff.route.includes(x.route))
+    &&(!S.ff.format.length ||S.ff.format.includes(x.format))
+    &&(!S.ff.deal.length   ||S.ff.deal.includes(x.deal)));
+}
+const feedKeyOf=(r,dim)=>dim==="day"?r.date:dim==="month"?r.date.slice(0,7):dim==="feed"?String(r.feed):r[dim];
+function feedAgg(rows,dims){
+  const m=new Map();
+  for(const r of rows){
+    const k=dims.map(d=>feedKeyOf(r,d)).join(" ¦ ");
+    let g=m.get(k);
+    if(!g){g={k,labels:dims.map(d=>feedKeyOf(r,d)),ids:new Set(),requests:0,responses:0,impressions:0,revenue:0,cost:0,plat_revenue:0,failures:0};m.set(k,g);}
+    g.ids.add(r.feed);
+    g.requests+=r.requests;g.responses+=r.responses;g.impressions+=r.impressions;
+    g.revenue+=r.revenue;g.cost+=r.cost;g.plat_revenue+=r.plat_revenue;g.failures+=r.failures;
+  }
+  return [...m.values()].map(feedDerive).sort((a,b)=>b.revenue-a.revenue);
+}
+function feedDerive(g){
+  g.feeds=g.ids?g.ids.size:g.feeds;
+  g.partner_revenue=g.cost;                       // what the partner books as theirs
+  g.profit=g.revenue-g.cost;
+  g.fill=g.requests>0?g.impressions/g.requests:null;
+  g.margin=g.revenue>0?g.profit/g.revenue:null;
+  g.ecpm=g.impressions>0?g.revenue/g.impressions*1000:null;
+  return g;
+}
+/* live pulse: what each 10-minute capture added, today against the same
+   window yesterday. Fill and eCPM are ratios, so they are plotted as a
+   2-hour rolling ratio — a single 10-minute bucket is too thin to read. */
+function pulseSeries(){
+  const slots=S.fhours*6, per=10/60;              // 10-minute buckets
+  const rows=feedRows();
+  const dayTotal=d=>{const t={requests:0,responses:0,impressions:0,revenue:0};
+    for(const r of FEED_FACTS)if(r.date===d&&rows.some(x=>x.feed===r.feed)){t.requests+=r.requests;t.responses+=r.responses;t.impressions+=r.impressions;t.revenue+=r.revenue;}
+    return t;};
+  const today=dayTotal(dISO(0)), yest=dayTotal(dISO(1));
+  const endH=HOUR+1, startH=Math.max(0,endH-S.fhours);
+  const mk=(tot,hoursCovered)=>{
+    const out=[];
+    for(let s=0;s<slots;s++){
+      const h=startH+s*per;
+      if(h>hoursCovered){out.push(null);continue;}
+      const shape=SHAPE[Math.min(23,Math.floor(h))]/SHSUM*per*(0.82+rnd()*0.36);
+      out.push({requests:tot.requests*shape,responses:tot.responses*shape,
+                impressions:tot.impressions*shape,revenue:tot.revenue*shape});
+    }
+    return out;
+  };
+  // yesterday's window is complete; today's stops at the current 10-minute slot
+  return {t:mk(today,endH),y:mk(yest,24),slots,startH,per};
+}
+function pulseMetric(arr,i,k){
+  if(k!=="fill"&&k!=="ecpm"){const v=arr[i];return v?v[k]:null;}
+  let req=0,imp=0,rev=0,seen=0;
+  for(let j=Math.max(0,i-11);j<=i;j++){const v=arr[j];if(!v)continue;req+=v.requests;imp+=v.impressions;rev+=v.revenue;seen++;}
+  if(!seen)return null;
+  return k==="fill"?(req?imp/req:null):(imp?rev/imp*1000:null);
+}
+const PULSE_METRICS={revenue:"Revenue",requests:"Requests",responses:"Responses",impressions:"Impressions",fill:"Fill rate",ecpm:"eCPM"};
+const PULSE_FMT={revenue:fmt$,requests:n=>n==null?"–":Math.round(n).toLocaleString(),responses:n=>n==null?"–":Math.round(n).toLocaleString(),
+                 impressions:n=>n==null?"–":Math.round(n).toLocaleString(),fill:pct,ecpm:usd2};
+
+/* one dropdown of checkboxes per filter — "All" until something is ticked,
+   then the single value or a count, so the bar reads at a glance */
+let MS_OPEN=null;
+function msPicker(id,list,label,chosen,pretty){
+  const set=new Set(chosen), fn=pretty||(v=>v);
+  const btn=set.size===0?"All":set.size===1?fn([...set][0]):`${set.size} selected`;
+  return `<label class="fl"><span>${label}</span>
+    <span class="ms ${MS_OPEN===id?"open":""}">
+      <button class="ms-btn" type="button" onclick="msToggle('${id}',event)">${esc(btn)}<span class="caret">▾</span></button>
+      <div class="ms-panel" onclick="event.stopPropagation()">
+        <div class="ms-actions"><a onclick="msAll('${id}',true)">all</a><a onclick="msAll('${id}',false)">none</a></div>
+        ${list.map(v=>`<label><input type="checkbox" ${set.has(v)?"checked":""} onchange="msPick('${id}','${esc(String(v)).replace(/'/g,"&#39;")}')">${esc(fn(v))}</label>`).join("")}
+      </div></span></label>`;
+}
+const msList=id=>id==="group"?FEED_GROUPS.map(g=>g[0]):
+  id==="label"?[...new Set(FEEDS.map(f=>f.label))]:
+  id==="dsp"?FEED_DSPS:id==="route"?FEED_ROUTES:id==="format"?FEED_FORMATS:FEED_DEALS;
+const msSel=id=>id==="group"?S.fdims:S.ff[id];
+function msToggle(id,ev){ev.stopPropagation();MS_OPEN=MS_OPEN===id?null:id;render();}
+function msPick(id,v){
+  const a=msSel(id),i=a.indexOf(v);
+  if(i>=0){if(id!=="group"||a.length>1)a.splice(i,1);}else a.push(v);
+  MS_OPEN=id;render();
+}
+function msAll(id,on){
+  const a=msSel(id);a.length=0;
+  if(on)a.push(...msList(id)); else if(id==="group")a.push("label");
+  MS_OPEN=id;render();
+}
+document.addEventListener("click",()=>{if(MS_OPEN){MS_OPEN=null;if(S.tab==="feeds")render();}});
+function setFRange(v){S.frange=v;if(v!=="custom"){const r=feedRange();S.ffrom=r.from;S.fto=r.to;}render();}
+function setFDate(k,v){if(!v)return;S.frange="custom";S[k]=v;render();}
+function feedCsv(){toast("CSV export — the live page streams the same grouped rows straight from the ledger");}
+
+function pageFeeds(){
+  const r=feedRange(), rows=feedRows(), agg=feedAgg(rows,S.fdims);
+  const tot=feedDerive({ids:new Set(rows.map(x=>x.feed)),
+    requests:rows.reduce((a,x)=>a+x.requests,0),responses:rows.reduce((a,x)=>a+x.responses,0),
+    impressions:rows.reduce((a,x)=>a+x.impressions,0),revenue:rows.reduce((a,x)=>a+x.revenue,0),
+    cost:rows.reduce((a,x)=>a+x.cost,0),plat_revenue:rows.reduce((a,x)=>a+x.plat_revenue,0),
+    failures:rows.reduce((a,x)=>a+x.failures,0)});
+  const watched=FEEDS.filter(f=>f.watch&&rows.some(x=>x.feed===f.id));
+  const gap=tot.revenue?(tot.plat_revenue-tot.revenue)/tot.revenue:0;
+
+  /* --- revenue / profit / impressions chart, one bar group per day --- */
+  const byDay=feedAgg(rows,["day"]).sort((a,b)=>a.labels[0]<b.labels[0]?-1:1);
+  const W=960,H=170,PD=54,PB=22;
+  const maxV=Math.max(1,...byDay.map(d=>d.revenue)), maxI=Math.max(1,...byDay.map(d=>d.impressions));
+  const bw=Math.min(15,(W-PD-14)/(byDay.length*2.6));
+  const cx=i=>PD+(W-PD-14)*(i+.5)/Math.max(1,byDay.length);
+  const cy=v=>H-PB-(H-PB-14)*v/maxV;
+  const chart=byDay.length?`<svg viewBox="0 0 ${W} ${H}" style="display:block;width:100%;height:auto">
+    ${[0,.5,1].map(f=>`<line x1="${PD}" x2="${W-8}" y1="${cy(maxV*f).toFixed(1)}" y2="${cy(maxV*f).toFixed(1)}" stroke="rgba(250,250,247,.09)"/><text x="${PD-6}" y="${(cy(maxV*f)+4).toFixed(1)}" text-anchor="end" fill="rgba(250,250,247,.45)" font-size="10">${fmt$(maxV*f)}</text>`).join("")}
+    ${byDay.map((d,i)=>{const x=cx(i),ih=(H-PB-14)*d.impressions/maxI;return `
+      <rect x="${(x-bw*1.15).toFixed(1)}" y="${(H-PB-ih).toFixed(1)}" width="${(bw*2.3).toFixed(1)}" height="${ih.toFixed(1)}" fill="rgba(10,79,50,.25)" rx="1"/>
+      <rect x="${(x-bw*1.05).toFixed(1)}" y="${cy(d.revenue).toFixed(1)}" width="${bw.toFixed(1)}" height="${(H-PB-cy(d.revenue)).toFixed(1)}" fill="#0A4F32" rx="1"><title>${d.labels[0]} · revenue ${fmt$(d.revenue)}</title></rect>
+      <rect x="${(x+bw*.05).toFixed(1)}" y="${cy(Math.max(d.profit,0)).toFixed(1)}" width="${bw.toFixed(1)}" height="${(H-PB-cy(Math.max(d.profit,0))).toFixed(1)}" fill="#F2C879" rx="1"><title>${d.labels[0]} · profit ${fmt$(d.profit)}</title></rect>
+      ${i%Math.max(1,Math.ceil(byDay.length/9))===0?`<text x="${x.toFixed(1)}" y="${H-6}" text-anchor="middle" fill="rgba(250,250,247,.45)" font-size="10">${fmtDay(d.labels[0])}</text>`:""}`;}).join("")}
+    </svg>`:`<div class="note">No captures in this range.</div>`;
+
+  /* --- live pulse --- */
+  const ps=pulseSeries(), mk=S.fmetric;
+  const pcur=[...Array(ps.slots)].map((_,i)=>pulseMetric(ps.t,i,mk));
+  const ppri=[...Array(ps.slots)].map((_,i)=>pulseMetric(ps.y,i,mk));
+  const upto=pcur.reduce((last,v,i)=>v!=null?i:last,0);
+  const pticks=[];
+  for(let s=0;s<ps.slots;s+=Math.max(1,Math.round(ps.slots/6)))pticks.push([s,String(Math.floor(ps.startH+s*ps.per)).padStart(2,"0")+":00"]);
+  if(pticks[pticks.length-1][0]!==ps.slots-1)pticks.push([ps.slots-1,"now"]);
+  FEED_PULSE={cur:pcur,pri:ppri,n:ps.slots,upto,label:PULSE_METRICS[mk],fmt:PULSE_FMT[mk],
+    color:CHART_METRICS[mk]?.color||"#6FE3A5",
+    pointLabel:i=>{const h=ps.startH+i*ps.per;return String(Math.floor(h)).padStart(2,"0")+":"+String(Math.round((h%1)*60)).padStart(2,"0");}};
+  const sumT=k=>ps.t.reduce((a,v)=>a+(v?v[k]:0),0), sumY=(k,upto2)=>ps.y.slice(0,upto2+1).reduce((a,v)=>a+(v?v[k]:0),0);
+  const pRev=sumT("revenue"), pRevY=sumY("revenue",upto);
+
+  return `
+  <div class="card">
+    <div class="fbar">
+      <label class="fl"><span>Range</span><select onchange="setFRange(this.value)">${
+        [["today","Today"],["yesterday","Yesterday"],["7d","Last 7 days"],["30d","Last 30 days"],
+         ["month","This month"],["lastmonth","Last month"],["all","All captured"],["custom","Custom"]]
+        .map(([k,l])=>`<option value="${k}"${S.frange===k?" selected":""}>${l}</option>`).join("")}</select></label>
+      <label class="fl"><span>From</span><input type="date" value="${r.from}" max="${r.to}" onchange="setFDate('ffrom',this.value)"></label>
+      <label class="fl"><span>To</span><input type="date" value="${r.to}" min="${r.from}" onchange="setFDate('fto',this.value)"></label>
+      ${msPicker("group",msList("group"),"Group by",S.fdims,k=>FEED_GROUPS.find(g=>g[0]===k)[1])}
+      ${msPicker("label",msList("label"),"Name",S.ff.label)}
+      ${msPicker("dsp",FEED_DSPS,"DSP",S.ff.dsp)}
+      ${msPicker("route",FEED_ROUTES,"Route",S.ff.route)}
+      ${msPicker("format",FEED_FORMATS,"Format",S.ff.format)}
+      ${msPicker("deal",FEED_DEALS,"Deal",S.ff.deal)}
+      <span style="margin-left:auto;display:flex;align-items:center;gap:12px">
+        <label class="fl" style="flex-direction:row;align-items:center;gap:6px;white-space:nowrap" title="Off: read the ledger, re-pulling today only if the 10-minute capture has fallen behind. On: re-pull every day in the range from the partner APIs first.">
+          <input type="checkbox" ${S.frepull?"checked":""} onchange="S.frepull=this.checked;render()"> force re-pull of range</label>
+        <span class="hint" style="cursor:pointer" onclick="feedCsv()">download CSV</span></span>
+    </div>
+    <div class="note">${rows.length.toLocaleString()} ledger rows · ${r.from} → ${r.to} · ${tot.feeds} feeds${S.frepull?" · re-pulling every day in the range from the partner APIs":" · reading the ledger, re-pulling today only if the capture has fallen behind"}</div>
+    ${watched.length?`<div class="note" style="color:#F2C879">⚑ ${watched.length} feed${watched.length>1?"s":""} under watch — ${watched.map(f=>esc(f.label)).join(", ")}. Still reported; the numbers are flagged, not dropped.</div>`:""}
+  </div>
+
+  <div class="card">
+    <div class="kpis">
+      <div class="kpi"><div class="l">Revenue</div><div class="v">${fmt$(tot.revenue)}</div></div>
+      <div class="kpi"><div class="l">Cost</div><div class="v">${fmt$(tot.cost)}</div></div>
+      <div class="kpi hl"><div class="l">Profit</div><div class="v">${fmt$(tot.profit)}</div></div>
+      <div class="kpi hl"><div class="l">Margin</div><div class="v">${pct(tot.margin)}</div></div>
+      <div class="kpi"><div class="l">Impressions</div><div class="v">${Math.round(tot.impressions).toLocaleString()}</div></div>
+      <div class="kpi"><div class="l">Fill</div><div class="v">${pct(tot.fill)}</div></div>
+      <div class="kpi"><div class="l">eCPM</div><div class="v">${usd2(tot.ecpm)}</div></div>
+      <div class="kpi"><div class="l">Platform gap</div><div class="v" style="color:${Math.abs(gap)>0.01?"#FF9E7D":"inherit"}">${(gap*100).toFixed(2)}%</div></div>
+    </div>
+    <div class="flegend">
+      <span><span class="sw" style="background:#0A4F32"></span>Revenue</span>
+      <span><span class="sw" style="background:#F2C879"></span>Profit</span>
+      <span><span class="sw" style="background:rgba(10,79,50,.25)"></span>Impressions</span>
+    </div>
+    <div style="padding:4px 8px 10px">${chart}</div>
+    <div class="note">Platform gap is the partner's own revenue figure against ours over the same rows. Under a percent is normal counting drift; a widening gap is the first thing to take to them.</div>
+  </div>
+
+  <div class="card">
+    <div class="fbar">
+      <span class="ftitle">Live pulse — 10-minute stats</span>
+      <span class="hint">updated ${nowStamp()}</span>
+      <span style="margin-left:auto;display:flex;gap:8px">
+        <select onchange="S.fmetric=this.value;render()">${Object.entries(PULSE_METRICS).map(([k,l])=>`<option value="${k}"${mk===k?" selected":""}>${l}</option>`).join("")}</select>
+        <select onchange="S.fhours=+this.value;render()">${[4,8,12,24].map(h=>`<option value="${h}"${S.fhours===h?" selected":""}>Last ${h}h</option>`).join("")}</select></span>
+    </div>
+    <div class="flegend">
+      <span><span class="sw" style="background:#0A4F32"></span>Today</span>
+      <span><span class="sw" style="background:#F2C879;opacity:.75"></span>Same window yesterday</span>
+    </div>
+    <div class="pchart" id="band-feedpulse">${multiSpark([{color:CHART_METRICS[mk]?.color||"#6FE3A5",cur:pcur,pri:ppri}],upto,ps.slots,pticks)}<div class="pguide"></div><div class="ptip"></div></div>
+    <div class="kpis" style="margin-top:10px">
+      <div class="kpi"><div class="l">${PULSE_METRICS[mk]} · window</div><div class="v">${PULSE_FMT[mk](mk==="fill"||mk==="ecpm"?pulseMetric(ps.t,upto,mk):sumT(mk))}</div></div>
+      <div class="kpi"><div class="l">Same window yesterday</div><div class="v">${PULSE_FMT[mk](mk==="fill"||mk==="ecpm"?pulseMetric(ps.y,upto,mk):sumY(mk,upto))}</div></div>
+      <div class="kpi hl"><div class="l">Revenue · window</div><div class="v">${fmt$(pRev)}${paceTag(pRev,pRevY)}</div></div>
+      <div class="kpi"><div class="l">Captures</div><div class="v">${upto+1}<small style="font-size:11px;color:var(--muted)"> / ${ps.slots}</small></div></div>
+    </div>
+    <div class="note">Fill and eCPM are ratios, so they plot as a 2-hour rolling ratio — one 10-minute bucket is too thin to read a rate off. Alerts run on the same captures: a rule fires only after two consecutive windows breach it, then holds a cooldown before it can fire again.</div>
+  </div>
+
+  <div class="card">
+    <div class="fbar"><span class="ftitle">Breakdown</span><span class="hint">${agg.length.toLocaleString()} rows · grouped by ${S.fdims.map(d=>FEED_GROUPS.find(g=>g[0]===d)[1].toLowerCase()).join(" × ")}</span></div>
+    <div class="tbl-wrap"><table>
+      <tr>${S.fdims.map(d=>`<th>${FEED_GROUPS.find(g=>g[0]===d)[1]}</th>`).join("")}${FEED_COLS.map(c=>`<th class="num">${c[1]}</th>`).join("")}</tr>
+      <tr class="totrow">${S.fdims.map((d,i)=>`<td>${i?"":"<b>Total</b>"}</td>`).join("")}${FEED_COLS.map(c=>`<td class="num">${c[2](tot[c[0]])}</td>`).join("")}</tr>
+      ${agg.map(g=>`<tr>${g.labels.map(l=>`<td>${esc(String(l))}</td>`).join("")}${FEED_COLS.map(c=>`<td class="num">${c[2](g[c[0]])}</td>`).join("")}</tr>`).join("")
+        ||`<tr><td colspan="${S.fdims.length+FEED_COLS.length}" class="note">No rows match those filters.</td></tr>`}
+    </table></div>
+    <div class="note">Every row traces to a capture in the ledger — one entry per feed per day, both sides kept. A restatement replaces its statement rather than stacking on it, so re-pulling a day can correct history without ever double-counting it.</div>
+  </div>`;
+}
+
+/* the feed pulse carries one metric over plain arrays, so it gets its own
+   binder rather than the cockpit bands' metricOf-shaped one */
+function bindFeedPulse(){
+  const band=document.getElementById("band-feedpulse"),d=FEED_PULSE;
+  if(!band||!d)return;
+  const svg=band.querySelector("svg"),guide=band.querySelector(".pguide"),tip=band.querySelector(".ptip");
+  const W=960,padL=8,padR=8,iW=W-padL-padR,last=Math.max(1,d.n-1);
+  svg.onmousemove=ev=>{
+    const box=svg.getBoundingClientRect();
+    const i=Math.max(0,Math.min(last,Math.round(((ev.clientX-box.left)/box.width*W-padL)/iW*last)));
+    const gx=(padL+i/last*iW)/W*box.width+svg.offsetLeft;
+    guide.style.display="block";guide.style.left=gx+"px";guide.style.top=svg.offsetTop+"px";guide.style.height=box.height+"px";
+    tip.innerHTML=`<div class="tth"><span>${d.pointLabel(i)}</span><span>vs yesterday</span></div><table>`
+      +`<tr><td class="m"><span class="dot2" style="background:${d.color}"></span>${d.label}</td>`
+      +`<td class="n">${i<=d.upto?d.fmt(d.cur[i]):"–"}</td><td class="n yv">${d.fmt(d.pri[i])}</td></tr></table>`;
+    tip.style.display="block";
+    const tw=tip.offsetWidth||190,flip=gx+14+tw>svg.offsetLeft+box.width;
+    tip.style.left=(flip?gx-tw-12:gx+12)+"px";tip.style.top=(svg.offsetTop+6)+"px";
+  };
+  svg.onmouseleave=()=>{guide.style.display="none";tip.style.display="none";};
+}
+
 /* ============ shell ============ */
 function setTab(t){S.tab=t;sync();window.scrollTo(0,0);}
 function headerRight(){
-  const NAV=[["radar","Radar"],["partners","Partners"],["whitelist","Whitelists"],["ops","Ops board →"],["mapper","Mapper"],["cockpit","Operations cockpit"]];
+  const NAV=[["radar","Radar"],["partners","Partners"],["whitelist","Whitelists"],["ops","Ops board →"],["mapper","Mapper"],["feeds","Feed stats"],["cockpit","Operations cockpit"]];
   const mins=((Date.now()/60000|0)%38)+5; // fake data age
   const now=new Date();
   const hm=String(now.getUTCHours()).padStart(2,"0")+":"+String(now.getUTCMinutes()).padStart(2,"0");
@@ -1614,8 +1960,9 @@ function headerRight(){
 }
 function render(){
   $("#hdr").innerHTML=headerRight();
-  $("#main").innerHTML=({cockpit:pageCockpit,ops:pageOps,whitelist:pageWhitelist,partners:pagePartners,mapper:pageMapper,radar:pageRadar})[S.tab]();
+  $("#main").innerHTML=({cockpit:pageCockpit,ops:pageOps,whitelist:pageWhitelist,partners:pagePartners,mapper:pageMapper,radar:pageRadar,feeds:pageFeeds})[S.tab]();
   if(S.tab==="cockpit"){bindBandHover("pulse");bindBandHover("daily");}
+  if(S.tab==="feeds")bindFeedPulse();
 }
 loadHash();
 pushHash();
