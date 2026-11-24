@@ -182,6 +182,8 @@ let DB = {
         revenues:[{country:"US",revenue:90},{country:"CA",revenue:70},{country:"AU",revenue:85},{country:"DE",revenue:60},{country:"UK",revenue:80}] },
       { id:23, name:"Nimbus Sweeps", event_name:"ftd", default_revenue:null, payout_model:"revshare", offer_url:"https://nimbus-sweeps.example/go?cid={click_id}&s1={sub_id}",
         revenues:[] },
+      { id:24, name:"Solara Bingo", event_name:"reg", default_revenue:40, offer_url:"https://solara-bingo.example/join?ref={click_id}&s1={sub_id}",
+        revenues:[] },
     ]},
   ],
   publishers: [
@@ -196,19 +198,37 @@ let DB = {
     { id:3, name:"Qualified FTD", param:"qftd" },
   ],
 };
-// 20% margin rounded down — nearest $5 at $100+, whole dollar under $100, one decimal under $10
-function defPayout(rev){ const p = rev*0.8; if (p>=100) return Math.floor(p/5)*5; if (p>=10) return Math.floor(p); return Math.floor(p*10)/10; }
+// Default payout tiers: 20% margin rounded to the NEAREST step, ties down —
+// revenue > $80 → nearest $5, $20–$80 → whole dollar, < $20 → one decimal.
+// (Replaced the old floored 10/100 tiers so product payouts and partner rate
+// cards round the same way.)
+function defPayout(rev){
+  const raw = rev*0.8, eps = 1e-9;
+  const halfDown = x => Math.ceil(x - 0.5 - eps);   // 1.75 → 1.7, 1.76 → 1.8
+  if (rev < 20) return halfDown(raw*10)/10;
+  if (rev <= 80) return halfDown(raw);
+  return halfDown(raw/5)*5;
+}
+const TIER_TIP = "Default payout = 20% margin off the revenue, rounded to the NEAREST step of its tier: revenue above $80 rounds to a $5 step, $20–$80 to a whole dollar, under $20 to one decimal. An exact tie rounds down (1.75 → 1.7). One rule shared by product payouts and the partner rate cards, so the same offer never shows two prices.";
 function offerById(id){ for (const a of DB.advertisers) for (const o of a.offers) if (o.id===id) return o; return null; }
 function advOfOffer(id){ for (const a of DB.advertisers) if (a.offers.some(o=>o.id===id)) return a; return null; }
 function pubById(id){ return DB.publishers.find(p=>p.id===id) || null; }
 (function seedProducts(){
-  const defs = [[41,11,1],[42,11,2],[43,12,1],[44,12,3],[45,21,2],[46,21,3],[47,22,1],[48,22,2]];
+  const defs = [[41,11,1],[42,11,2],[43,12,1],[44,12,3],[45,21,2],[46,21,3],[47,22,1],[48,22,2],[50,24,2]];
   DB.products = defs.map(([id,off,pub])=>({ id, offer_id:off, publisher_id:pub,
     payouts:(offerById(off).revenues||[]).map(r=>({country:r.country, payout:defPayout(r.revenue)})) }));
   // The revshare offer: the advertiser sends the amount on the postback, so no
   // rate card — the product carries the agreed publisher share instead.
   DB.products.push({ id:49, offer_id:23, publisher_id:3, payouts:[], revshare_pct:80 });
+  // #44 was paused when the advertiser capped the campaign: the link stays
+  // alive and traffic diverts to the fallback instead of 404ing.
+  DB.products.find(p=>p.id===44).paused = 1;
 })();
+function productPauseState(pr){
+  if (pr.paused===1) return "product";
+  const o = offerById(pr.offer_id);
+  return o && o.paused===1 ? "offer" : null;
+}
 
 // ═══════════════ fraud: IVT screening + incent pool ═══════════════
 // What each verdict means in words, because "hosting_asn" is jargon and the
@@ -223,6 +243,17 @@ const IVT_COPY = {
 };
 const IVT_FLAG_NOTE  = "Flagged only; the click still redirected. Nothing blocks until an operator names the reason in the ivt_block_reasons setting.";
 const IVT_BLOCK_NOTE = "This click was blocked and never reached the advertiser — diverted to the fallback URL rather than a 404, so a misjudged human still lands somewhere real.";
+const IVT_ALLOW_NOTE = "— but the IP is on the allow-list, so it was served and counted as a real click. The verdict is kept, not erased: the row still says what would have happened and why it did not.";
+const SCREENED_NOTE  = "A blocked click is COUNTED, not stored. It used to get a full clicks row — then a datacenter flood sent 33,000 clicks in ten minutes, every one wrote a row plus ten index entries, and the day's database quota was gone within the hour. Now each isolate keeps a counter per product × reason × minute and writes a sampled rejects row (the first in the bucket and every 200th after) carrying the running count. The reject-spike alert still fires; the redirect to the fallback is unchanged.";
+// ── IP allow-list: the IVT screen's exception list ──
+// Blocking hosting networks stops click floods. It also stops a partner
+// testing a placement from a VPN, or an office machine on a hosting ASN.
+const ALLOW_NOTE = "The false-positive escape hatch: a partner's office IP, or a QA device that keeps getting flagged as datacenter. A click from a listed address is served and recorded as a real click even when the screen would flag or block it — the verdict is kept with severity 'allowed', and bot=0, because an authorised test machine is not a crawler for the figures. Time-boxed by default so exceptions don't rot; expiry is judged at match time, so an entry stops working the moment it lapses. Exact address only, no ranges: a range is a policy, this is a list of exceptions.";
+let ALLOWLIST = [
+  { ip:"203.0.113.77", note:"Clickforge office — QA phone kept flagging as datacenter", publisher_id:2, hours:72, added:Date.now()-5*3600e3 },
+  { ip:"198.51.100.9", note:"our own monitoring probe", publisher_id:null, hours:null, added:Date.now()-14*864e5 },
+];
+const MY_IP = "203.0.113.42";
 const INCENT_NOTE = "Incent traffic is not invalid traffic — the visitor is a real person on a real browser paid to click; most casino CPA terms prohibit that. Clicks are matched on the referrer's domain against a hand-curated pool — there is no signal to automate it on.";
 let INCENT_POOL = [
   { domain:"flexrewards.net",  note:"cashback / rewards portal" },
@@ -361,6 +392,7 @@ const FALLBACK_URL = "https://vane-labs.com/offers";
 const hex = n => [...Array(n)].map(()=>Math.floor(rnd()*16).toString(16)).join("");
 function genClicks(){
   CLICKS = [];
+  let pbSeqN = 0;   // the first three delivered-to-publisher conversions demo the three outbound outcomes
   const now = Date.now();
   for (let i=0;i<150;i++){
     const pr = pick(DB.products), off = offerById(pr.offer_id), pub = pubById(pr.publisher_id), adv = advOfOffer(pr.offer_id);
@@ -369,39 +401,54 @@ function genClicks(){
     const t = now - rnd()*3*864e5;
     const id = "c"+hex(15);
     const sub = "fb_"+Math.floor(1000+rnd()*9000);
-    const sub3 = pick(["creative_a","creative_b","story_v2","banner_728",null]);
+    let sub3 = pick(["creative_a","creative_b","story_v2","banner_728",null]);
     const gclid = rnd()<0.3 ? "EAIaIQ"+hex(12) : null;
     // ── IVT screen + incent seeding ──
-    let ivt_reason=null, ivt_severity=null, ua=pick(UAS), asn=null, as_org=null, referer=pick(REFS), blocked=false;
+    // Blocked clicks never appear here: they are counted, not stored — the
+    // sampled shape lives in the integration debugger (see SCREENED_NOTE).
+    let ivt_reason=null, ivt_severity=null, ua=pick(UAS), asn=null, as_org=null, referer=pick(REFS), allowedIp=false;
     if (i<3)       { ivt_reason="declared_bot"; ivt_severity="flag"; ua=pick(BOT_UAS); }
     else if (i<5)  { ivt_reason="no_ua"; ivt_severity="flag"; ua=null; }
     else if (i<8)  { ivt_reason="hosting_asn"; ivt_severity="flag"; [asn,as_org]=HOSTING[i-5]; }
-    else if (i===8){ ivt_reason="declared_bot"; ivt_severity="block"; ua=BOT_UAS[1]; blocked=true; }
-    else if (i<14) { referer=INCENT_REFS[(i-9)%INCENT_REFS.length]; }
-    const bot = ivt_reason==="declared_bot" || ivt_reason==="no_ua";   // hosting deliberately does not set bot=1
+    else if (i<10){ ivt_reason="hosting_asn"; ivt_severity="allowed"; [asn,as_org]=HOSTING[0]; allowedIp=true; }
+    else if (i<15) { referer=INCENT_REFS[(i-10)%INCENT_REFS.length]; }
+    if (i%17===14) sub3 = "{clickid}";   // the publisher's platform did not fill its macro
+    // allowed overrides the verdict's effect, not the verdict: bot=0, click served
+    const bot = (ivt_reason==="declared_bot" || ivt_reason==="no_ua") && !allowedIp;   // hosting deliberately does not set bot=1
     const test = false;
-    const conv = !bot && !blocked && rnd()<0.22;
+    // A paused product (or offer) keeps the link alive and diverts to the fallback.
+    const fallback = !!productPauseState(pr);
+    const conv = !bot && !fallback && rnd()<0.22;
     const params = {product:String(pr.id), sub_id:sub};
     if (sub3) params.sub3 = sub3;
     if (gclid) params.gclid = gclid;
     const qs = Object.entries(params).map(([k,v])=>k+"="+v).join("&");
     const request_url  = `https://${pub.click_host}/click?${qs}`;
-    const redirect_url = blocked ? FALLBACK_URL
+    const redirect_url = fallback ? FALLBACK_URL
       : (off.offer_url||"https://advertiser.example/lp?cid={click_id}")
         .replace("{click_id}",id).replace("{sub_id}",sub).replace("{sub3}",sub3||"");
     const rev = conv ? (isRS ? 45*(0.6+rnd()*0.9) : geoRev(off,g)*(0.92+rnd()*0.16)) : null;
     const pay = conv ? (isRS ? Math.round(rev*(pr.revshare_pct||0))/100 : geoPay(pr,g)) : null;
     const hasPb = !!(pub.postback_url||"").trim();
-    const pbFail = conv && hasPb && rnd()<0.08;
+    // Outbound has three outcomes, not two: delivered (2xx, or a 4xx whose body
+    // says already processed — their idempotency working), rejected (any other
+    // 4xx — final on the first attempt, the request itself is wrong), retried
+    // (only a 5xx or no answer).
+    let pb_mode = null;
+    if (conv && hasPb){
+      pb_mode = pbSeqN<3 ? ["dup","rejected","retry"][pbSeqN] : (rnd()<0.1 ? "dup" : "ok");
+      pbSeqN++;
+    }
     CLICKS.push({
       id, t, prod:pr.id, offName:off.name, advName:adv.name, pubName:pub.name, geo:g,
-      ip:`203.0.113.${10+Math.floor(rnd()*200)}`, ua, referer,
+      ip: allowedIp ? ALLOWLIST[0].ip : `203.0.113.${10+Math.floor(rnd()*200)}`, ua, referer,
       bot, test, gclid, sub_id:sub, sub3, sub4:null, sub5:rnd()<0.15?"aud_"+Math.floor(rnd()*90):null, sub6:null, sub7:null,
       request_url, redirect_url, params,
-      ivt_reason, ivt_severity, asn, as_org, is_fallback:blocked,
+      ivt_reason, ivt_severity, asn, as_org, is_fallback:fallback,
       conv, event: conv?off.event_name:null, conv_at: conv? t+rnd()*3600e3*5 : null,
-      revenue:rev, payout:pay,
-      pb_sent: conv && hasPb && !pbFail, pb_attempts: conv ? (hasPb ? (pbFail?3:1) : 0) : 0,
+      revenue:rev, payout:pay, pb_mode,
+      pb_sent: pb_mode==="ok"||pb_mode==="dup",
+      pb_attempts: conv ? (hasPb ? (pb_mode==="retry"?5:1) : 0) : 0,
     });
   }
   CLICKS.sort((a,b)=>b.t-a.t);
@@ -417,11 +464,15 @@ function eventFromClick(c){
     : (pub&&pub.postback_url?pub.postback_url:"https://publisher.example/s2s?cid={sub_id}&payout={payout}")
       .replace("{click_id}",c.id).replace("{sub_id}",c.sub_id).replace("{payout}",(c.payout||0).toFixed(2))
       .replace("{event}",c.event).replace("{country}",c.geo);
+  const out_resp = c.pb_mode==="ok" ? "1"
+    : c.pb_mode==="dup" ? '400 — {"status":"already processed"}'
+    : c.pb_mode==="rejected" ? '400 — {"error":"unknown goal \'ftd2\'"}'
+    : null;   // retry: a 5xx / no answer — nothing worth keeping
   return { id:"e"+hex(12), t:c.conv_at, event:c.event, offName:c.offName, advName:c.advName, pubName:c.pubName,
     geo:c.geo, click_id:c.id, gclid:c.gclid, sub_id:c.sub_id, sub3:c.sub3, sub4:c.sub4, sub5:c.sub5, sub6:c.sub6, sub7:c.sub7,
     revenue:c.revenue, payout:c.payout, referrer:c.referer, google: !!c.gclid, is_test:false,
-    raw_in, raw_in2, raw_out, out_resp: c.pb_sent ? "1" : null,
-    out_sent: c.pb_sent, out_attempts: c.pb_attempts };
+    raw_in, raw_in2, raw_out, out_resp,
+    out_mode:c.pb_mode, out_sent: c.pb_sent, out_attempts: c.pb_attempts };
 }
 function genEvents(){
   EVENTS = CLICKS.filter(c=>c.conv).map(eventFromClick);
@@ -430,13 +481,58 @@ function genEvents(){
 function genRejects(){
   const now = Date.now();
   REJECTS = [
+    // Blocked clicks surface here as sampled counters, not as click rows:
+    // one rejects row for the first click in each product × reason × minute
+    // bucket and every 200th after, carrying the running count.
+    { ts:now-18*60e3,   endpoint:"click",    reason:"screened: declared_bot", key:null, raw:"product=47&sub_id=fb_8812&__screened=declared_bot&__count=401&__publisher=1" },
+    { ts:now-19*60e3,   endpoint:"click",    reason:"screened: declared_bot", key:null, raw:"product=47&sub_id=fb_8812&__screened=declared_bot&__count=201&__publisher=1" },
     { ts:now-42*60e3,   endpoint:"postback", reason:"unknown click_id", key:"nk_7f3a…", raw:"click_id=abc-not-a-real-id&event=ftd&payout=72" },
     { ts:now-3*3600e3,  endpoint:"postback", reason:"bad key",          key:"nk_9x11…", raw:"click_id=c4be2210af31&key=nk_9x11wrong&event=ftd" },
+    { ts:now-6*3600e3,  endpoint:"click",    reason:"screened: hosting_asn", key:null,  raw:"product=42&sub_id=fb_2231&__screened=hosting_asn&__count=1&__publisher=2" },
     { ts:now-7*3600e3,  endpoint:"click",    reason:"unknown product",  key:null,       raw:"product=99&sub_id=fb_4417" },
     { ts:now-26*3600e3, endpoint:"postback", reason:"duplicate event",  key:"nk_7f3a…", raw:"click_id=c09a8e1d22b7&event=ftd" },
     { ts:now-31*3600e3, endpoint:"click",    reason:"missing sub_id",   key:null,       raw:"product=43" },
   ];
 }
+// Blocked-click counters for the Clicks tab header — what the screen kept out
+// of the log entirely (counted per product × reason × minute, never stored).
+function screenedCount(){
+  // Sampled rows carry a running count; the latest row of each product ×
+  // reason series is the truth for that series.
+  const seen = {};
+  for (const r of REJECTS) if (r.reason.startsWith("screened:")){
+    const prodm = r.raw.match(/product=(\d+)/), cm = r.raw.match(/__count=(\d+)/);
+    const k = (prodm?prodm[1]:"?")+":"+r.reason;
+    seen[k] = Math.max(seen[k]||0, cm?+cm[1]:1);
+  }
+  return Object.values(seen).reduce((a,b)=>a+b,0);
+}
+// ═══════════════ alerts (milestones & operational) ═══════════════
+const now0 = Date.now();
+let ALERTS = [
+  { ts:now0-2*3600e3,  kind:"milestone", msg:"Product #50 has its first real conversion.\nSolara Bingo @ Clickforge — reg, $40.00 revenue." },
+  { ts:now0-9*3600e3,  kind:"milestone", msg:"Product #50 reached 5 real clicks today (Perth day, bots and tests excluded) — the first time it has." },
+  { ts:now0-26*3600e3, kind:"reject-spike", msg:"Click rejects spiked: 401 screened (declared_bot) on product #47 in the last hour." },
+  { ts:now0-3*864e5,   kind:"outbound", msg:"Northwind Media's endpoint rejected event e4b8d2 outright: 400 unknown goal. A 4xx means the request itself is wrong — it was not retried. Fix the postback template, then re-fire from the event detail." },
+];
+const MILESTONE_TIP = "Two moments where an integration stops being a setup and becomes a product: the first real conversion a product ever books, and its first day with five or more real clicks (bots and tests excluded). Once-ever by design — alert_state remembers every key ever sent, which survives redeploys, so a throttle expiring can never re-announce a first. Products that passed a milestone before the alert existed were seeded as sent.";
+// ═══════════════ rate cards (Admin) ═══════════════
+let RC = {
+  connected:true, account:"demo@vane-labs.com",
+  master:"1xDEMO-master-catalog", masterRows:42, masterAt:now0-7*3600e3, masterOk:true,
+  lastError:null,
+  networks:[
+    { name:"Northstar Affiliates", feed:true,  configured:true, offers:2, paused:0,
+      last:{ ok:true, at:now0-7*3600e3, summary:"24 campaigns · 2 new · 1 paused · 3 rate changes" } },
+    { name:"Meridian Partners",    feed:false, offers:4, paused:0, last:null },
+  ],
+  sheets:[   // one per publisher that reads a rate card
+    { pub:1, sheet:"1xDEMO-northwind", rows:17, ok:true,  at:now0-7*3600e3,  error:null },
+    { pub:2, sheet:"1xDEMO-clickforge", rows:21, ok:true, at:now0-7*3600e3,  error:null },
+    { pub:3, sheet:"1xDEMO-advista",   rows:12, ok:false, at:now0-7*3600e3,
+      error:"The caller does not have permission (403) on spreadsheet 1xDEMO-advista" },
+  ],
+};
 function genAll(){ seed = Math.floor(Math.random()*1e6)||42; genFacts(); genClicks(); genEvents(); genRejects(); }
 genAll();
 
@@ -554,10 +650,11 @@ document.addEventListener("click", e => {
 // ═══════════════ UI state ═══════════════
 let tab = "dashboard";
 // dashboard
-let preset="7d", range=rangeFor("7d"), compare=true, metric="revenue", split="none", grain="day";
+// Opens on Today — a saved view marked default still takes precedence on load.
+let preset="today", range=rangeFor("today"), compare=true, metric="revenue", split="none", grain="hour";
 let dims=["offer"], sortKey="revenue", sortAsc=false, colFilters={};
 let VIEWS = [
-  { id:1, name:"Daily ops", is_default:1, email_to:"demo@vane-labs.com", send_hour:9,
+  { id:1, name:"Daily ops", is_default:0, email_to:"demo@vane-labs.com", send_hour:9,
     config:{preset:"7d",compare:true,metric:"revenue",split:"none",grain:"day",dims:["offer"],sortKey:"revenue",sortAsc:false,colFilters:{}} },
   { id:2, name:"US casino", is_default:0, email_to:null, send_hour:null,
     config:{preset:"30d",compare:false,metric:"margin",split:"offer",grain:"day",dims:["offer","country"],sortKey:"margin",sortAsc:false,colFilters:{dim1:"US"}} },
@@ -566,6 +663,7 @@ let selView="", saveName="", schedEmails=["demo@vane-labs.com"], schedHour=9, ne
 // events
 let evPreset="7d", evRange=rangeFor("7d"), evFilter="", evColFilters={}, evSortK=null, evSortAsc=true;
 let colSelOpen=false, expandedEv=null, testOpen=false, rejectsOpen=false, testProd=41, TESTLOG=[], refireArm=null;
+let pcArm=null, pcAmount="", pcResults={};   // publisher's-own-click test
 const EV_COLS = [
   ["t","Time"],["event","Event"],["offer","Offer"],["country","Country"],["source","Publisher"],
   ["click_id","Click ID"],["gclid","gclid"],["sub_id","Sub ID"],["sub3","Sub3"],["sub4","Sub4"],
@@ -725,7 +823,7 @@ function toggleDefault(){
   const was=v.is_default===1;
   VIEWS.forEach(x=>x.is_default=0);
   v.is_default=was?0:1;
-  toast(was?"✓ No default view":"✓ Default view — the dashboard opens on it");
+  toast(was?"✓ No default view — the dashboard opens on Today":"✓ Default view — the dashboard opens on it instead of Today");
   render();
 }
 function updateView(){
@@ -944,7 +1042,7 @@ function toggleEv(id){ expandedEv=expandedEv===id?null:id; render(); }
 // Re-fire reaches a partner's live ledger, so it is admin-only and two-click.
 function refire(id){
   const ev=EVENTS.find(e=>e.id===id); if(!ev) return;
-  ev.out_attempts=(ev.out_attempts||0)+1; ev.out_sent=true; ev.out_resp="1";
+  ev.out_attempts=(ev.out_attempts||0)+1; ev.out_sent=true; ev.out_resp="1"; ev.out_mode="ok";
   const pub=DB.publishers.find(p=>p.name===ev.pubName);
   ev.raw_out=((pub&&pub.postback_url)||"https://publisher.example/s2s?cid={sub_id}&payout={payout}")
     .replace("{click_id}",ev.click_id||"").replace("{sub_id}",ev.sub_id||"")
@@ -958,8 +1056,13 @@ function pbTrace(ev){
   if(p.type!=="internal") return "";
   const cap = u => u ? `<span style="font-family:var(--mono);font-size:11px;color:var(--t2);word-break:break-all">${esc(u)}</span>`
     : `<span style="color:var(--t3)">not captured — this event predates the raw-postback log</span>`;
-  const st = ev.out_sent ? `<span class="pos">delivered</span>`
-    : ev.out_attempts ? `<span class="neg">failed after ${ev.out_attempts} attempt(s)</span>`
+  // Three outcomes, not two: delivered (2xx, or a 4xx saying already
+  // processed), rejected (any other 4xx — final on the first attempt),
+  // retried (only a 5xx or no answer).
+  const st = ev.out_mode==="dup" ? `<span class="pos" ${tipAttr("Already processed = delivered","Their 400 “already processed” is their idempotency working — the conversion is on their side. It used to be read as a failure, retried five times over an hour, then alerted that they were not hearing about conversions. The opposite was true.")}>delivered — their “already processed” counts</span>`
+    : ev.out_sent ? `<span class="pos">delivered</span>`
+    : ev.out_mode==="rejected" ? `<span class="neg" ${tipAttr("Rejected — 4xx is final","The request itself is wrong — bad id, missing token, unknown goal — so the same bytes were not sent again. Alerted immediately with what to fix, instead of after five pointless retries.")}>rejected — 4xx is final, not retried</span>`
+    : ev.out_attempts ? `<span class="neg">failed after ${ev.out_attempts} attempt(s) — 5xx / no answer</span>`
     : ev.is_test ? `<span style="color:var(--t3)">not sent — test conversion</span>`
     : `<span style="color:var(--t3)">not sent</span>`;
   return `
@@ -1008,6 +1111,34 @@ function fireTest(){
   toast("⚡ Test conversion fired — flagged TEST, excluded from dashboard & P&L figures");
   render();
 }
+// A sub value that is still a template token — "{id}", "{{clickId}}" — means
+// the publisher's platform did not fill its macro. A postback echoing it
+// cannot be matched on their side, so say so before the button is pressed.
+function unfilledToken(v){ return !v || /^\{+[^{}]*\}+$/.test(String(v).trim()); }
+// The test a publisher actually asks for: "we ran a click through our tracker —
+// fire the postback so we see it arrive." Books a TEST conversion on THEIR
+// click and delivers their postback (test + notify set), waiting for their
+// answer. Admin only, two taps, because it reaches a partner's live tracker.
+function firePubClick(id){
+  const c=CLICKS.find(x=>x.id===id); if(!c) return;
+  pcArm=null;
+  if(c.conv){ toast("That click already converted — re-fire it from the event detail instead of booking a duplicate"); render(); return; }
+  const pr=DB.products.find(p=>p.id===c.prod)||{};
+  const off=offerById(pr.offer_id), pub=pubById(pr.publisher_id);
+  const isRS=off&&off.payout_model==="revshare";
+  const n=parseFloat(pcAmount);
+  const rev=(pcAmount.trim()!==""&&Number.isFinite(n))?n:(isRS?1:geoRev(off,c.geo));
+  const pay=isRS?Math.round(rev*(pr.revshare_pct||0))/100:geoPay(pr,c.geo);
+  c.conv=true; c.event=(off&&off.event_name)||"conv"; c.conv_at=Date.now();
+  c.revenue=rev; c.payout=pay; c.test=true; c.pb_mode="ok"; c.pb_sent=true; c.pb_attempts=1;
+  const url=((pub&&pub.postback_url)||"https://publisher.example/s2s?cid={sub_id}&payout={payout}")
+    .replace("{click_id}",c.id).replace("{sub_id}",c.sub_id||"").replace("{payout}",pay.toFixed(2))
+    .replace("{event}",c.event).replace("{country}",c.geo);
+  const ev=eventFromClick(c); ev.is_test=true; EVENTS.unshift(ev);
+  pcResults[id]={ok:true, rev, pay, url, resp:"1"};
+  toast("✓ Test conversion booked on their click — flagged TEST, publisher postback delivered");
+  render();
+}
 function evCell(ev,k){
   switch(k){
     case "t": return `<span style="font-family:var(--mono);font-size:11px;color:var(--t2);white-space:nowrap" title="${new Date(ev.t).toISOString()}">${fmtDT(ev.t)}</span>`;
@@ -1043,7 +1174,7 @@ function pageEvents(){
     ? `<button class="abtn" onclick="testOpen=true;render()">⚡ Test Event</button>`
     : `<div class="panelbox" style="width:100%">
         <div class="ph"><span style="font-weight:600;font-size:13px">⚡ Test Event</span>
-          <span style="font-size:11px;color:var(--t3)">fires the real loop in production: /click mints a click_id, then /postback fires with the advertiser's key — flagged <span class="dotted" ${tipAttr("Test-conversion hygiene","A test conversion is flagged is_test, excluded from every dashboard and P&L figure — and it does not fire the publisher's postback, so a rehearsal never lands in a partner's ledger. The admin re-fire button is unaffected.")}>TEST, never counted in P&amp;L, and never notifies the publisher</span></span>
+          <span style="font-size:11px;color:var(--t3)">fires the real loop in production: /click mints a click_id, then /postback fires with the advertiser's key — flagged <span class="dotted" ${tipAttr("Test-conversion hygiene","A test conversion is flagged is_test, excluded from every dashboard and P&L figure — and this plain fire does not notify the publisher, so a rehearsal never lands in a partner's ledger. The two deliberate exceptions, both admin-only: the re-fire button on an event, and the publisher's-own-click test below, which exists precisely to reach their tracker.")}>TEST, never counted in P&amp;L, and never notifies the publisher</span></span>
           <button class="abtn" style="margin-left:auto" onclick="testOpen=false;render()">✕</button></div>
         <div class="b" style="padding:12px 14px">
           <div class="controls" style="margin-bottom:${TESTLOG.length?"10px":"0"}">
@@ -1062,13 +1193,50 @@ function pageEvents(){
               <td><span class="${l.ok?"pos":"neg"}">${l.ok?"✓":"✗"} ${esc(l.detail)}</span></td>
               <td class="num">${l.ms}</td></tr>`).join("")}
           </table></div>`:""}
+          ${p.admin&&!viewAs?(()=>{
+            const pcClicks=CLICKS.filter(c=>c.prod===testProd).slice(0,3);
+            const pcOff=offerById((DB.products.find(x=>x.id===testProd)||{}).offer_id);
+            const pcRS=pcOff&&pcOff.payout_model==="revshare";
+            return `<div style="border-top:1px solid var(--line);margin-top:12px;padding-top:10px">
+              <div class="controls" style="margin-bottom:8px">
+                <span style="font-weight:600;font-size:12.5px">Publisher's own click → fire their postback${tipMark("Testing on the partner's click","The test a publisher asks for is “we ran a click through our tracker, fire the postback so we see it arrive”. Their click lands here as it happens (the list re-checks every 15 seconds); one tap books a conversion flagged TEST on that click and delivers THEIR postback — the server runs the ordinary postback path with the advertiser's key, test and notify set, and waits for delivery, so the partner's answer shows in place. Admin only and two taps, because it reaches a partner's live tracker. Built to be used from a phone.")}</span>
+                <label class="lbl">${pcRS?"Revenue to simulate $":"Revenue override $"}
+                  <input id="pc-amount" class="inp mono" type="number" step="0.01" min="0" style="width:72px" value="${esc(pcAmount)}" placeholder="${pcRS?"1":"rate card"}" oninput="pcAmount=this.value"></label>
+                <span style="font-size:11px;color:var(--t3);margin-left:auto">re-checks every 15 s in production</span>
+              </div>
+              ${pcClicks.length?pcClicks.map(c=>{
+                const res=pcResults[c.id], bad=unfilledToken(c.sub3);
+                return `<div style="background:rgba(26,47,35,.5);border:1px solid rgba(39,64,47,.6);border-radius:2px;padding:8px 10px;margin-bottom:6px">
+                  <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;font-size:11.5px;margin-bottom:4px">
+                    <span style="font-family:var(--mono);color:var(--t2)">${fmtDTs(c.t)}</span>
+                    <span style="color:var(--t3)">${c.geo}</span>
+                    ${c.test?`<span class="badge gray">test click</span>`:""}
+                    ${c.conv?`<span class="badge ok">already converted</span>`:""}
+                  </div>
+                  <div style="font-size:11px;font-family:var(--mono);word-break:break-all;margin-bottom:6px">
+                    <span style="color:var(--t3)">their click id: </span><span style="color:${bad?"var(--red)":"var(--t2)"}">${esc(c.sub3||"(empty)")}</span>
+                    <span style="color:var(--t3)"> · source: </span><span style="color:var(--t2)">${esc(c.sub_id||"(empty)")}</span>
+                  </div>
+                  ${bad?`<div style="font-size:11px;color:var(--red);margin-bottom:6px">Their click id was not filled in by their platform, so a postback for this click cannot be matched on their side.</div>`:""}
+                  ${pcArm===c.id
+                    ?`<div style="display:flex;gap:8px"><button class="abtn confirm" style="flex:1" onclick="firePubClick('${c.id}')">Confirm — send their postback</button><button class="abtn" onclick="pcArm=null;render()">Cancel</button></div>`
+                    :`<button class="abtn ${c.conv?"":"confirm"}" style="width:100%" ${c.conv?"disabled":""} onclick="${c.conv?"":`pcArm='${c.id}';render()`}">▶ Fire test conversion + notify publisher</button>`}
+                  ${res?`<div style="font-size:11px;margin-top:6px">
+                    <div class="${res.ok?"pos":"neg"}">${res.ok?`Accepted by their tracker — revenue $${res.rev.toFixed(2)}, payout $${res.pay.toFixed(2)}`:"Their tracker did not accept it"}</div>
+                    <div style="font-family:var(--mono);color:var(--t3);word-break:break-all">${esc(res.url)}</div>
+                    <div style="font-family:var(--mono);color:var(--t3)">answered: ${esc(res.resp)}</div>
+                  </div>`:""}
+                </div>`;
+              }).join(""):`<div style="font-size:11.5px;color:var(--t3)">No clicks on this product yet. This list checks again every 15 seconds.</div>`}
+            </div>`;
+          })():""}
         </div></div>`);
 
   const rejectsPanel = !p.canEdit ? "" : (!rejectsOpen
     ? `<button class="abtn" onclick="rejectsOpen=true;render()">🔍 Integration debugger</button>`
     : `<div class="panelbox" style="width:100%">
         <div class="ph"><span style="font-weight:600;font-size:13px">🔍 Integration debugger${tipMark("Postback authentication","Each advertiser has its own secret postback key. A postback carrying a wrong key or an unknown click_id is rejected and logged here with the raw params that arrived — never booked. During partner onboarding this is where misconfigured macros surface instead of vanishing as silent 400s.")}</span>
-          <span style="font-size:11px;color:var(--t3)">rejected postbacks &amp; clicks — last 100</span>
+          <span style="font-size:11px;color:var(--t3)">rejected postbacks &amp; clicks — last 100 · <span class="dotted" ${tipAttr("screened: rows",SCREENED_NOTE)}>screened: rows are blocked-click counters</span></span>
           <button class="abtn" style="margin-left:auto" onclick="rejectsOpen=false;render()">✕</button></div>
         <div class="tbl-wrap"><table>
           <tr><th>Time</th><th>Endpoint</th><th>Reason</th><th>Key</th><th>Params received</th></tr>
@@ -1158,7 +1326,8 @@ function clicksShown(){
 function ivtBadge(c){
   if(!c.ivt_reason) return `<span style="color:var(--t3);font-size:10px">—</span>`;
   const copy=IVT_COPY[c.ivt_reason]||{label:c.ivt_reason,why:""};
-  const blocked=c.ivt_severity==="block";
+  const blocked=c.ivt_severity==="block", allowed=c.ivt_severity==="allowed";
+  if(allowed) return `<span class="badge ok" ${tipAttr("IVT screen — "+copy.label+" · allowed", copy.why+" "+IVT_ALLOW_NOTE)}>✓ ${copy.label} · allowed</span>`;
   return `<span class="badge ${blocked?"no":"amber"}" ${tipAttr("IVT screen — "+copy.label, copy.why+" "+(blocked?IVT_BLOCK_NOTE:IVT_FLAG_NOTE))}>${blocked?"⛔":"⚑"} ${copy.label}</span>`;
 }
 function incentBadge(c){
@@ -1190,8 +1359,10 @@ function exportClicks(){
 }
 function pbChip(c){
   if(!c.conv) return `<span style="color:var(--t3)">—</span>`;
+  if(c.pb_mode==="dup") return `<span class="badge ok" ${tipAttr("Delivered — already processed","Their endpoint answered 400 “already processed”. That is their idempotency working: the conversion is on their side, so it counts as delivered — not retried, not alerted.")}>fired</span>`;
   if(c.pb_sent) return `<span class="badge ok">fired</span>`;
-  if(c.pb_attempts) return `<span class="badge no" title="${c.pb_attempts} attempts">failed</span>`;
+  if(c.pb_mode==="rejected") return `<span class="badge no" ${tipAttr("Rejected — 4xx is final","The request itself is wrong — bad id, missing token, unknown goal — so sending the same bytes again cannot help. Terminal on the first attempt, alerted immediately with what to fix. Only a 5xx or no answer is retried.")}>rejected</span>`;
+  if(c.pb_attempts) return `<span class="badge no" title="${c.pb_attempts} attempts — 5xx / no answer, the only outcome worth retrying">failed</span>`;
   return `<span class="badge gray" title="publisher has no postback URL configured">none</span>`;
 }
 function pageClicks(){
@@ -1220,13 +1391,14 @@ function pageClicks(){
     </select>
     <span style="margin-left:auto;display:flex;align-items:center;gap:10px">
       <span style="font-size:11.5px;color:var(--t3)">${rows.length.toLocaleString()} clicks</span>
+      ${P().type==="internal"?`<span style="font-size:11.5px;color:#E0B968" ${tipAttr("Blocked clicks — counted, not stored",SCREENED_NOTE)}>⛔ ${screenedCount().toLocaleString()} blocked (counted, not stored)</span>`:""}
       <button class="abtn" onclick="exportClicks()">⬇ Export CSV</button>
     </span>
   </div>
   <div class="card">
     <div class="tbl-wrap"><table>
       <tr><th>Time</th><th>Click ID</th><th>Geo</th>
-      <th>Quality${tipMark("IVT screening","Every inbound click runs through the IVT screen ported from vane-edge: the user agent against a 1,500-pattern crawler corpus, and the IP's network against a hosting heuristic. Flagged clicks still redirect; blocked ones divert to the fallback URL. "+IVT_FLAG_NOTE)}</th>
+      <th>Quality${tipMark("IVT screening","Every inbound click runs through the IVT screen ported from vane-edge: the user agent against a 1,500-pattern crawler corpus, and the IP's network against a hosting heuristic. Flagged clicks still redirect; blocked ones divert to the fallback URL and are counted rather than stored, so they never appear as rows here. An allow-listed IP is served and counted as a real click whatever the verdict. "+IVT_FLAG_NOTE)}</th>
       <th>Incent${tipMark("Incent pool",INCENT_NOTE)}</th>
       ${p.seesVisitor?`<th>Referrer${tipMark("Referrer","Captured at the click edge from the Referer header. This is what the incent pool matches on — a rewards site sends real people on real browsers, so the referrer domain is the only tell. Internal accounts only, like IP and user agent.")}</th>`:""}
       <th>Offer</th>${showPub?"<th>Publisher</th>":""}<th>Sub ID</th><th>Conversion</th>${p.rev?'<th class="num">Revenue</th>':""}${p.pay?'<th class="num">Payout</th>':""}<th>Postback</th></tr>
@@ -1287,6 +1459,89 @@ function pageClicks(){
     <div class="note">Click any row for the full forensic detail — inbound params, redirect chain, postback state.${P().seesVisitor?"":" IP, user agent and referrer are internal-accounts-only."}</div>
   </div>`;
 }
+// ═══════════════ products: the partner-facing catalogue ═══════════════
+// Every product an account can see, with the link to run it, what it pays and
+// whether it is live. Read-only by construction: in production it renders what
+// /api/hierarchy already scoped and masked before it left the server — payouts
+// absent unless the account may see them, the revenue split stripped unless
+// the account can edit — so no client rendering choice can leak. Visible to
+// everyone, admins included: it is the only way to see the page a partner
+// sees without logging in as them.
+let prodViewOpen=null;
+// A rate card is usually one number repeated across many countries with a
+// couple of exceptions — say that in a line rather than making someone read
+// eighteen identical rows to find the two that differ.
+function payoutSummary(pr){
+  const o=offerById(pr.offer_id);
+  if(o&&o.payout_model==="revshare"){
+    // Partner-facing wording: "variable payouts", never the pricing model's
+    // name — and the split % only for accounts that can edit. 80% to the
+    // publisher is 20% to us; putting it on the partner's page publishes the margin.
+    return P().canEdit&&pr.revshare_pct!=null ? `variable payouts · ${pr.revshare_pct}%` : "variable payouts";
+  }
+  // No per-country rows means no geo restriction: the product runs everywhere.
+  // A dash there read as "no payout", the opposite of what it means.
+  if(!pr.payouts.length) return "all countries";
+  const amounts=[...new Set(pr.payouts.map(x=>x.payout))].sort((a,b)=>a-b);
+  const n=pr.payouts.length;
+  if(amounts.length===1) return `$${amounts[0]} · ${n} ${n===1?"country":"countries"}`;
+  return `$${amounts[0]}–$${amounts[amounts.length-1]} · ${n} countries`;
+}
+function exportProducts(){
+  // In production the server already stripped payouts the account may not see;
+  // the demo mirrors that here so the CSV never carries more than the page.
+  const pay=P().pay;
+  const rows=[...DB.products].sort((a,b)=>(offerById(a.offer_id)?.name||"").localeCompare(offerById(b.offer_id)?.name||""));
+  const out=[];
+  for(const pr of rows){
+    const o=offerById(pr.offer_id);
+    const status=pr.paused===1?"paused":"active";
+    const geos=pay&&pr.payouts.length?pr.payouts:[{country:"",payout:null}];
+    for(const g of geos) out.push([pr.id, o?o.name:"offer #"+pr.offer_id, status, pay?payoutSummary(pr):"", g.country, g.payout, clickUrlFor(pr)]);
+  }
+  csvDownload(`traquery-products-${dstrOf(new Date())}.csv`, ["Product","Offer","Status","Payout","Country","Country payout","Click URL"], out);
+  toast("✓ CSV downloaded — "+out.length+" rows");
+}
+function pageProducts(){
+  const p=P();
+  const rows=[...DB.products].sort((a,b)=>(offerById(a.offer_id)?.name||"").localeCompare(offerById(b.offer_id)?.name||""));
+  const live=rows.filter(r=>r.paused!==1).length, pausedN=rows.length-live;
+  return `
+  <div class="controls">
+    <span style="font-size:11.5px;color:var(--t3)">${rows.length} product${rows.length===1?"":"s"} · ${live} active${pausedN>0?` <span style="color:#E0B968">· ${pausedN} paused</span>`:""}</span>
+    ${tipMark("Products — the partner-facing catalogue","The page a partner reads: the link to run, what a product pays and whether it is live. Scoped and masked at the source in production — payouts are absent unless the account may see them, and the revenue split never reaches a partner's browser. Visible to admins too: it is the only way to see the page a partner sees without logging in as them.")}
+    <button class="abtn" style="margin-left:auto" onclick="exportProducts()">⬇ Export CSV</button>
+  </div>
+  ${rows.map(pr=>{
+    const o=offerById(pr.offer_id), pb=pubById(pr.publisher_id);
+    const pState=productPauseState(pr);
+    const isOpen=prodViewOpen===pr.id;
+    const url=clickUrlFor(pr);
+    const isRS=o&&o.payout_model==="revshare";
+    return `<div class="hrow" style="margin-bottom:8px;${pState?"background:rgba(201,163,78,.08);border-color:rgba(190,130,40,.5);border-left:4px solid #E0B968":""}">
+      <div class="hr-head">
+        <span class="pid">#${pr.id}</span>
+        <span style="font-weight:500;${pState?"color:rgba(242,206,133,.7)":""}">${esc(o?o.name:"offer #"+pr.offer_id)}</span>
+        ${pState
+          ? `<span class="badge" style="background:${pState==="product"?"#E0B968":"rgba(224,185,104,.7)"};color:#2A1F08;font-size:11.5px" ${tipAttr(pState==="product"?"Paused":"Offer paused","The link still works, but visitors are sent to the fallback instead of the offer. Nothing is counted as offer traffic — pull the placements rather than keep sending traffic.")}>⏸ ${pState==="product"?"PAUSED":"OFFER PAUSED"}</span>`
+          : `<span class="badge ok" title="Live — clicks go straight to the offer.">● active</span>`}
+        ${p.pay?`<span style="font-size:11.5px;font-family:var(--mono);color:var(--gold-d)" ${isRS?tipAttr("Variable payouts","The amount moves per conversion — what each one actually paid is shown in Events."):""}>${payoutSummary(pr)}</span>`:""}
+        <span style="flex:1"></span>
+        <span class="urlchip" title="${esc(url)} — click to copy" onclick="copyText('${url.replace(/'/g,"")}','✓ Click URL copied — exactly what goes into the platform, macros and all')">copy click URL</span>
+        ${(pr.payouts.length>0||isRS)&&p.pay?`<button class="abtn" onclick="prodViewOpen=${isOpen?null:pr.id};render()">${isOpen?"▲ hide":"▼ countries"}</button>`:""}
+      </div>
+      <div style="padding:0 10px 8px"><span style="font-size:11px;font-family:var(--mono);color:var(--t3);word-break:break-all">${esc(url)}</span></div>
+      ${isOpen?`<div class="hr-body">
+        ${isRS?`<span style="font-size:12px;color:var(--t2)">This offer pays a share of the revenue each conversion earns, rather than a fixed amount per country, so there is no rate card. The amount paid is shown per conversion in Events.${p.canEdit&&pr.revshare_pct!=null?` Current share: ${pr.revshare_pct}% — $1.00 of revenue pays $${(pr.revshare_pct/100).toFixed(2)}.`:""}</span>`
+        :`<div style="display:flex;gap:6px 22px;flex-wrap:wrap">
+          ${[...pr.payouts].sort((a,b)=>a.country.localeCompare(b.country)).map(g=>`<span style="font-size:12px;font-family:var(--mono)"><span style="color:var(--t3)">${g.country}</span> $${g.payout}</span>`).join("")}
+        </div>`}
+      </div>`:""}
+    </div>`;
+  }).join("")}
+  ${!rows.length?`<div class="note" style="text-align:center;padding:24px">No products are assigned to this account yet.</div>`:""}`;
+}
+
 // ═══════════════ hierarchy: handlers ═══════════════
 function parseGeoAmounts(text){
   const out=[]; const re=/([A-Za-z]{2})\s*[:\s]\s*\$?(\d+(?:\.\d+)?)/g; let m;
@@ -1348,6 +1603,24 @@ function saveShare(prId){
   toast(n==null?"⚠ Share cleared — this product now books revenue and pays nothing, and raises an alert on its first conversion":"✓ Share saved — payout = revenue × "+n+"%, rounded to the nearest cent");
   render();
 }
+// Same contract as a product pause, applied to every product on the offer at
+// once: links stay alive, traffic diverts to each publisher's fallback.
+function togglePauseOffer(id){
+  const o=offerById(id); if(!o) return;
+  const next=o.paused!==1;
+  if(next && !confirm(`Pause offer "${o.name}"?\n\nEvery product on it keeps its click link, but visitors go to the publisher's fallback URL instead of the offer. Traffic is logged and badged as fallback.`)) return;
+  o.paused=next?1:0;
+  toast(next?"⏸ Offer paused — every product on it, now and later, diverts to the fallback":"✓ Offer resumed — its products serve again");
+  render();
+}
+function togglePauseProduct(id){
+  const pr=DB.products.find(p=>p.id===id); if(!pr) return;
+  const next=pr.paused!==1;
+  if(next && !confirm(`Pause product #${id}?\n\nThe click link keeps working, but visitors go to the publisher's fallback URL instead of the offer.`)) return;
+  pr.paused=next?1:0;
+  toast(next?"⏸ Product paused — the link stays alive, traffic diverts to the fallback":"✓ Product resumed");
+  render();
+}
 function delOffer(id){
   const o=offerById(id); if(!o) return;
   if(!confirm(`Delete offer "${o.name}"? Its products and click links stop working.`)) return;
@@ -1390,7 +1663,7 @@ function addProduct(){
   }
   DB.products.push({id,offer_id:off,publisher_id:pub,payouts:(o.revenues||[]).map(r=>({country:r.country,payout:defPayout(r.revenue)}))});
   npOffer=""; npPub="";
-  toast(`✓ Product #${id} created — payouts defaulted to 20% margin, rounded down`); render();
+  toast(`✓ Product #${id} created — payouts defaulted to 20% margin, rounded to the nearest step`); render();
 }
 function savePayouts(prId){
   const pr=DB.products.find(p=>p.id===prId); if(!pr) return;
@@ -1468,14 +1741,17 @@ function offerRowHtml(o){
       </div>
     </div></div>`;
   }
-  return `<div class="hrow"><div class="hr-head">
+  const oPaused=o.paused===1;
+  return `<div class="hrow" ${oPaused?'style="background:rgba(201,163,78,.08);border-color:rgba(190,130,40,.5);border-left:3px solid #E0B968"':""}><div class="hr-head">
     <span class="tag o">O</span>
-    <span style="flex:1;font-weight:500">${esc(o.name)}</span>
+    ${oPaused?`<span class="badge" style="background:#E0B968;color:#2A1F08" title="offer retired: every product on it diverts to the publisher fallback">⏸ PAUSED</span>`:""}
+    <span style="flex:1;font-weight:500;${oPaused?"color:rgba(242,206,133,.7)":""}">${esc(o.name)}</span>
     <span style="font-size:11px;color:var(--t3)">ID #${o.id}</span>
     ${o.event_name?`<span class="badge ok" style="font-family:var(--mono)" title="paid event">${o.event_name}</span>`:""}
     ${o.payout_model==="revshare"?`<span class="badge purple" ${tipAttr("Revshare — share of revenue","The advertiser values each conversion individually and sends the amount on the postback; there is no rate card to build. The only fixed term is the publisher's share, agreed on each product.")}>revshare</span>`:""}
     ${(o.revenues||[]).length?`<span class="badge ok" style="font-family:var(--mono)" title="${(o.revenues||[]).map(r=>r.country+":"+r.revenue).join("  ")}">rev ×${o.revenues.length}</span>`:""}
     <button class="abtn" onclick="editOffer=${o.id};render()">Edit</button>
+    <button class="abtn" ${tipAttr("Offer-level pause","Retire a whole campaign in one place. When an advertiser kills a campaign the OFFER is what died, and every product on it — now and later — should divert the same way: link alive, traffic to the publisher fallback, badged as fallback.")} onclick="togglePauseOffer(${o.id})">${oPaused?"Resume":"Pause"}</button>
     <button class="abtn danger" onclick="delOffer(${o.id})">Delete</button>
   </div></div>`;
 }
@@ -1539,16 +1815,20 @@ function pageHierarchy(){
     const revBy=new Map((o?.revenues||[]).map(r=>[r.country,r.revenue]));
     const countries=[...new Set([...(o?.revenues||[]).map(r=>r.country),...pr.payouts.map(p=>p.country)])].sort();
     const payBy=new Map(pr.payouts.map(p=>[p.country,p.payout]));
-    return `<div class="hrow">
+    const pState=productPauseState(pr);
+    return `<div class="hrow" ${pState?'style="background:rgba(201,163,78,.08);border-color:rgba(190,130,40,.5);border-left:3px solid #E0B968"':""}>
       <div class="hr-head">
         <span class="pid" title="Product ID — use in the click link">#${pr.id}</span>
-        <span><span style="color:#E0B968">${esc(o?o.name:"offer #"+pr.offer_id)}</span><span style="color:var(--t3)"> @ </span><span style="color:#B48AD6">${esc(pb?pb.name:"pub #"+pr.publisher_id)}</span></span>
+        ${pState==="product"?`<span class="badge" style="background:#E0B968;color:#2A1F08" title="the click link keeps working; visitors go to the publisher's fallback URL instead of the offer">⏸ PAUSED</span>`
+          :pState==="offer"?`<span class="badge" style="background:rgba(224,185,104,.7);color:#2A1F08" title="the offer is paused: this product's traffic diverts to the fallback URL">⏸ OFFER PAUSED</span>`:""}
+        <span><span style="color:#E0B968;${pState?"opacity:.7":""}">${esc(o?o.name:"offer #"+pr.offer_id)}</span><span style="color:var(--t3)"> @ </span><span style="color:#B48AD6">${esc(pb?pb.name:"pub #"+pr.publisher_id)}</span></span>
         ${o&&o.payout_model==="revshare"
           ? `<span class="badge purple" ${tipAttr("Publisher share",`Payout on this product is revenue × ${pr.revshare_pct!=null?pr.revshare_pct:"—"}%, rounded to the nearest cent — a stated share is a term of the deal and the publisher is owed the arithmetic. New revshare products start on the standard 80% split.`)}>share ${pr.revshare_pct!=null?pr.revshare_pct+"%":"—"}</span>`
           : `<span class="badge ok" style="font-family:var(--mono)">payout ×${pr.payouts.length}</span>`}
         <span style="flex:1"></span>
         <span class="urlchip" title="${esc(url)} — click to copy" onclick="copyText('${url.replace(/'/g,"")}','✓ Click URL copied — this is what the publisher places')">click URL</span>
         <button class="abtn" onclick="prodOpen[${pr.id}]=!prodOpen[${pr.id}];render()">${open?"Hide payouts":o&&o.payout_model==="revshare"?"Share":"Payouts"}</button>
+        <button class="abtn" onclick="togglePauseProduct(${pr.id})">${pr.paused===1?"Resume":"Pause"}</button>
         <button class="abtn danger" onclick="delProduct(${pr.id})">Delete</button>
       </div>
       ${open?(o&&o.payout_model==="revshare"?`<div class="hr-body">
@@ -1622,7 +1902,7 @@ function pageHierarchy(){
         </select>
         <button class="abtn confirm" onclick="addProduct()">+ Create product</button>
       </div>
-      <div style="font-size:11px;color:var(--t3)">New products default to 20% margin, rounded down — nearest $5 at $100+, whole dollar under $100, one decimal under $10. Payouts editable per country.</div>
+      <div style="font-size:11px;color:var(--t3)">New products default to <span class="dotted" ${tipAttr("Default payout tiers",TIER_TIP)}>20% margin, rounded to the nearest step — nearest $5 above $80 revenue, whole dollar $20–$80, one decimal under $20 (ties down)</span>. Payouts editable per country.</div>
     </div>
   </div>
   <div class="sect"><div class="sh"><span class="st">Event names</span><span class="ss">registry — the param is what the advertiser's event= must send, exactly</span></div>
@@ -1659,6 +1939,67 @@ function addIncent(){
   render();
 }
 function rmIncent(dom){ INCENT_POOL=INCENT_POOL.filter(e=>e.domain!==dom); toast("✓ Removed from the pool"); render(); }
+// ── IP allow-list handlers ──
+let allowHours=24, allowPub="";
+const ALLOW_DURATIONS=[["1","1 hour"],["24","24 hours"],["72","3 days"],["168","7 days"],["720","30 days"],["null","until removed"]];
+function allowClicksSince(e){ return CLICKS.filter(c=>c.ip===e.ip && c.t>=e.added).length; }
+function allowExpiry(e){
+  if(e.hours==null) return {text:"until removed", red:false};
+  const end=e.added+e.hours*3600e3, ms=end-Date.now();
+  if(ms<=0) return {text:"expired "+fmtDT(end), red:true};
+  const h=ms/3600e3;
+  const left=h<1?Math.ceil(ms/60e3)+" min":h<48?Math.ceil(h)+" h":Math.ceil(h/24)+" d";
+  return {text:left+" left · "+fmtDT(end), red:false};
+}
+function useMyIp(){ const el=document.getElementById("al-ip"); if(el) el.value=MY_IP; }
+function addAllow(){
+  const ipEl=document.getElementById("al-ip"), nEl=document.getElementById("al-note");
+  const ip=(ipEl&&ipEl.value||"").trim();
+  if(!/^\d{1,3}(\.\d{1,3}){3}$/.test(ip)){ toast("Exact address only — no ranges: a range is a policy, this is a list of exceptions"); return; }
+  if(ALLOWLIST.some(e=>e.ip===ip)){ toast("Already listed"); return; }
+  ALLOWLIST.push({ip, note:(nEl&&nEl.value||"").trim(), publisher_id:allowPub?+allowPub:null, hours:allowHours, added:Date.now()});
+  toast(allowHours!=null?`✓ Allowed for ${allowHours} h (takes effect within 2 minutes)`:"✓ Allowed until removed (takes effect within 2 minutes)");
+  render();
+}
+function rmAllow(ip){ ALLOWLIST=ALLOWLIST.filter(e=>e.ip!==ip); toast("✓ Removed — the screen judges this address normally again"); render(); }
+// ── Rate cards handlers ──
+function rcToggleGoogle(){
+  if(RC.connected){
+    if(!confirm("Disconnect Google? Sheets stop updating until it is reconnected.")) return;
+    RC.connected=false; toast("✓ Google disconnected");
+  } else { RC.connected=true; toast("✓ Google connected — the sheets can be published"); }
+  render();
+}
+function rcCrawl(name){
+  const n=RC.networks.find(x=>x.name===name); if(!n||!n.feed) return;
+  n.last={ok:true, at:Date.now(), summary:"24 campaigns · 0 new · 0 paused · 1 rate change"};
+  toast("✓ "+name+": 24 campaigns · 0 new · 0 paused · 1 rate change — rates land on the offers; hand-set payouts kept and reported");
+  render();
+}
+function rcPublish(pubId){
+  if(!RC.connected){ toast("Connect Google first — nothing can be published yet"); return; }
+  if(pubId==null){
+    RC.sheets.forEach(s=>{ s.ok=true; s.error=null; s.at=Date.now(); });
+    RC.masterAt=Date.now(); RC.masterOk=true;
+    toast(`✓ ${RC.sheets.length} sheets published · master ${RC.masterRows} rows — values only, other tabs left alone`);
+  } else {
+    const s=RC.sheets.find(x=>x.pub===pubId);
+    if(s){ s.ok=true; s.error=null; s.at=Date.now(); toast("✓ Sheet published — "+s.rows+" rows"); }
+  }
+  render();
+}
+// ── Usage (written by the server, not GA) ──
+let usageOpen=null;
+const USAGE=[
+  { email:"demo@vane-labs.com", type:"internal · admin", last:"today", d7:7, d30:26, tabs:"dashboard · events · clicks · hierarchy",
+    trail:[["10:42","products","anna@northwindmedia.com"],["10:38","dashboard",null],["09:15","events",null]] },
+  { email:"anna@northwindmedia.com", type:"publisher", last:"today", d7:4, d30:11, tabs:"dashboard · products",
+    trail:[["08:51","products",null],["08:49","dashboard",null]] },
+  { email:"rep@northstar-affiliates.com", type:"advertiser", last:"3 days ago", d7:1, d30:6, tabs:"dashboard · events",
+    trail:[["Thu 14:02","events",null]] },
+  { email:"ops@vane-labs.com", type:"internal", last:"yesterday", d7:3, d30:14, tabs:"events · clicks",
+    trail:[["Yesterday 16:20","clicks",null]] },
+];
 function delUser(uid){
   const u=USERS.find(x=>x.uid===uid); if(!u) return;
   if(!confirm(`Delete ${u.email}?\n\nThis removes the account and its grants. It does not ban the address — signing in again re-creates it as pending with no permissions.`)) return;
@@ -1667,7 +2008,7 @@ function delUser(uid){
   render();
 }
 function viewAsUser(uid){
-  viewAs=uid; adminOpen=false; openClick=null; expandedEv=null;
+  viewAs=uid; adminOpen=false; openClick=null; expandedEv=null; prodViewOpen=null; testOpen=false; pcArm=null;
   hAdvF=""; hPubF="";   // the filter bar re-scopes to what this account may see
   sanitizeScope();
   toast("Viewing as "+(USERS.find(u=>u.uid===uid)||{}).email+" — the whole app is now scoped to that account");
@@ -1779,6 +2120,111 @@ function drawerHtml(){
       </div>`:""}
     </div>`;
 
+  const allowRows = ALLOWLIST.map(e=>{
+    const ex=allowExpiry(e), pb=e.publisher_id?pubById(e.publisher_id):null, n=allowClicksSince(e);
+    return `<div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;background:rgba(26,47,35,.5);border:1px solid rgba(39,64,47,.6);border-radius:2px;padding:6px 10px">
+      <span style="font-family:var(--mono);font-size:12px;color:var(--forest-l)">${esc(e.ip)}</span>
+      ${e.note?`<span style="font-size:11px;color:var(--t3);overflow:hidden;text-overflow:ellipsis">${esc(e.note)}</span>`:""}
+      ${pb?`<span class="badge gray">${esc(pb.name)} only</span>`:""}
+      <span style="margin-left:auto;font-size:11px;color:${ex.red?"var(--red)":"var(--t3)"};white-space:nowrap">${ex.text}</span>
+      <span style="font-size:11px;color:var(--t3);white-space:nowrap" title="clicks from this address since it was added">${n} click${n===1?"":"s"}</span>
+      <button class="abtn danger" onclick="rmAllow('${e.ip}')">Remove</button>
+    </div>`;
+  }).join("");
+  const allowPanel = `
+    <div class="sect" style="margin:0"><div class="sh"><span class="st">IP allow-list${tipMark("IP allow-list",ALLOW_NOTE)}</span><span class="ss">addresses the IVT screen lets through — VPN tests, authorised machines</span></div>
+      <div class="sb">
+        <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+          <input id="al-ip" class="inp mono" style="width:130px" placeholder="203.0.113.7" onkeydown="if(event.key==='Enter')addAllow()">
+          <button class="abtn" title="fill in the address this browser is on" onclick="useMyIp()">use my IP</button>
+          <input id="al-note" class="inp" style="flex:1;min-width:140px" placeholder="who / why (optional)" onkeydown="if(event.key==='Enter')addAllow()">
+          <select class="inp" title="limit to one publisher's products, or any" onchange="allowPub=this.value">
+            <option value="">any product</option>
+            ${DB.publishers.map(pb=>`<option value="${pb.id}" ${String(allowPub)===String(pb.id)?"selected":""}>${esc(pb.name)} only</option>`).join("")}
+          </select>
+          <select class="inp" onchange="allowHours=this.value==='null'?null:+this.value">
+            ${ALLOW_DURATIONS.map(([v,l])=>`<option value="${v}" ${String(allowHours??"null")===v?"selected":""}>${l}</option>`).join("")}
+          </select>
+          <button class="abtn confirm" onclick="addAllow()">Allow</button>
+        </div>
+        ${ALLOWLIST.length?allowRows:`<span style="font-size:11px;color:var(--t3)">Nothing allow-listed.</span>`}
+        <span style="font-size:11px;color:var(--t3)">A click from a listed address is served and recorded as a real click even when the screen would flag or block it — the Clicks tab shows what would have happened, marked allowed. Timed entries stop working the moment they lapse; "until removed" stays. Changes take effect within two minutes. Exact address only — no ranges.</span>
+      </div>
+    </div>`;
+  const failedSheet = RC.sheets.find(s=>!s.ok&&s.error);
+  const rcWhen = ms => fmtDT(ms);
+  const ratePanel = `
+    <div class="sect" style="margin:0"><div class="sh"><span class="st">Rate cards${tipMark("Rate cards","The partner sheets and an internal master are rebuilt from the catalog every morning and on demand here. A network with a feed is crawled through its API: rates, status and publisher-facing terms land on the offers; a campaign gone from the feed pauses its offers, a returning one resumes them; default-tier payouts follow a rate change while hand-set payouts are kept and reported; the paid event is never touched. Sheets are written values-only — formatting and other tabs are left alone.")}</span><span class="ss">crawl the networks, publish the sheets — daily at 06:00 Perth, or now</span></div>
+      <div class="sb">
+        ${failedSheet?`<div style="font-size:11.5px;color:var(--red)">Last publish failed (${rcWhen(failedSheet.at)}): ${esc(failedSheet.error)}<br><span style="color:#E0B968">→ The connected Google account cannot open that sheet. Reconnect as the account that owns the sheets, or share the sheets with the connected account as Editor.</span></div>`:""}
+        <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;font-size:12px">
+          <span class="slab">Google</span>
+          ${RC.connected
+            ?`<span style="color:var(--forest)">● connected as ${esc(RC.account)}</span><button class="abtn danger" onclick="rcToggleGoogle()">Disconnect</button>`
+            :`<span style="color:#E0B968">○ not connected — nothing can be published yet</span><button class="abtn confirm" ${tipAttr("One-click Google connect","OAuth in place of a service-account key: sign in as the account that owns the sheets; it asks for Google Sheets access only, and the panel then reads “connected as …” — the one fact that explains a 403 on a sheet.")} onclick="rcToggleGoogle()">Connect Google</button>`}
+        </div>
+        <div>
+          <span class="slab" style="display:block;margin-bottom:4px">Networks</span>
+          ${RC.networks.map(n=>`<div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;background:rgba(26,47,35,.5);border:1px solid rgba(39,64,47,.6);border-radius:2px;padding:6px 10px;margin-bottom:4px;font-size:11.5px">
+            <span style="color:var(--ink);width:150px">${esc(n.name)}</span>
+            <span style="color:var(--t3)">${n.offers} offers${n.paused?` · ${n.paused} paused`:""}</span>
+            ${n.feed
+              ?`<span class="badge ok">feed</span>
+                <span style="color:var(--t3);flex:1;min-width:160px">${n.last?`<span style="color:${n.last.ok?"var(--forest)":"var(--red)"}">${n.last.ok?"●":"✗"}</span> ${rcWhen(n.last.at)} — ${esc(n.last.summary)}`:"never crawled"}</span>
+                <button class="abtn confirm" onclick="rcCrawl('${esc(n.name)}')">Crawl now</button>`
+              :`<span style="color:var(--t3);flex:1">no feed — offers are edited by hand (Hierarchy → offer)</span>`}
+          </div>`).join("")}
+        </div>
+        <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;font-size:11.5px">
+          <span class="slab">Master sheet</span>
+          <span style="font-family:var(--mono);color:var(--t2)">${esc(RC.master)}</span>
+          <span class="urlchip" onclick="toast('Demo — production opens the Google Sheet')">open ↗</span>
+          <span style="color:var(--t3)"><span style="color:${RC.masterOk?"var(--forest)":"var(--red)"}">●</span> ${rcWhen(RC.masterAt)} · ${RC.masterRows} rows</span>
+          <span style="color:var(--t3)">internal — carries revenue; partner sheets never do</span>
+        </div>
+        <div>
+          <span class="slab" style="display:block;margin-bottom:4px">Partner sheets <span style="color:var(--t3);text-transform:none;letter-spacing:0">— one tab of each is rewritten; other tabs are left alone</span></span>
+          ${RC.sheets.map(s=>{ const pb=pubById(s.pub); return `<div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;background:rgba(26,47,35,.5);border:1px solid rgba(39,64,47,.6);border-radius:2px;padding:6px 10px;margin-bottom:4px;font-size:11.5px">
+            <span style="width:120px;color:var(--ink)">${esc(pb?pb.name:"pub #"+s.pub)}</span>
+            <span style="font-family:var(--mono);color:var(--t3)">${esc(s.sheet)}</span>
+            <span class="urlchip" onclick="toast('Demo — production opens the Google Sheet')">open ↗</span>
+            <span style="color:var(--t3)">${s.rows} rows</span>
+            <span style="margin-left:auto;color:var(--t3)" title="${esc(s.error||"")}"><span style="color:${s.ok?"var(--forest)":"var(--red)"}">${s.ok?"●":"✗"}</span> ${rcWhen(s.at)}</span>
+            <button class="abtn" onclick="rcPublish(${s.pub})">Publish</button>
+          </div>`;}).join("")}
+          <div style="display:flex;gap:8px;align-items:center">
+            <button class="abtn confirm" onclick="rcPublish(null)">Publish all sheets</button>
+            <span style="font-size:11px;color:var(--t3)">to add one: copy an existing partner sheet in Drive, share it with the connected account, paste its link here</span>
+          </div>
+        </div>
+      </div>
+    </div>`;
+  const usagePanel = `
+    <div class="sect" style="margin:0"><div class="sh"><span class="st">Usage${tipMark("Usage log","Written by the server from authenticated API calls, so it cannot be blocked and needs no consent — GA answered “is anyone using this?” only for visitors who accepted the banner and ran no ad-blocker, which excludes precisely the partner accounts worth watching. One row per account per tab per five-minute bucket, so a count is time spent, not requests made. Under view-as the REAL caller is logged, with who they were viewing as. Kept 90 days.")}</span><span class="ss">who has been in, how often, and what they looked at</span></div>
+      <div class="sb">
+        ${USAGE.map((u,i)=>`<div style="background:rgba(26,47,35,.5);border:1px solid rgba(39,64,47,.6);border-radius:2px">
+          <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;padding:6px 10px;cursor:pointer" onclick="usageOpen=usageOpen===${i}?null:${i};render()">
+            <span style="font-size:12px;color:var(--t2);min-width:170px">${esc(u.email)} <span style="color:var(--t3)">· ${u.type}</span></span>
+            <span style="font-size:11px;color:var(--t3)">${u.last}</span>
+            <span style="font-size:11px;font-family:var(--mono);color:var(--t2)" title="distinct active days, last 7">${u.d7}/7d</span>
+            <span style="font-size:11px;font-family:var(--mono);color:var(--t2)" title="distinct active days, last 30">${u.d30}/30d</span>
+            <span style="font-size:11px;color:var(--t3);margin-left:auto">${u.tabs}</span>
+          </div>
+          ${usageOpen===i?`<div style="padding:2px 10px 8px">${u.trail.map(([t,tb,as])=>`<div style="font-size:11px;font-family:var(--mono);color:var(--t3)">${t} · ${tb}${as?` <span style="color:#E0B968">· viewing as ${esc(as)}</span>`:""}</div>`).join("")}</div>`:""}
+        </div>`).join("")}
+      </div>
+    </div>`;
+  const alertsPanel = `
+    <div class="sect" style="margin:0"><div class="sh"><span class="st">Alerts</span><span class="ss">Slack + email through the alert layer — recent</span></div>
+      <div class="sb">
+        ${ALERTS.map(a=>`<div style="display:flex;gap:10px;align-items:flex-start;background:rgba(26,47,35,.5);border:1px solid rgba(39,64,47,.6);border-radius:2px;padding:6px 10px">
+          <span class="badge ${a.kind==="milestone"?"ok":a.kind==="reject-spike"?"amber":"no"}" ${a.kind==="milestone"?tipAttr("Milestone alerts",MILESTONE_TIP):""}>${a.kind==="milestone"?"★ milestone":a.kind}</span>
+          <span style="font-size:11.5px;color:var(--t2);white-space:pre-line;flex:1">${esc(a.msg)}</span>
+          <span style="font-size:11px;color:var(--t3);white-space:nowrap">${fmtDT(a.ts)}</span>
+        </div>`).join("")}
+        <span style="font-size:11px;color:var(--t3)">Milestones fire once ever — the first real conversion a product books, and its first day with five or more real clicks — so an operator goes and looks at the moment an integration becomes a product.</span>
+      </div>
+    </div>`;
   return `<div class="drawer">
     <div class="ov" onclick="adminOpen=false;render()"></div>
     <div class="panel">
@@ -1790,6 +2236,7 @@ function drawerHtml(){
         <div class="sect" style="margin:0"><div class="sh"><span class="st">Users &amp; permissions</span><span class="ss">nothing is granted by default — every capability is explicit</span></div>
           <div class="sb">${userRows}${inviteRows}${composer}</div>
         </div>
+        ${allowPanel}
         <div class="sect" style="margin:0"><div class="sh"><span class="st">Incent pool${tipMark("Incent pool",INCENT_NOTE+" Matching runs per query, so adding a domain flags every click that ever came from it — a compliance list that only worked going forward would be useless the day you discover a source.")}</span><span class="ss">referrer domains known to send incentivised traffic</span></div>
           <div class="sb">
             <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
@@ -1809,7 +2256,10 @@ function drawerHtml(){
             <span style="font-size:11px;color:var(--t3)">Nothing is blocked — the value is finding out before the advertiser does. Subdomains match automatically: go.flexrewards.net is the same operation.</span>
           </div>
         </div>
-        <div class="note" style="padding:0">Tip: hit <b style="display:inline;color:var(--t2)">View as</b> on anna@northwindmedia.com (publisher) — revenue vanishes everywhere and advertiser names mask; the rep@northstar row shows the advertiser side. In production this drawer also drives click-domain pools, fallback URLs and alerting.</div>
+        ${ratePanel}
+        ${usagePanel}
+        ${alertsPanel}
+        <div class="note" style="padding:0">Tip: hit <b style="display:inline;color:var(--t2)">View as</b> on anna@northwindmedia.com (publisher) — revenue vanishes everywhere, advertiser names mask, and the Products tab shows "variable payouts" with the split kept off the page; the rep@northstar row shows the advertiser side. In production this drawer also drives click-domain pools and fallback URLs.</div>
       </div>
     </div>
   </div>`;
@@ -1842,7 +2292,7 @@ function bannerHtml(){
 }
 function tabsHtml(){
   const canH=P().canEdit||P().admin;
-  const tabs=[["dashboard","Dashboard"],["events","Events"],["clicks","Clicks"],...(canH?[["hierarchy","Hierarchy"]]:[])];
+  const tabs=[["dashboard","Dashboard"],["events","Events"],["clicks","Clicks"],["products","Products"],...(canH?[["hierarchy","Hierarchy"]]:[])];
   return tabs.map(([k,l])=>`<button class="${tab===k?"on":""}" onclick="setTab('${k}')">${l}</button>`).join("");
 }
 
@@ -1855,7 +2305,7 @@ function render(){
   $("#hdr").innerHTML=headerHtml();
   $("#banner").innerHTML=bannerHtml();
   $("#tabs").innerHTML=tabsHtml();
-  $("#main").innerHTML=({dashboard:pageDashboard,events:pageEvents,clicks:pageClicks,hierarchy:pageHierarchy})[tab]();
+  $("#main").innerHTML=({dashboard:pageDashboard,events:pageEvents,clicks:pageClicks,products:pageProducts,hierarchy:pageHierarchy})[tab]();
   $("#drawer").innerHTML=drawerHtml();
   tickClock();
   if(fid){ const el=document.getElementById(fid);
@@ -1875,7 +2325,7 @@ document.addEventListener("keydown",e=>{
 document.addEventListener("mousedown",e=>{
   if(colSelOpen && !e.target.closest(".colsel") && !e.target.closest(".colselbtn")){ colSelOpen=false; render(); }
 });
-// boot: the default saved view loads automatically
+// boot: the dashboard opens on Today — a saved view marked default overrides
 (function(){
   const def=VIEWS.find(v=>v.is_default===1);
   if(def){ selView=def.id; applyConfig(def.config); schedEmails=def.email_to?def.email_to.split(","):["demo@vane-labs.com"]; schedHour=def.send_hour??9; }

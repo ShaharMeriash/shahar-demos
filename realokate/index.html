@@ -45,7 +45,7 @@ body{background:#E9E4DC;font-family:var(--fb);color:#1A1823;min-height:100vh;dis
 .hbtn{width:34px;height:34px;border:2px solid var(--ink);border-radius:10px;background:var(--s1);display:flex;align-items:center;justify-content:center;box-shadow:var(--shadow-sm);cursor:pointer;font-size:15px;position:relative;flex-shrink:0}
 .hbtn:active{transform:translate(2px,2px);box-shadow:none}
 .bell-count{position:absolute;top:-6px;right:-6px;background:var(--re);color:#fff;font-size:9px;font-weight:700;min-width:16px;height:16px;border-radius:9px;border:1.5px solid var(--ink);display:flex;align-items:center;justify-content:center;padding:0 3px}
-main{flex:1;overflow-y:auto;padding:16px;padding-bottom:12px;position:relative}
+main{flex:1;overflow-y:auto;padding:16px;padding-bottom:12px}
 main::-webkit-scrollbar{width:0}
 h2.pg{font-family:var(--fd);font-size:22px;font-weight:400;margin-bottom:2px;color:var(--t0)}
 .sub{font-size:12.5px;color:var(--t2);margin-bottom:14px}
@@ -1305,6 +1305,7 @@ function sheetMore(){
       <div style="min-width:0;flex:1">
         <div class="sheet-name">${esc(profile.person1)} · demo workspace</div>
         <div class="sheet-sync"><span class="sheet-sync-dot" style="background:#0d9488"></span>Local demo — nothing leaves this page</div>
+        <div class="sheet-sync">📱 Realokate 0.9.3 · iOS TestFlight beta</div>
       </div>
       <button class="btn xs" onclick="showT('Google sign-in lives in the real app — this demo stays local')">Sign out</button>
     </div>

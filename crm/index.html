@@ -237,12 +237,12 @@ let settings={
   partnerTypes:["demand","supply","partner","product","agency","custom"],
   partnerCategories:["prog","app","lead-gen","consulting","saas"],
   opportunityTypes:["direct","reseller","upsell","renewal"],
-  revenueCategories:["programmatic","app-monetization","lead-gen","consulting","payroll","hosting","media","other"],
+  revenueCategories:["programmatic","app-monetization","lead-gen","consulting","payroll","hosting","tools","media","other"],
   tags:["priority","emea","apac","ctv","finance","xero","email-import"],
   currencies:["USD","EUR","AUD"]};
 
 let partners=[
-  {id:"p1",name:"Northlight DSP",type:"demand",cat:"prog",status:"active",terms:30,website:"northlight.io",tags:["priority","emea"],access:{crm:true,traquery:true},notes:"Largest demand partner. Quarterly QBR cadence; Dana owns commercials.",
+  {id:"p1",name:"Northlight DSP",type:"demand",cat:"prog",status:"active",terms:30,website:"northlight.io",tags:["priority","emea"],access:{crm:true,traquery:true},payerNames:["Northlight Media Ltd"],notes:"Largest demand partner. Quarterly QBR cadence; Dana owns commercials. Pays as Northlight Media Ltd.",
    contacts:[{id:"c1",name:"Dana Ellis",title:"VP Partnerships",email:"dana.ellis@northlight.io",phone:"+44 20 7946 0110",isPrimary:true},{id:"c2",name:"Omar Said",title:"AdOps Lead",email:"omar@northlight.io",phone:"",isPrimary:false}]},
   {id:"p2",name:"Skyfield Media",type:"supply",cat:"app",status:"active",terms:45,website:"skyfield.tv",tags:["ctv"],access:{crm:false,traquery:true},notes:"CTV-heavy supply. TraQuery reporting access granted.",
    contacts:[{id:"c3",name:"Tom Reyes",title:"Head of Demand",email:"tom.reyes@skyfield.tv",phone:"+1 310 555 0182",isPrimary:true}]},
@@ -295,6 +295,7 @@ function platformOf(e){
   if(e.tags.includes("traquery"))return "TraQuery";
   if(e.tags.includes("xero"))return "Xero";
   if(e.tags.includes("wise"))return "Wise";
+  if(e.tags.includes("service"))return "Service";
   return "Manual";
 }
 function scopeOf(e){
@@ -307,17 +308,85 @@ function scopeOf(e){
 /* Deterministic payment id — approving the same month twice can't duplicate. */
 const payId=(dir,pid,month)=>`pay-${dir==="receivable"?"rec":"pay"}-${pid}-${month}`;
 const monthOf=ago=>mISO(ago,1).slice(0,7);
-let payments=[
-  {id:payId("receivable","p1",monthOf(2)),pid:"p1",month:monthOf(2),dir:"receivable",amount:34000,currency:"USD",status:"paid",due:dISO(-38),paidAt:dISO(-33),platforms:["RTB Monster"]},
-  {id:payId("receivable","p1",monthOf(1)),pid:"p1",month:monthOf(1),dir:"receivable",amount:31000,currency:"USD",status:"pending",due:dISO(-6),paidAt:null,platforms:["RTB Monster"]},
-  {id:payId("payable","p2",monthOf(1)),pid:"p2",month:monthOf(1),dir:"payable",amount:8680,currency:"USD",status:"pending",due:dISO(9),paidAt:null,platforms:["RTB Monster"]},
+const lastDayOf=m=>{const[y,mo]=m.split("-").map(Number);return new Date(Date.UTC(y,mo,0)).toISOString().slice(0,10);};
+/* Due dates: month end + the payee's net terms. Partner payment runs land on
+   the 10th — first 10th on/after that date; setUTCDate(1) first avoids the
+   month-end overflow (e.g. Jan 31 + 1 month ≠ Mar 3). Services keep the raw
+   month-end + terms (0 = due at month end, typical for subscriptions). */
+function dueOf(month,terms,partnerRun){
+  const[y,mo]=month.split("-").map(Number);
+  const d=new Date(Date.UTC(y,mo,0));
+  d.setUTCDate(d.getUTCDate()+(terms||0));
+  if(partnerRun){const past10=d.getUTCDate()>10;d.setUTCDate(1);if(past10)d.setUTCMonth(d.getUTCMonth()+1);d.setUTCDate(10);}
+  return d.toISOString().slice(0,10);
+}
+/* Demo ECB-style FX table (USD-relative) + per-transaction-date conversion.
+   Production pulls daily frankfurter.dev fixings; here the rate gets a small
+   deterministic per-date wiggle so "converted at the transaction date" shows. */
+const FX_USD={USD:1,EUR:0.92,AUD:1.53,GBP:0.79,ILS:3.64};
+function fxConvert(amount,from,to,date){
+  if(from===to||!FX_USD[from]||!FX_USD[to])return amount;
+  let h=0;for(const ch of String(date||""))h=(h*31+ch.charCodeAt(0))%997;
+  return amount*(FX_USD[to]/FX_USD[from])*(1+((h/997)-.5)*.02);
+}
+const fmtC=(n,c)=>new Intl.NumberFormat("en-US",{style:"currency",currency:c||"USD",maximumFractionDigits:0}).format(n);
+/* Settlement figures keep their cents (the app-wide formatter rounds to units). */
+const money2=(n,c)=>new Intl.NumberFormat("en-US",{style:"currency",currency:c||"USD",minimumFractionDigits:2,maximumFractionDigits:2}).format(n);
+
+/* Services / subscriptions the business pays for — payees for payment items,
+   never in the P&L breakdown (their costs enter as Corp expense entries). */
+let services=[
+  {id:"s1",name:"Nimbus Cloud",category:"infra",website:"nimbuscloud.io",currency:"USD",terms:28,notes:"Prod + staging fleet"},
+  {id:"s2",name:"Quill AI",category:"ai",website:"quillai.dev",currency:"USD",terms:0,notes:"Assistant API plan"},
+  {id:"s3",name:"Brightbooks",category:"accounting",website:"brightbooks.app",currency:"AUD",terms:30,notes:"Bookkeeping + BAS lodgement"},
 ];
-const isOverdue=p=>p.status==="pending"&&p.due<todayISO();
+const SV=id=>services.find(s=>s.id===id);
+
+/* The three kinds of payment item, told apart at a glance on the Payments tab. */
+const payKindOf=p=>p.sid?"service":p.dir==="receivable"?"in":"out";
+const PAY_KINDS=["in","out","service"];
+const PAY_KIND_META={
+  in:{label:"To get paid",hint:"Partners owe us — demand side",color:"#0A4F32",tint:"rgba(10,79,50,.07)",icon:"↙"},
+  out:{label:"To pay",hint:"We owe partners — supply side",color:"#C0392B",tint:"rgba(192,57,43,.07)",icon:"↗"},
+  service:{label:"Services",hint:"Subscriptions & vendors",color:"#8E44AD",tint:"rgba(142,68,173,.08)",icon:"⚙"},
+};
+/* Lifecycle: auto-opened on the 2nd for the closed month → pending-approval;
+   the operator approves (optionally editing the amount) → approved ("amount
+   approved", awaiting an invoice); an invoice is attached by hand or filed
+   from Xero → invoiced (= pending payment); money lands → paid. */
+const PAY_STATUS_ORDER={"pending-approval":0,approved:1,invoiced:2,paid:3};
+const M1=monthOf(1),M2=monthOf(2),M3=monthOf(3);
+let payments=[
+  /* ---- to get paid (receivables) — demand kept separate from supply ---- */
+  {id:payId("receivable","p1",M3),pid:"p1",month:M3,dir:"receivable",amount:34000,bookedAmount:34000,currency:"USD",status:"paid",due:dueOf(M3,30,true),approvedAt:mISO(2,4),invoicedAt:mISO(2,7),xeroNum:"INV-40212",paidAt:mISO(1,11),paidAmount:34000,paidCurrency:"USD",paidVia:"wise",paidRef:"Northlight Media Ltd",wiseId:"wa-88213",platforms:["RTB Monster"]},
+  {id:payId("receivable","p1",M2),pid:"p1",month:M2,dir:"receivable",amount:31000,bookedAmount:31000,currency:"USD",status:"invoiced",approvedAt:mISO(1,5),invoicedAt:mISO(1,8),xeroNum:"INV-40220",due:dueOf(M2,30,true),platforms:["RTB Monster"]},
+  {id:payId("receivable","p1",M1),pid:"p1",month:M1,dir:"receivable",amount:41500,bookedAmount:41500,currency:"USD",status:"pending-approval",due:dueOf(M1,30,true),platforms:["RTB Monster"]},
+  {id:payId("receivable","p2",M1),pid:"p2",month:M1,dir:"receivable",amount:16000,bookedAmount:16000,currency:"USD",status:"pending-approval",due:dueOf(M1,45,true),platforms:["RTB Monster"]},
+  {id:payId("receivable","p4",M1),pid:"p4",month:M1,dir:"receivable",amount:10750,bookedAmount:10500,currency:"USD",status:"pending-approval",due:dueOf(M1,60,true),platforms:["RTB Monster"]},
+  {id:payId("receivable","p6",M2),pid:"p6",month:M2,dir:"receivable",amount:3000,bookedAmount:3000,currency:"USD",status:"invoiced",approvedAt:mISO(1,3),invoicedAt:mISO(1,6),xeroNum:"INV-40209",due:dueOf(M2,14,true),platforms:["Manual"]},
+  /* ---- to pay (payables) — same partner-month as a receivable is NOT netted ---- */
+  {id:payId("payable","p2",M2),pid:"p2",month:M2,dir:"payable",amount:8680,bookedAmount:8680,currency:"USD",status:"paid",due:dueOf(M2,45,true),approvedAt:mISO(1,4),invoicedAt:mISO(1,9),paidAt:mISO(0,6),paidAmount:7944.10,paidCurrency:"EUR",paidVia:"wise",paidRef:"Skyfield rev-share",wiseId:"wa-87401",platforms:["RTB Monster"]},
+  {id:payId("payable","p2",M1),pid:"p2",month:M1,dir:"payable",amount:9920,bookedAmount:9920,currency:"USD",status:"approved",approvedAt:dISO(-8),due:dueOf(M1,45,true),platforms:["RTB Monster"]},
+  {id:payId("payable","p5",M1),pid:"p5",month:M1,dir:"payable",amount:6080,bookedAmount:6080,currency:"USD",status:"pending-approval",due:dueOf(M1,30,true),platforms:["RTB Monster"]},
+  /* ---- services — month = SERVICE month (a payment made in M covers use in M-1) ---- */
+  {id:payId("payable","s1",M2),sid:"s1",month:M2,dir:"payable",amount:3300,bookedAmount:3300,currency:"USD",status:"paid",due:dueOf(M2,28,false),paidAt:mISO(1,8),paidAmount:3300,paidCurrency:"USD",paidVia:"wise",paidRef:"Nimbus Cloud Pty",recurring:true},
+  {id:payId("payable","s1",M1),sid:"s1",month:M1,dir:"payable",amount:3300,bookedAmount:3300,currency:"USD",status:"pending-approval",due:dueOf(M1,28,false),recurring:true},
+  {id:payId("payable","s2",M1),sid:"s2",month:M1,dir:"payable",amount:240,bookedAmount:240,currency:"USD",status:"paid",due:dueOf(M1,0,false),paidAt:mISO(0,3),paidAmount:240,paidCurrency:"USD",paidVia:"other",paidRef:"card •••• 4417",recurring:true},
+  {id:payId("payable","s3",M1),sid:"s3",month:M1,dir:"payable",amount:145,bookedAmount:145,currency:"AUD",status:"approved",approvedAt:dISO(-5),due:dueOf(M1,30,false),recurring:true},
+];
+const isOverdue=p=>p.status!=="paid"&&p.due&&p.due<todayISO();
+const payPayeeName=p=>p.pid?(P(p.pid)?.name||"—"):(SV(p.sid)?.name||"—");
+
+/* Completed Wise activities the nightly reconciliation can consume (demo). */
+let wiseActivities=[
+  {id:"wa-90112",title:"Northlight Media Ltd",dir:"in",amount:31000,ccy:"USD",date:dISO(-2)},
+  {id:"wa-90075",title:"Brightbooks subscription",dir:"out",amount:145,ccy:"AUD",date:dISO(-1)},
+];
 const revenueOf=pid=>revenueEntries.filter(e=>e.pid===pid&&e.type==="revenue").reduce((a,e)=>a+e.amount,0);
 const costOf=pid=>revenueEntries.filter(e=>e.pid===pid&&e.type==="cost").reduce((a,e)=>a+e.amount,0);
 
 let docs=[
-  {id:"d1",num:"INV-40218",type:"invoice",pid:"p1",amount:24500,issue:mISO(1,1),due:mISO(0,1),terms:30,status:"sent",tags:[]},
+  {id:"d1",num:"INV-40218",type:"invoice",pid:"p1",amount:24500,issue:mISO(1,1),due:mISO(0,1),terms:30,status:"sent",tags:["xero"],xeroId:"x1",file:"INV-40218.pdf"},
   {id:"d2",num:"IO-1092",type:"IO",pid:"p2",amount:64000,issue:mISO(1,18),due:"",terms:45,status:"signed",tags:["ctv"]},
   {id:"d3",num:"INV-40217",type:"invoice",pid:"p3",amount:12000,issue:mISO(2,24),due:mISO(1,24),terms:30,status:"paid",tags:[]},
   {id:"d4",num:"INV-40209",type:"invoice",pid:"p6",amount:9000,issue:mISO(2,2),due:mISO(2,16),terms:14,status:"overdue",tags:["finance"]},
@@ -384,6 +453,7 @@ let xero={
     {id:"x4",num:"INV-40209",kind:"invoice",contact:"Helio Consulting",date:mISO(2,2),due:mISO(2,16),status:"AUTHORISED",total:9000,dueAmt:9000},
     {id:"x5",num:"BILL-2214",kind:"bill",contact:"Amazon Web Services",date:dISO(-11),due:dISO(-4),status:"PAID",total:3300,dueAmt:0},
     {id:"x6",num:"BILL-2215",kind:"bill",contact:"LinkedIn Ads",date:dISO(-8),due:dISO(22),status:"AUTHORISED",total:2100,dueAmt:2100},
+    {id:"x7",num:"INV-40222",kind:"invoice",contact:"Meridian Services Co",date:dISO(-5),due:dISO(25),status:"AUTHORISED",total:4200,dueAmt:4200},
   ],
   contacts:[
     {name:"Northlight DSP",email:"billing@northlight.io",cust:true,supp:false,status:"ACTIVE"},
@@ -406,6 +476,13 @@ let page="dash", q="", role="admin";
 let pipeView="board", pipeSort={key:"value",dir:"desc"};
 let pFilter={type:"",cat:"",status:""};
 let revFilter="", revTab="monthly", revPageTab="pnl", revView="business", revGroupBy="partner", revFilterCat="", revFilterPid="", revFilterScope="";
+let payKind="all", payFilters={};                       // Payments tab: kind chip + per-column filters
+let kpiMonth=null;                                      // P&L KPI time frame (null = default: previous month)
+let expandedMonths=new Set([monthOf(0),M1]);            // breakdown: running month + the one just closed start open
+/* Display currency — shared between Dashboard and Revenue (persisted). */
+let fxCcy=(()=>{try{return localStorage.getItem("vlcrm-fx-ccy")||"USD"}catch(e){return "USD"}})();
+function setFxCcy(c){fxCcy=c;try{localStorage.setItem("vlcrm-fx-ccy",c)}catch(e){}render();}
+const FX_CURRENCIES=["USD","AUD","EUR","GBP","ILS"];
 let xeroTab="reconcile";
 let showResolved=false;
 let calY=new Date().getFullYear(), calM=new Date().getMonth();
@@ -418,10 +495,10 @@ const openOpps=()=>opps.filter(o=>!o.stage.startsWith("closed"));
 const openTasks=()=>tasks.filter(t=>t.status!=="done");
 const overdueTasks=()=>tasks.filter(t=>t.status!=="done"&&t.due&&t.due<todayISO());
 const pendingN=()=>notifs.filter(n=>n.status==="pending");
-function monthlyData(){const m={};revenueEntries.forEach(e=>{const k=e.date.slice(0,7);if(!m[k])m[k]={month:k,revenue:0,cost:0};m[k][e.type==="revenue"?"revenue":"cost"]+=e.amount;});return Object.values(m).sort((a,b)=>a.month.localeCompare(b.month)).map(r=>({...r,profit:r.revenue-r.cost,label:new Date(r.month+"-01T00:00").toLocaleDateString("en-US",{month:"short"}),full:new Date(r.month+"-01T00:00").toLocaleDateString("en-US",{month:"short",year:"numeric"})}));}
+function monthlyData(entries){const m={};(entries||revenueEntries).forEach(e=>{const k=e.date.slice(0,7);if(!m[k])m[k]={month:k,revenue:0,cost:0};m[k][e.type==="revenue"?"revenue":"cost"]+=e.amount;});return Object.values(m).sort((a,b)=>a.month.localeCompare(b.month)).map(r=>({...r,profit:r.revenue-r.cost,label:new Date(r.month+"-01T00:00").toLocaleDateString("en-US",{month:"short"}),full:new Date(r.month+"-01T00:00").toLocaleDateString("en-US",{month:"short",year:"numeric"})}));}
 function chartTip(evt,label,rev,cost){
   const w=evt.target.closest(".chartwrap");const t=w.querySelector(".ctip");
-  t.innerHTML=`<div class="tl">${label}</div><div style="color:var(--forest)">Revenue&ensp;<b style="font-family:var(--fd)">${fmt$(rev)}</b></div><div style="color:var(--danger)">Cost&ensp;<b style="font-family:var(--fd)">${fmt$(cost)}</b></div>`;
+  t.innerHTML=`<div class="tl">${label}</div><div style="color:var(--forest)">Revenue&ensp;<b style="font-family:var(--fd)">${fmtC(rev,fxCcy)}</b></div><div style="color:var(--danger)">Cost&ensp;<b style="font-family:var(--fd)">${fmtC(cost,fxCcy)}</b></div>`;
   t.style.display="block";
   const r=w.getBoundingClientRect();
   let lx=evt.clientX-r.left+14;
@@ -448,6 +525,7 @@ const ICON_PATHS={
   users:'<path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/>',
   settings:'<circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09a1.65 1.65 0 0 0-1-1.51 1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09a1.65 1.65 0 0 0 1.51-1 1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33h0a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51h0a1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82v0a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1Z"/>',
   logout:'<path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/>',
+  wrench:'<path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/>',
   chevL:'<polyline points="15 18 9 12 15 6"/>',
   chevR:'<polyline points="9 18 15 12 9 6"/>'};
 const icon=(n,s=15)=>`<svg width="${s}" height="${s}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${ICON_PATHS[n]}</svg>`;
@@ -455,7 +533,7 @@ const icon=(n,s=15)=>`<svg width="${s}" height="${s}" viewBox="0 0 24 24" fill="
 const NAVG=[
   ["Business",[["partners","Partners","building"],["pipe","Pipeline","trending"],["au","AU Market","globe"],["docs","Documents","file"]]],
   ["Work",[["notifications","Notifications","bell"],["tasks","Tasks","check"],["calendar","Calendar","calendar"],["notes","Notes","note"]]],
-  ["Finance",[["revenue","Revenue","dollar"],["xero","Xero","landmark"],["wise","Wise","wallet"]]],
+  ["Finance",[["revenue","Revenue","dollar"],["services","Services","wrench"],["xero","Xero","landmark"],["wise","Wise","wallet"]]],
   ["Admin",[["users","Users","users"],["settings","Settings","settings"]]]];
 const ADMIN_PAGES=["xero","wise","users","settings"];
 let sideCollapsed=false;
@@ -503,23 +581,25 @@ const oppOpts=cur=>`<option value="">None</option>`+opps.map(o=>`<option value="
 
 /* ============================ dashboard ============================ */
 function pageDash(){
-  const rev=revenueEntries.filter(e=>e.type==="revenue").reduce((a,e)=>a+e.amount,0);
-  const cost=revenueEntries.filter(e=>e.type==="cost").reduce((a,e)=>a+e.amount,0);
-  const md=monthlyData(), maxV=Math.max(...md.map(m=>m.revenue))*1.12;
+  const fxAll=revenueEntries.map(e=>({...e,currency:fxCcy,amount:Math.round(fxConvert(e.amount,e.currency,fxCcy,e.date)*100)/100}));
+  const rev=fxAll.filter(e=>e.type==="revenue").reduce((a,e)=>a+e.amount,0);
+  const cost=fxAll.filter(e=>e.type==="cost").reduce((a,e)=>a+e.amount,0);
+  const md=monthlyData(fxAll), maxV=Math.max(...md.map(m=>m.revenue))*1.12;
   const W=560,H=170,PD=40;
   const x=i=>PD+(W-PD-10)*i/Math.max(md.length-1,1), y=v=>H-26-(H-46)*v/maxV;
   const line=md.map((m,i)=>`${i?"L":"M"}${x(i).toFixed(1)},${y(m.revenue).toFixed(1)}`).join("");
   const area=line+`L${x(md.length-1).toFixed(1)},${H-26}L${x(0).toFixed(1)},${H-26}Z`;
   const cline=md.map((m,i)=>`${i?"L":"M"}${x(i).toFixed(1)},${y(m.cost).toFixed(1)}`).join("");
   const gridV=[0,.25,.5,.75,1].map(f=>Math.round(maxV*f/1000));
+  const dsym=({USD:"$",AUD:"A$",EUR:"€",GBP:"£",ILS:"₪"})[fxCcy]||"$";
   const urgent=[...openTasks()].sort((a,b)=>PRI_ORDER[a.pri]-PRI_ORDER[b.pri]).slice(0,4);
   const pinned=notes.filter(n=>n.pinned);
   return pageHead("Vane Labs CRM","Dashboard",
     `<button class="btn btn-ghost btn-sm" onclick="nav('revenue')">Revenue Detail</button><button class="btn btn-primary btn-sm" onclick="nav('pipe')">View Pipeline</button>`)+`
   <div class="kpis six">
-    <div class="kpi"><div class="l">Total Revenue</div><div class="v">${fmt$(rev)}</div><div class="s">All time</div></div>
-    <div class="kpi"><div class="l">Total Cost</div><div class="v" style="color:var(--danger)">${fmt$(cost)}</div><div class="s">All time</div></div>
-    <div class="kpi"><div class="l">Net Profit</div><div class="v">${fmt$(rev-cost)}</div><div class="s">${(100*(rev-cost)/rev).toFixed(1)}% margin</div></div>
+    <div class="kpi"><div class="l">Total Revenue</div><div class="v">${fmtC(rev,fxCcy)}</div><div class="s">All time</div></div>
+    <div class="kpi"><div class="l">Total Cost</div><div class="v" style="color:var(--danger)">${fmtC(cost,fxCcy)}</div><div class="s">All time</div></div>
+    <div class="kpi"><div class="l">Net Profit</div><div class="v">${fmtC(rev-cost,fxCcy)}</div><div class="s">${(100*(rev-cost)/rev).toFixed(1)}% margin</div></div>
     <div class="kpi"><div class="l">Weighted Pipeline</div><div class="v">${fmt$(weighted())}</div><div class="s">${openOpps().length} open opportunities</div></div>
     <div class="kpi"><div class="l">Active Partners</div><div class="v">${partners.filter(p=>p.status==="active").length}</div><div class="s">${partners.length} total</div></div>
     <div class="kpi"><div class="l">Open Tasks</div><div class="v" style="color:${overdueTasks().length?"var(--warning)":"var(--forest)"}">${openTasks().length}</div><div class="s" style="${overdueTasks().length?"color:var(--danger)":""}">${overdueTasks().length?overdueTasks().length+" overdue":"on track"}</div></div>
@@ -527,10 +607,13 @@ function pageDash(){
   <div class="card"><div style="padding:18px 22px 0;display:flex;align-items:flex-start;justify-content:space-between;gap:12px">
       <div><div class="eyebrow" style="letter-spacing:.2em">Revenue vs Cost</div>
         <div style="font-family:var(--fd);font-weight:600;font-size:16px;color:var(--ink);margin-top:2px">Monthly P&amp;L Trend</div></div>
-      <button class="btn btn-ghost btn-sm" onclick="nav('revenue')">Full Report →</button></div>
+      <span style="display:inline-flex;gap:8px;align-items:center">
+        <select class="inp" style="width:76px;padding:4px 8px;font-size:12px;font-family:var(--fd);font-weight:700" title="Display currency — shared with the Revenue page; every amount converted at its transaction date (ECB daily rates)" onchange="setFxCcy(this.value)">
+          ${FX_CURRENCIES.map(c=>`<option value="${c}"${fxCcy===c?" selected":""}>${c}</option>`).join("")}</select>
+        <button class="btn btn-ghost btn-sm" onclick="nav('revenue')">Full Report →</button></span></div>
     <div class="chartwrap" style="padding:12px 14px;overflow-x:auto"><svg class="chart" viewBox="0 0 ${W} ${H}" style="width:100%;min-width:420px">
       <defs><linearGradient id="g" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#0A4F32" stop-opacity=".15"/><stop offset="1" stop-color="#0A4F32" stop-opacity="0"/></linearGradient></defs>
-      ${[0,.25,.5,.75,1].map((f,i)=>`<line x1="${PD}" x2="${W-10}" y1="${y(maxV*f).toFixed(1)}" y2="${y(maxV*f).toFixed(1)}" stroke="rgba(10,79,50,.08)" stroke-dasharray="3 3"/><text x="${PD-6}" y="${(y(maxV*f)+4).toFixed(1)}" text-anchor="end">$${gridV[i]}k</text>`).join("")}
+      ${[0,.25,.5,.75,1].map((f,i)=>`<line x1="${PD}" x2="${W-10}" y1="${y(maxV*f).toFixed(1)}" y2="${y(maxV*f).toFixed(1)}" stroke="rgba(10,79,50,.08)" stroke-dasharray="3 3"/><text x="${PD-6}" y="${(y(maxV*f)+4).toFixed(1)}" text-anchor="end">${dsym}${gridV[i]}k</text>`).join("")}
       <path d="${area}" fill="url(#g)"/><path d="${line}" fill="none" stroke="#0A4F32" stroke-width="2.5"/>
       <path d="${cline}" fill="none" stroke="#C0392B" stroke-width="2" stroke-dasharray="5 4"/>
       ${md.map((m,i)=>`<text x="${x(i).toFixed(1)}" y="${H-8}" text-anchor="middle">${m.label}</text>`).join("")}
@@ -723,15 +806,17 @@ function savePartner(){
 function pageDocs(){
   return pageHead("Invoices & IOs","Documents")+`
   <div class="card"><div class="tbl-wrap"><table>
-    <tr><th>Doc #</th><th>Type</th><th>Partner</th><th class="num">Amount</th><th>Issue Date</th><th>Due Date</th><th class="num">Net Terms</th><th>Status</th><th>Tags</th></tr>
+    <tr><th>Doc #</th><th>Source</th><th>Type</th><th>Partner</th><th class="num">Amount</th><th>Issue Date</th><th>Due Date</th><th class="num">Net Terms</th><th>Status</th><th>File</th><th>Tags</th></tr>
     ${docs.map(d=>`<tr><td><b>${esc(d.num)}</b></td>
+      <td>${d.xeroId?`<span class="badge b-info" title="Filed automatically from Xero — approved sales invoices become CRM documents with the invoice PDF attached; the PDF refreshes when Xero's invoice changes">⇣ filed from Xero</span>`:`<span style="font-size:11.5px;color:var(--t3)">manual</span>`}</td>
       <td><span class="badge ${d.type==="IO"?"b-gold":"b-forest"}">${esc(d.type)}</span></td>
-      <td>${esc(P(d.pid)?.name||"—")}</td><td class="num">${fmt$(d.amount)}</td>
+      <td>${d.pid?esc(P(d.pid)?.name||"—"):`<span title="No partner matched the Xero contact — assign one">—</span>`}</td><td class="num">${fmt$(d.amount)}</td>
       <td>${fmtDate(d.issue)}</td><td>${d.due?fmtDate(d.due):"—"}</td><td class="num">Net ${d.terms}</td>
       <td><span class="badge ${statusBadge(d.status)}">${esc(d.status)}</span></td>
-      <td>${d.tags.map(t=>`<span class="tag-chip">${esc(t)}</span>`).join(" ")||"—"}</td></tr>`).join("")}
+      <td>${d.file?`<span class="tag-chip" title="Attached PDF — downloads from Drive in production">📎 ${esc(d.file)}</span>`:"—"}</td>
+      <td>${d.tags.map(t=>`<span class="tag-chip"${t==="needs-partner"?' style="background:rgba(230,126,34,.14);color:#8A6220" title="Filed from Xero but no partner name matched the Xero contact"':""}>${esc(t)}</span>`).join(" ")||"—"}</td></tr>`).join("")}
   </table></div>
-  <div class="note">Line-item editor, auto due-dates from net terms, and Google-Drive-backed file attachments in production. Approving a thread update with a suggested IO creates a draft here.</div></div>`;
+  <div class="note">Line-item editor, auto due-dates from net terms, and Google-Drive-backed file attachments in production. Approving a thread update with a suggested IO creates a draft here; approved Xero sales invoices file themselves in with the PDF.</div></div>`;
 }
 
 /* ============================ tasks ============================ */
@@ -962,22 +1047,65 @@ function applyCustomN(){
 }
 
 /* ============================ revenue — P&L workbench ============================ */
-const opEntries=()=>revenueEntries.filter(e=>scopeOf(e)==="operational");
-const expEntries=()=>revenueEntries.filter(e=>scopeOf(e)==="expense");
 const mLabel=m=>new Date(m+"-01T00:00").toLocaleDateString("en-US",{month:"short",year:"2-digit"});
 const mLabelLong=m=>new Date(m+"-01T00:00").toLocaleDateString("en-US",{month:"long",year:"numeric"});
 
+/* Most reliable figure wins on the P&L: synced platform numbers are an
+   estimate until the month is settled. Once a partner-month's payment item is
+   APPROVED, the approved amount is the truth; once PAID, what actually landed
+   (possibly in another currency) is. The operational entries behind that
+   partner-month are rescaled pro rata so the platform split and transaction
+   dates (FX) survive and the total equals the authoritative figure. The
+   Transactions tab keeps the raw ledger. */
+function applySettled(entries){
+  const auth=new Map();
+  payments.forEach(p=>{
+    if(!p.pid||p.status==="pending-approval")return;
+    const paid=p.status==="paid"&&p.paidAmount>0;
+    auth.set(`${p.pid}|${p.month}|${p.dir==="receivable"?"revenue":"cost"}`,
+      {amount:paid?p.paidAmount:p.amount,currency:paid?(p.paidCurrency||p.currency):p.currency,tag:p.status==="paid"?"settled:paid":"settled:approved"});
+  });
+  if(!auth.size)return entries;
+  const groups=new Map();
+  entries.forEach(e=>{
+    if(!e.pid||e.amount<=0||scopeOf(e)!=="operational")return;
+    const k=`${e.pid}|${e.date.slice(0,7)}|${e.type}`;
+    if(!auth.has(k))return;
+    if(!groups.has(k))groups.set(k,[]);
+    groups.get(k).push(e);
+  });
+  const replaced=new Map(),synth=[];
+  for(const[k,t]of auth){
+    const g=groups.get(k)||[],total=g.reduce((a,e)=>a+e.amount,0);
+    if(total>0){
+      const f=t.amount/total;
+      g.forEach(e=>replaced.set(e.id,{...e,amount:Math.round(e.amount*f*100)/100,currency:t.currency,tags:[...e.tags,t.tag]}));
+    }else{
+      const[pid,month,type]=k.split("|");
+      synth.push({id:"settled-"+k,type,pid,amount:t.amount,currency:t.currency,category:"other",scope:"operational",
+        description:(t.tag==="settled:paid"?"Paid":"Approved")+" amount — "+mLabelLong(month),date:lastDayOf(month),tags:["settled",t.tag]});
+    }
+  }
+  return entries.map(e=>replaced.get(e.id)||e).concat(synth);
+}
+const pnlEntries=()=>applySettled(revenueEntries);
+const opEntries=()=>pnlEntries().filter(e=>scopeOf(e)==="operational");
+const expEntries=()=>pnlEntries().filter(e=>scopeOf(e)==="expense");
+/* Everything the graphs/KPIs show is converted into the one selected display
+   currency at each TRANSACTION's date. */
+const fxE=list=>list.map(e=>({...e,currency:fxCcy,amount:Math.round(fxConvert(e.amount,e.currency,fxCcy,e.date)*100)/100}));
+
 /* Business series: operational trading only. */
-function monthlyBusiness(){
+function monthlyBusiness(op){
   const m={};
-  opEntries().forEach(e=>{const k=e.date.slice(0,7);if(!m[k])m[k]={month:k,revenue:0,cost:0,expenses:0};m[k][e.type==="revenue"?"revenue":"cost"]+=e.amount;});
+  op.forEach(e=>{const k=e.date.slice(0,7);if(!m[k])m[k]={month:k,revenue:0,cost:0,expenses:0};m[k][e.type==="revenue"?"revenue":"cost"]+=e.amount;});
   return Object.values(m).sort((a,b)=>a.month.localeCompare(b.month)).map(r=>({...r,profit:r.revenue-r.cost,label:mLabel(r.month)}));
 }
 /* Corp series: operational rev/cost + business expenses + corp net. */
-function monthlyCorp(){
+function monthlyCorp(op,exp){
   const m={},b=k=>(m[k]||(m[k]={month:k,revenue:0,cost:0,expenses:0}));
-  opEntries().forEach(e=>{const r=b(e.date.slice(0,7));if(e.type==="revenue")r.revenue+=e.amount;else r.cost+=e.amount;});
-  expEntries().forEach(e=>{const r=b(e.date.slice(0,7));if(e.type==="revenue")r.revenue+=e.amount;else r.expenses+=e.amount;});
+  op.forEach(e=>{const r=b(e.date.slice(0,7));if(e.type==="revenue")r.revenue+=e.amount;else r.cost+=e.amount;});
+  exp.forEach(e=>{const r=b(e.date.slice(0,7));if(e.type==="revenue")r.revenue+=e.amount;else r.expenses+=e.amount;});
   return Object.values(m).sort((a,b2)=>a.month.localeCompare(b2.month)).map(r=>({...r,profit:r.revenue-r.cost-r.expenses,label:mLabel(r.month)}));
 }
 /* P&L breakdown: month → partner|platform rows, newest month first. */
@@ -992,7 +1120,8 @@ function buildBreakdown(groupBy){
     if(!rows.has(key))rows.set(key,{key,name,pid:groupBy==="partner"?e.pid:null,platforms:[],revenue:0,cost:0});
     const row=rows.get(key);
     if(!row.platforms.includes(platform))row.platforms.push(platform);
-    if(e.type==="revenue")row.revenue+=e.amount;else row.cost+=e.amount;
+    const amtUsd=fxConvert(e.amount,e.currency||"USD","USD",e.date); // table shows USD; settled figures keep their FX effect
+    if(e.type==="revenue")row.revenue+=amtUsd;else row.cost+=amtUsd;
   }
   return [...byMonth.entries()].sort((a,b)=>b[0].localeCompare(a[0])).map(([month,rows])=>{
     const list=[...rows.values()].sort((a,b)=>(b.revenue+b.cost)-(a.revenue+a.cost));
@@ -1009,7 +1138,7 @@ function buildExpenseBlocks(){
     if(!rows.has(e.category))rows.set(e.category,{name:e.category,platforms:[],cost:0});
     const row=rows.get(e.category);
     if(!row.platforms.includes(platform))row.platforms.push(platform);
-    row.cost+=e.amount;
+    row.cost+=fxConvert(e.amount,e.currency||"USD","USD",e.date);
   }
   const out=new Map();
   for(const [month,rows] of byMonth){
@@ -1019,47 +1148,153 @@ function buildExpenseBlocks(){
   return out;
 }
 const overduePayments=()=>payments.filter(isOverdue);
-
-function approvePay(dir,pid,month,amount,platforms){
-  const id=payId(dir,pid,month);
-  if(payments.some(p=>p.id===id))return;
-  const terms=P(pid)?.terms??30;
-  const [y,mo]=month.split("-").map(Number);
-  const d=new Date(Date.UTC(y,mo,0));                       // last day of the month
-  d.setUTCDate(d.getUTCDate()+terms);
-  payments.push({id,pid,month,dir,amount:Math.round(amount*100)/100,currency:"USD",status:"pending",due:d.toISOString().slice(0,10),paidAt:null,platforms});
-  render();toast(`Approved ${fmt$(amount)} — payment due ${fmtDate(d.toISOString().slice(0,10))} on ${P(pid)?.name}'s ${terms}-day terms`);
-}
-function payMark(id,paid){const p=payments.find(x=>x.id===id);if(!p)return;p.status=paid?"paid":"pending";p.paidAt=paid?todayISO():null;render();toast(paid?"Marked paid":"Payment reopened");}
-function payDue(id,v){const p=payments.find(x=>x.id===id);if(p&&v){p.due=v;render();}}
-function payDelete(id){payments=payments.filter(p=>p.id!==id);render();toast("Payment removed — the revenue entries behind it stay untouched");}
+const PAY=id=>payments.find(p=>p.id===id);
 function setRevTabPage(t){revPageTab=t;render();}
+function toggleMonth(m){expandedMonths.has(m)?expandedMonths.delete(m):expandedMonths.add(m);render();}
 
-function approveCell(row,month,dir){
+/* ---- payment lifecycle actions (Payments tab) ---- */
+function payApprove(id){const p=PAY(id);if(!p)return;p.status="approved";p.approvedAt=todayISO();render();toast(`Amount approved — ${fmtC(p.amount,p.currency)} now the P&L figure; awaiting the invoice`);}
+function payReopen(id){const p=PAY(id);if(!p)return;
+  p.status=(p.file||p.xeroNum)?"invoiced":"approved";
+  delete p.paidAt;delete p.paidAmount;delete p.paidCurrency;delete p.paidRef;delete p.paidVia;delete p.wiseId;
+  if(p.sid)reconcileServiceExpenseDemo(p);
+  render();toast("Payment reopened");}
+function payDue(id,v){const p=PAY(id);if(p&&v){p.due=v;render();}}
+function payAmount(id,v){const p=PAY(id);const n=Math.round(Number(v)*100)/100;if(p&&Number.isFinite(n)&&n>0&&n!==p.amount){p.amount=n;render();}}
+function payDelete(id){payments=payments.filter(p=>p.id!==id);render();toast("Payment removed — the revenue entries behind it stay untouched");}
+function payToggleRecurring(id){const p=PAY(id);if(!p)return;p.recurring=!p.recurring;render();toast(p.recurring?"Repeats monthly — a fresh copy opens with each new month":"No longer recurring");}
+function payAttach(id){const p=PAY(id);if(!p)return;
+  p.file=(p.xeroNum||"approval")+".pdf";
+  if(p.status==="approved"){p.status="invoiced";p.invoicedAt=todayISO();}
+  render();toast("Attached — invoice on file moves the item to pending payment (bytes go to Google Drive in production)");}
+
+/* A PAID service payment books a Corp P&L expense entry for its SERVICE month
+   (paid in month M = used in M-1, so payment.month IS the service month).
+   Deterministic id; retracts if the payment is reopened or deleted. */
+function reconcileServiceExpenseDemo(p){
+  if(!p.sid)return;
+  const eid=`svcexp-${p.sid}-${p.month}`;
+  revenueEntries=revenueEntries.filter(e=>e.id!==eid);
+  if(p.status!=="paid")return;
+  const s=SV(p.sid)||{name:"Service",category:"subscription"};
+  const cat=s.category==="infra"?"hosting":"tools";
+  revenueEntries.push({id:eid,type:"cost",scope:"expense",amount:p.paidAmount??p.amount,currency:p.paidCurrency||p.currency,
+    category:cat,description:`${s.name} — service month ${mLabelLong(p.month)}`,date:p.month+"-01",pid:null,tags:["service"]});
+}
+
+/* Mark Paid: record what ACTUALLY landed — possibly another currency (USD
+   invoice settled in AUD on Wise) and another payer name (the legal entity).
+   Remembering that payer name lets the nightly Wise reconciliation match the
+   next one automatically. */
+function openMarkPaid(id){
+  const p=PAY(id);if(!p)return;
+  DR={pid:id,paidAt:todayISO(),amount:String(p.amount),currency:p.currency,via:"wise",ref:"",remember:true};
+  renderMarkPaid();
+}
+function renderMarkPaid(){
+  const p=PAY(DR.pid);if(!p)return;
+  const partner=p.pid?P(p.pid):null;
+  const parsed=Number(DR.amount),valid=DR.paidAt&&Number.isFinite(parsed)&&parsed>0;
+  const cross=DR.currency!==p.currency;
+  const ccys=[...new Set([p.currency,...settings.currencies,"USD","AUD","ILS","EUR","GBP"])];
+  const refTrim=DR.ref.trim();
+  const norm=s=>s.toLowerCase().replace(/[^a-z0-9]+/g," ").trim();
+  const canRemember=!!partner&&refTrim.length>=3&&norm(refTrim)!==norm(partner.name)&&!(partner.payerNames||[]).some(n=>norm(n)===norm(refTrim));
+  openModal(`Mark Paid — ${payPayeeName(p)}`,`
+    <div style="font-size:13px;color:var(--muted);margin-bottom:12px">Approved <b style="font-family:var(--fd);font-size:14px">${fmtC(p.amount,p.currency)}</b> · ${mLabelLong(p.month)} · ${p.dir==="receivable"?"receivable":"payable"}</div>
+    <div class="frow">
+      <div class="fg" style="max-width:160px"><label class="label">Paid On</label><input class="inp" type="date" value="${DR.paidAt}" onchange="DR.paidAt=this.value;renderMarkPaid()"></div>
+      <div class="fg" style="max-width:150px"><label class="label">Received Amount</label><input class="inp" type="number" step="0.01" min="0.01" value="${esc(DR.amount)}" onchange="DR.amount=this.value;renderMarkPaid()"></div>
+      <div class="fg" style="max-width:100px"><label class="label">Currency</label><select class="inp" onchange="DR.currency=this.value;renderMarkPaid()">${ccys.map(c=>`<option value="${c}"${c===DR.currency?" selected":""}>${c}</option>`).join("")}</select></div>
+      <div class="fg" style="max-width:150px"><label class="label">Via</label><select class="inp" onchange="DR.via=this.value">${[["wise","Wise"],["bank","Bank transfer"],["cash","Cash"],["other","Other"]].map(([k,l])=>`<option value="${k}"${k===DR.via?" selected":""}>${l}</option>`).join("")}</select></div>
+    </div>
+    <div class="fg"><label class="label">Payer / Reference (as it appears on the bank feed)</label>
+      <input class="inp" value="${esc(DR.ref)}" onchange="DR.ref=this.value;renderMarkPaid()" placeholder="${partner?`e.g. the legal entity paying for ${esc(partner.name)}`:"e.g. transfer reference"}"></div>
+    ${cross&&valid?`<div style="font-size:12.5px;color:var(--gold-d);margin-bottom:8px">Settled in ${DR.currency}: ${money2(parsed,DR.currency)} received against ${money2(p.amount,p.currency)} approved (implied rate 1 ${p.currency} = ${(parsed/p.amount).toFixed(4)} ${DR.currency}). The P&amp;L now shows what landed.</div>`:""}
+    ${canRemember?`<label style="display:flex;align-items:center;gap:8px;font-size:12.5px;cursor:pointer"><input type="checkbox" ${DR.remember?"checked":""} onchange="DR.remember=this.checked" style="accent-color:#0A4F32">Remember "${esc(refTrim)}" as a payer name for ${esc(partner.name)} — future Wise transfers under this name auto-match.</label>`:""}`,
+    `<button class="btn btn-ghost" onclick="closeModal()">Cancel</button><button class="btn btn-primary" ${valid?"":"disabled"} onclick="submitMarkPaid()">✓ Mark Paid</button>`);
+}
+function submitMarkPaid(){
+  const p=PAY(DR.pid);if(!p)return;
+  const parsed=Number(DR.amount);if(!(DR.paidAt&&Number.isFinite(parsed)&&parsed>0))return;
+  const refTrim=DR.ref.trim();
+  Object.assign(p,{status:"paid",paidAt:DR.paidAt,paidAmount:Math.round(parsed*100)/100,paidCurrency:DR.currency,paidVia:DR.via,paidRef:refTrim||undefined});
+  if(DR.remember&&refTrim.length>=3&&p.pid){const pt=P(p.pid);if(pt&&!(pt.payerNames||[]).includes(refTrim))pt.payerNames=[...(pt.payerNames||[]),refTrim];}
+  if(p.sid)reconcileServiceExpenseDemo(p);
+  closeModal();render();toast(`Paid — ${money2(p.paidAmount,p.paidCurrency)} recorded${p.paidCurrency!==p.currency?" (cross-currency settlement kept with cents)":""}`);
+}
+
+/* Nightly Wise auto-reconciliation (demo trigger): a pending payment is marked
+   PAID when a completed Wise activity matches it — payee name or remembered
+   payer alias in the title, same direction, amount within 0.5% same-currency
+   or 3% cross-currency at the ECB rate of the transfer date. */
+function wiseReconcileDemo(){
+  const norm=s=>s.toLowerCase().replace(/[^a-z0-9]+/g," ").trim();
+  let matched=0;
+  for(const p of payments){
+    if(p.status!=="approved"&&p.status!=="invoiced")continue;
+    const payeeId=p.pid||p.sid;
+    const aliases=[payPayeeName(p),...((p.pid?P(p.pid)?.payerNames:null)||[])].map(norm).filter(n=>n.length>=3);
+    if(!payeeId||!aliases.length)continue;
+    const want=p.dir==="receivable";
+    const hit=wiseActivities.find(a=>{
+      if(a.used||(a.dir==="in")!==want)return false;
+      const t=norm(a.title);
+      if(!aliases.some(n=>t.includes(n)||n.includes(t)))return false;
+      const expected=fxConvert(p.amount,p.currency,a.ccy,a.date);
+      const tol=a.ccy===p.currency?Math.max(.05,expected*.005):expected*.03;
+      return Math.abs(a.amount-expected)<=tol;
+    });
+    if(!hit)continue;
+    hit.used=true;matched++;
+    Object.assign(p,{status:"paid",paidAt:hit.date,paidAmount:hit.amount,paidCurrency:hit.ccy,paidVia:"wise",paidRef:hit.title,wiseId:hit.id});
+    if(p.sid)reconcileServiceExpenseDemo(p);
+  }
+  render();
+  toast(matched?`Wise reconciliation: ${matched} payment${matched>1?"s":""} matched to completed activity and marked paid — in production this runs nightly and emails a summary`
+               :"Wise reconciliation: no pending payment matched a completed Wise activity");
+}
+
+/* Nightly rebook (demo trigger): items still PENDING APPROVAL re-book to the
+   figures the sync says today (restated platform numbers). Approved/paid
+   figures are the operator's decision and never move; the current month is
+   never booked at all (a month-to-date figure is not a booked amount). */
+function rebookDemo(){
+  const cur=monthOf(0);let rebooked=0;
+  for(const p of payments){
+    if(p.status!=="pending-approval"||!p.pid||p.month>=cur)continue;
+    const synced=revenueEntries.filter(e=>e.pid===p.pid&&e.date.slice(0,7)===p.month&&e.type===(p.dir==="receivable"?"revenue":"cost")&&scopeOf(e)==="operational")
+      .reduce((a,e)=>a+e.amount,0);
+    if(synced>0&&(synced!==p.amount||synced!==p.bookedAmount)){p.amount=synced;p.bookedAmount=synced;rebooked++;}
+  }
+  render();
+  toast(rebooked?`Rebooked ${rebooked} pending-approval item${rebooked>1?"s":""} to the restated sync figures — approved and paid amounts never move, and the current month is never booked`
+               :"Nothing to rebook — every pending item already matches the sync, and the current month is never booked");
+}
+
+/* ---- P&L breakdown status chip: payments are reviewed on the Payments tab ---- */
+function payStatusChip(row,month,dir){
   const amount=dir==="receivable"?row.revenue:row.cost;
   if(!amount)return "";
-  if(!row.pid)return `<span title="Assign these entries to a partner to approve" style="font-size:10.5px;color:var(--t3)">no partner</span>`;
-  const ex=payments.find(p=>p.id===payId(dir,row.pid,month));
-  if(ex){
-    const od=isOverdue(ex);
-    const color=ex.status==="paid"?"#1f7a00":od?"var(--danger)":"var(--gold-d)";
-    const text=ex.status==="paid"?"Paid":od?"Overdue":"Approved";
-    const icon=ex.status==="paid"?"✓":od?"⚠":"◔";
-    return `<button type="button" onclick="setRevTabPage('payments')" title="${text} — due ${fmtDate(ex.due)}. Click to open Payments."
-      style="border:0;background:transparent;cursor:pointer;padding:0;font-family:var(--fd);font-weight:700;font-size:10.5px;letter-spacing:.08em;text-transform:uppercase;color:${color}">${icon} ${text}</button>`;
-  }
-  if(!canEdit())return "";
-  return `<button type="button" class="ce" onclick="approvePay('${dir}','${row.pid}','${month}',${amount},${JSON.stringify(row.platforms).replace(/"/g,"&quot;")})"
-    title="Approve ${fmt$(amount)} as ${dir} — creates a payment due per net terms"
-    style="font-family:var(--fd);font-weight:700;font-size:10.5px;letter-spacing:.08em;text-transform:uppercase;padding:2px 8px;border:1px solid rgba(10,79,50,.3);border-radius:2px;background:var(--surface);cursor:pointer;color:var(--forest)">Approve</button>`;
+  if(!row.pid)return `<span title="Assign these entries to a partner to track a payment" style="font-size:10.5px;color:var(--t3)">no partner</span>`;
+  const p=payments.find(x=>x.id===payId(dir,row.pid,month));
+  if(!p)return `<span title="A payment item opens automatically on the 2nd, once the month has closed" style="font-family:var(--fd);font-weight:600;font-size:10px;color:#B9C2BE;cursor:help">—</span>`;
+  const od=isOverdue(p);
+  const m=p.status==="paid"?["Paid","#1f7a00","✓"]
+    :p.status==="pending-approval"?["Pending approval","#E67E22","◔"]
+    :p.status==="approved"?["Amount approved","#2980B9","▤"]
+    :od?["Overdue","#C0392B","⚠"]:["Pending payment","#887B05","◔"];
+  const shown=p.status==="paid"&&p.paidAmount!=null?`P&L shows the paid ${money2(p.paidAmount,p.paidCurrency||p.currency)}`:`P&L shows the approved ${fmtC(p.amount,p.currency)}`;
+  const edited=p.bookedAmount!=null&&p.bookedAmount!==p.amount;
+  return `<button type="button" onclick="setRevTabPage('payments')" title="${m[0]} — ${shown}${edited?` (booked ${fmtC(p.bookedAmount,p.currency)})`:""}, due ${fmtDate(p.due)}. Click to open Payments."
+    style="border:0;background:transparent;cursor:pointer;padding:0;font-family:var(--fd);font-weight:700;font-size:10.5px;letter-spacing:.06em;text-transform:uppercase;color:${m[1]};white-space:nowrap">${m[2]} ${m[0]}${edited?"*":""}</button>`;
 }
 const money=(v,color,sign)=>v===0?`<span style="color:#B9C2BE">—</span>`:`<span style="font-family:var(--fd);font-weight:700;font-size:13.5px;color:${color}">${sign}${fmt$(v)}</span>`;
 
 function pageRevenue(){
   const corp=revView==="corp";
-  const md=corp?monthlyCorp():monthlyBusiness();
-  const rev=md.reduce((a,m)=>a+m.revenue,0), cost=md.reduce((a,m)=>a+m.cost,0), exp=md.reduce((a,m)=>a+m.expenses,0);
-  const opProfit=rev-cost, corpProfit=opProfit-exp;
+  const opFx=fxE(opEntries()), expFx=fxE(expEntries());
+  const md=corp?monthlyCorp(opFx,expFx):monthlyBusiness(opFx);
   const od=overduePayments();
   const tabs=[["pnl","P&L"],["payments","Payments"],["transactions","Transactions"]];
   const head=pageHead("Financial","Revenue",
@@ -1069,45 +1304,64 @@ function pageRevenue(){
     `<div style="display:flex;gap:4px;align-items:center;flex-wrap:wrap">
       ${tabs.map(([k,l])=>`<button class="btn btn-sm" style="${revPageTab===k?"background:var(--forest);color:#fff;border:1px solid var(--forest)":"background:transparent;color:var(--muted);border:1px solid rgba(10,79,50,.2)"};display:inline-flex;align-items:center;gap:6px" onclick="setRevTabPage('${k}')">${l}${k==="payments"&&od.length?`<span style="background:var(--danger);color:#fff;border-radius:8px;font-size:10px;font-weight:700;padding:0 6px;line-height:15px">${od.length}</span>`:""}</button>`).join("")}
       ${revPageTab==="pnl"?`<span style="display:flex;gap:4px;margin-left:14px;padding-left:14px;border-left:1px solid rgba(10,79,50,.15)">
-        ${[["business","Business P&L","Operational trading only — platform &amp; partner money"],["corp","Corp P&L","Includes business expenses (Xero/Wise bills, payroll, hosting…)"]].map(([k,l,t])=>
+        ${[["business","Business P&L","Operational trading only — platform &amp; partner money"],["corp","Corp P&L","Includes business expenses (Xero/Wise bills, services, payroll, hosting…)"]].map(([k,l,t])=>
           `<button class="btn btn-sm" title="${t}" style="${revView===k?"background:var(--gold-d);color:#fff;border:1px solid var(--gold-d)":"background:transparent;color:var(--muted);border:1px solid rgba(189,140,61,.4)"}" onclick="revView='${k}';render()">${l}</button>`).join("")}
       </span>`:""}
     </div>`);
 
   const overdueBanner=od.length?`<div onclick="setRevTabPage('payments')" title="Open Payments" style="cursor:pointer;padding:10px 14px;background:#FDF3F2;border:1px solid rgba(192,57,43,.3);border-radius:2px;font-size:13px;color:var(--danger);font-weight:500;display:flex;align-items:center;gap:8px;margin-bottom:16px">
-    ⚠ ${od.length} payment${od.length>1?"s":""} overdue — ${od.map(p=>`${esc(P(p.pid)?.name||"?")} ${fmt$(p.amount)}`).join(", ")}</div>`:"";
+    ⚠ ${od.length} payment${od.length>1?"s":""} overdue — ${od.map(p=>`${esc(payPayeeName(p))} ${fmtC(p.amount,p.currency)}`).join(", ")}</div>`:"";
 
   if(revPageTab==="payments")      return head+overdueBanner+revPayments();
   if(revPageTab==="transactions")  return head+overdueBanner+revTransactions();
 
   /* ---------------- P&L tab ---------------- */
+  /* KPI time frame: one calendar month (default = the previous month, the
+     last fully closed one) or all time. Months offered = months with entries. */
+  const kpiMonths=[...new Set(revenueEntries.map(e=>e.date.slice(0,7)))].sort((a,b)=>b.localeCompare(a));
+  const frame=kpiMonth??(kpiMonths.includes(M1)?M1:(kpiMonths[0]||"all"));
+  const inFrame=e=>frame==="all"||e.date.slice(0,7)===frame;
+  const opK=opFx.filter(inFrame), expK=expFx.filter(inFrame);
+  const rev=opK.filter(e=>e.type==="revenue").reduce((a,e)=>a+e.amount,0);
+  const cost=opK.filter(e=>e.type==="cost").reduce((a,e)=>a+e.amount,0);
+  const exp=expK.filter(e=>e.type==="cost").reduce((a,e)=>a+e.amount,0);
+  const opProfit=rev-cost, corpProfit=opProfit-exp;
   const kpis=corp?[
-    ["Operating Profit",fmt$(opProfit),opProfit>=0?"var(--forest)":"var(--danger)"],
-    ["Business Expenses",fmt$(exp),"#E67E22"],
-    ["Corp Net Profit",fmt$(corpProfit),corpProfit>=0?"var(--forest)":"var(--danger)"],
+    ["Operating Profit",fmtC(opProfit,fxCcy),opProfit>=0?"var(--forest)":"var(--danger)"],
+    ["Business Expenses",fmtC(exp,fxCcy),"#E67E22"],
+    ["Corp Net Profit",fmtC(corpProfit,fxCcy),corpProfit>=0?"var(--forest)":"var(--danger)"],
     ["Corp Margin",rev?(100*corpProfit/rev).toFixed(1)+"%":"—","var(--gold-d)"],
   ]:[
-    ["Revenue",fmt$(rev),"var(--forest)"],
-    ["Operating Cost",fmt$(cost),"var(--danger)"],
-    ["Operating Profit",fmt$(opProfit),opProfit>=0?"var(--forest)":"var(--danger)"],
+    ["Revenue",fmtC(rev,fxCcy),"var(--forest)"],
+    ["Operating Cost",fmtC(cost,fxCcy),"var(--danger)"],
+    ["Operating Profit",fmtC(opProfit,fxCcy),opProfit>=0?"var(--forest)":"var(--danger)"],
     ["Op Margin",rev?(100*opProfit/rev).toFixed(1)+"%":"—","var(--gold-d)"],
   ];
 
+  /* Expenses ride a RIGHT-hand axis in corp view: monthly service/Xero bills
+     are 1-2 orders of magnitude below trading volume, so on the shared axis
+     they render sub-pixel and "disappear". */
   const series=corp
-    ?[["revenue","Revenue","#0A4F32",1],["cost","Op Cost","#C0392B",.75],["expenses","Expenses","#E67E22",.85],["profit","Corp Net","#BD8C3D",1]]
+    ?[["revenue","Revenue","#0A4F32",1],["cost","Op Cost","#C0392B",.75],["profit","Corp Net","#BD8C3D",1]]
     :[["revenue","Revenue","#0A4F32",1],["cost","Cost","#C0392B",.75],["profit","Profit","#BD8C3D",1]];
+  const sym=({USD:"$",AUD:"A$",EUR:"€",GBP:"£",ILS:"₪"})[fxCcy]||"$";
   const maxM=Math.max(1,...md.map(m=>Math.max(...series.map(s=>Math.abs(m[s[0]])))));
-  const W=640,H=210,PD=44,bw=Math.min(14,(W-PD-20)/(md.length*(series.length+1.2)));
-  const gx=i=>PD+(W-PD-16)*(i+.5)/md.length, gy=v=>H-28-(H-52)*v/maxM;
+  const maxE=Math.max(1,...md.map(m=>m.expenses||0));
+  const W=640,H=210,PD=44,PR=corp?46:8,bw=Math.min(14,(W-PD-20-PR)/(md.length*(series.length+1.2)));
+  const gx=i=>PD+(W-PD-PR-8)*(i+.5)/md.length, gy=v=>H-28-(H-52)*v/maxM, ey=v=>H-28-(H-52)*v/maxE;
   const bx=(i,s)=>gx(i)-(series.length*bw)/2+s*bw;
+  const expLine=corp?md.map((m,i)=>`${i?"L":"M"}${gx(i).toFixed(1)},${ey(m.expenses||0).toFixed(1)}`).join(""):"";
   const chart= revTab==="monthly"
     ?`<div style="padding:6px 4px;overflow-x:auto"><svg class="chart" viewBox="0 0 ${W} ${H}" style="width:100%;min-width:460px">
-      ${[0,.25,.5,.75,1].map(f=>`<line x1="${PD}" x2="${W-8}" y1="${gy(maxM*f).toFixed(1)}" y2="${gy(maxM*f).toFixed(1)}" stroke="rgba(10,79,50,.08)" stroke-dasharray="3 3"/><text x="${PD-6}" y="${(gy(maxM*f)+4).toFixed(1)}" text-anchor="end">$${Math.round(maxM*f/1000)}k</text>`).join("")}
+      ${[0,.25,.5,.75,1].map(f=>`<line x1="${PD}" x2="${W-PR}" y1="${gy(maxM*f).toFixed(1)}" y2="${gy(maxM*f).toFixed(1)}" stroke="rgba(10,79,50,.08)" stroke-dasharray="3 3"/><text x="${PD-6}" y="${(gy(maxM*f)+4).toFixed(1)}" text-anchor="end">${sym}${Math.round(maxM*f/1000)}k</text>`).join("")}
+      ${corp?[0,.5,1].map(f=>`<text x="${W-PR+6}" y="${(ey(maxE*f)+4).toFixed(1)}" fill="#E67E22" style="fill:#E67E22">${sym}${(maxE*f/1000).toFixed(1)}k</text>`).join(""):""}
       ${md.map((m,i)=>series.map(([k,,color,op],s)=>{const v=Math.max(m[k],0);return `<rect x="${bx(i,s).toFixed(1)}" y="${gy(v).toFixed(1)}" width="${(bw-1).toFixed(1)}" height="${(H-28-gy(v)).toFixed(1)}" fill="${color}" opacity="${op}" rx="1"/>`;}).join("")
         +`<text x="${gx(i).toFixed(1)}" y="${H-9}" text-anchor="middle">${m.label}</text>`).join("")}
+      ${corp?`<path d="${expLine}" fill="none" stroke="#E67E22" stroke-width="2"/>${md.map((m,i)=>`<circle cx="${gx(i).toFixed(1)}" cy="${ey(m.expenses||0).toFixed(1)}" r="3" fill="#E67E22"/>`).join("")}`:""}
       </svg>
       <div style="display:flex;gap:16px;padding:2px 10px 8px;font-family:var(--fd);font-size:10.5px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);flex-wrap:wrap">
-        ${series.map(([,label,color,op])=>`<span><span style="display:inline-block;width:9px;height:9px;background:${color};opacity:${op};border-radius:1px;margin-right:5px"></span>${label}</span>`).join("")}</div></div>`
+        ${series.map(([,label,color,op])=>`<span><span style="display:inline-block;width:9px;height:9px;background:${color};opacity:${op};border-radius:1px;margin-right:5px"></span>${label}</span>`).join("")}
+        ${corp?`<span title="Business expenses are plotted on the right-hand axis — their own scale, so small monthly bills stay visible next to trading volume"><span style="display:inline-block;width:9px;height:3px;background:#E67E22;border-radius:1px;margin-right:5px;vertical-align:middle"></span>Expenses (right axis)</span>`:""}</div></div>`
     :`<div class="two" style="padding:16px 18px">${[["Revenue by Category",byCategory("revenue"),"#0A4F32"],["Cost by Category",byCategory("cost"),"#C0392B"]].map(([label,data,color])=>{
         const mx=Math.max(1,...data.map(d=>d.value));
         return `<div><div style="font-family:var(--fd);font-weight:600;font-size:13px;margin-bottom:10px">${label}</div>
@@ -1122,11 +1376,22 @@ function pageRevenue(){
   const secOf=m=>breakdown.find(s=>s.month===m)||{month:m,rows:[],revenue:0,cost:0};
 
   return head+overdueBanner+`
+  <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:10px">
+    <span class="eyebrow" style="letter-spacing:.2em">${corp?"Corp P&amp;L":"Business P&amp;L"}</span>
+    <select class="inp" style="width:auto;padding:4px 8px;font-size:12px;font-family:var(--fd);font-weight:700" title="Time frame for the figures below — one calendar month, or all time" onchange="kpiMonth=this.value;render()">
+      ${kpiMonths.map(m=>`<option value="${m}"${frame===m?" selected":""}>${mLabelLong(m)}</option>`).join("")}
+      <option value="all"${frame==="all"?" selected":""}>All time</option></select>
+    ${frame===monthOf(0)?`<span style="font-size:11.5px;color:var(--gold-d);font-family:var(--fd);font-weight:700;text-transform:uppercase;letter-spacing:.06em">month to date</span>`:""}
+    <span title="Each partner-month shows its most reliable figure: the amount actually paid, else the approved amount, else the synced platform number. The Transactions tab keeps the raw ledger."
+      style="margin-left:auto;font-size:10.5px;color:var(--t3);font-family:var(--fd);font-weight:600;letter-spacing:.05em;text-transform:uppercase;cursor:help">figures: paid › approved › synced</span>
+  </div>
   <div class="kpis" style="grid-template-columns:repeat(auto-fit,minmax(160px,1fr))">
     ${kpis.map(([l,v,c])=>`<div class="kpi"><div class="l">${l}</div><div class="v" style="color:${c}">${v}</div></div>`).join("")}
   </div>
   <div class="card"><div class="h"><span class="t">Analytics</span>
-    <span style="margin-left:auto;display:inline-flex;gap:4px">
+    <span style="margin-left:auto;display:inline-flex;gap:4px;align-items:center">
+      <select class="inp" style="width:76px;padding:4px 8px;font-size:12px;font-family:var(--fd);font-weight:700" title="Display currency — shared with the Dashboard; every amount converted at its transaction date (ECB daily rates)" onchange="setFxCcy(this.value)">
+        ${FX_CURRENCIES.map(c=>`<option value="${c}"${fxCcy===c?" selected":""}>${c}</option>`).join("")}</select>
       <button class="btn btn-sm" style="${revTab==="monthly"?"background:var(--forest);color:#fff;border:1px solid var(--forest)":"background:transparent;color:var(--muted);border:1px solid rgba(10,79,50,.2)"}" onclick="revTab='monthly';render()">Monthly Trend</button>
       <button class="btn btn-sm" style="${revTab==="category"?"background:var(--forest);color:#fff;border:1px solid var(--forest)":"background:transparent;color:var(--muted);border:1px solid rgba(10,79,50,.2)"}" onclick="revTab='category';render()">By Category</button></span></div>
     ${chart}</div>
@@ -1138,21 +1403,22 @@ function pageRevenue(){
     ${months.map(m=>{
       const sec=secOf(m), blk=corp?blocks.get(m):null;
       const opNet=sec.revenue-sec.cost, corpNet=opNet-(blk?blk.total:0);
+      const open=expandedMonths.has(m);
       return `<div style="border-bottom:1px solid rgba(10,79,50,.08)">
-        <div style="padding:11px 16px;background:rgba(10,79,50,.045);display:flex;align-items:baseline;gap:14px;flex-wrap:wrap">
-          <span style="font-family:var(--fd);font-weight:700;font-size:14px;color:var(--forest);letter-spacing:.04em">${mLabelLong(m)}</span>
+        <div onclick="toggleMonth('${m}')" title="${open?"Collapse":"Expand"} month" style="padding:11px 16px;background:rgba(10,79,50,.045);display:flex;align-items:baseline;gap:14px;flex-wrap:wrap;cursor:pointer;user-select:none">
+          <span style="font-family:var(--fd);font-weight:700;font-size:14px;color:var(--forest);letter-spacing:.04em">${open?"▾":"▸"} ${mLabelLong(m)}</span>
           <span style="font-size:12px;color:var(--muted)">
             rev <b style="color:var(--forest)">${sec.revenue?fmt$(sec.revenue):"—"}</b> · cost <b style="color:var(--danger)">${sec.cost?fmt$(sec.cost):"—"}</b>
             ${corp?` · op net <b style="color:${opNet>=0?"var(--forest)":"var(--danger)"}">${fmt$(opNet)}</b> · expenses <b style="color:#E67E22">${blk?fmt$(blk.total):"—"}</b> · corp net <b style="color:${corpNet>=0?"var(--forest)":"var(--danger)"}">${fmt$(corpNet)}</b>`
                  :` · net <b style="color:${opNet>=0?"var(--forest)":"var(--danger)"}">${fmt$(opNet)}</b>`}
           </span></div>
-        <table>
+        ${open?`<table>
           ${sec.rows.map(r=>`<tr>
             <td style="font-weight:500;width:26%">${esc(r.name)}${revGroupBy==="partner"&&r.platforms.length?`<span style="margin-left:8px">${r.platforms.map(pl=>`<span class="tag-chip" style="margin-right:3px;font-size:9.5px">${esc(pl)}</span>`).join("")}</span>`:""}</td>
             <td style="width:18%">${money(r.revenue,"var(--forest)","+")}</td>
-            <td style="width:10%">${revGroupBy==="partner"?approveCell(r,m,"receivable"):""}</td>
+            <td style="width:10%">${revGroupBy==="partner"?payStatusChip(r,m,"receivable"):""}</td>
             <td style="width:18%">${money(r.cost,"var(--danger)","–")}</td>
-            <td style="width:10%">${revGroupBy==="partner"?approveCell(r,m,"payable"):""}</td>
+            <td style="width:10%">${revGroupBy==="partner"?payStatusChip(r,m,"payable"):""}</td>
             <td class="num" style="width:18%;padding-right:18px">${money(r.revenue-r.cost,(r.revenue-r.cost)>=0?"var(--forest)":"var(--danger)","")}</td></tr>`).join("")}
           ${blk?blk.rows.map(er=>`<tr style="background:rgba(230,126,34,.04)">
             <td style="width:26%;color:#8A6220"><span style="font-family:var(--fd);font-weight:700;font-size:10px;letter-spacing:.08em;text-transform:uppercase;color:#E67E22;margin-right:8px">Expense</span>${esc(er.name)}
@@ -1161,46 +1427,190 @@ function pageRevenue(){
             <td style="width:18%">${money(er.cost,"#E67E22","–")}</td><td style="width:10%"></td>
             <td class="num" style="width:18%;padding-right:18px">${money(er.cost,"#E67E22","–")}</td></tr>`).join(""):""}
           ${!sec.rows.length&&!(blk&&blk.rows.length)?`<tr><td colspan="6" style="color:var(--t3);font-size:12.5px">No activity</td></tr>`:""}
-        </table></div>`;}).join("")}
+        </table>`:""}</div>`;}).join("")}
   </div>
-  ${revGroupBy==="partner"?`<div class="note">Approve a month's revenue or cost to create a tracked payment — the due date comes from the partner's net terms, and the id is derived from partner + month so approving twice can't duplicate it.</div>`:""}
+  ${revGroupBy==="partner"?`<div class="note">Payments open automatically on the 2nd for the month that just closed — review, edit and approve them on the Payments tab. Settled months show the paid/approved figure here (pro-rata across the month's entries).</div>`:""}
   </div>`;
 }
 
+/* -------- Payments tab: colour-coded groups + per-column filters -------- */
+function pfSet(k,v,id){payFilters[k]=v;render();if(id){const e=document.getElementById(id);if(e){e.focus();try{e.setSelectionRange(e.value.length,e.value.length)}catch(err){}}}}
+function payColumns(){
+  const sum1=p=>fxConvert(p.amount,p.currency,"USD",p.due||todayISO());
+  void sum1;
+  const statusVal=p=>p.status!=="paid"&&isOverdue(p)?"overdue":p.status;
+  return [
+    {k:"payee",label:"Payee",text:p=>payPayeeName(p)+" "+(p.platforms||[]).join(" ")},
+    {k:"month",label:"Month",opts:[...new Set(payments.map(p=>p.month))].sort((a,b)=>b.localeCompare(a)).map(m=>[m,mLabelLong(m)]),val:p=>p.month},
+    {k:"type",label:"Type",opts:PAY_KINDS.map(k=>[k,PAY_KIND_META[k].label]),val:p=>payKindOf(p)},
+    {k:"approved",label:"Approved",text:p=>`${p.amount} ${fmtC(p.amount,p.currency)} ${p.currency}`},
+    {k:"booked",label:"Booked",text:p=>p.bookedAmount!=null?`${p.bookedAmount} ${fmtC(p.bookedAmount,p.currency)}`:""},
+    {k:"delta",label:"Δ",text:p=>{if(p.bookedAmount==null||!p.bookedAmount)return "";const d=Math.round((p.amount-p.bookedAmount)*100)/100;return `${d} ${((d/p.bookedAmount)*100).toFixed(1)}%`;}},
+    {k:"due",label:"Due",text:p=>(p.due||"")+" "+(p.due?fmtDate(p.due):"")},
+    {k:"status",label:"Status",opts:[["pending-approval","Pending approval"],["approved","Amount approved"],["invoiced","Pending payment"],["overdue","Overdue"],["paid","Paid"]],val:statusVal,
+      text:p=>`${p.status} ${p.paidVia||""} ${p.paidRef||""} ${p.xeroNum||""} ${isOverdue(p)?"overdue":""}`},
+    {k:"file",label:"Invoice / Approval",text:p=>p.file||""},
+  ];
+}
 function revPayments(){
-  const pend=payments.filter(p=>p.status==="pending");
-  const rec=pend.filter(p=>p.dir==="receivable").reduce((a,p)=>a+p.amount,0);
-  const pay=pend.filter(p=>p.dir==="payable").reduce((a,p)=>a+p.amount,0);
   const od=overduePayments();
-  const list=[...payments].sort((a,b)=>a.status===b.status?a.due.localeCompare(b.due):a.status==="pending"?-1:1);
+  const usd=p=>fxConvert(p.amount,p.currency,"USD",p.due||todayISO());
+  const rec=payments.filter(p=>p.status!=="paid"&&p.dir==="receivable").reduce((a,p)=>a+usd(p),0);
+  const pay=payments.filter(p=>p.status!=="paid"&&p.dir==="payable").reduce((a,p)=>a+usd(p),0);
+  const nPend=payments.filter(p=>p.status==="pending-approval").length;
+  const nAwait=payments.filter(p=>p.status==="approved").length;
+  const cols=payColumns();
+  const active=Object.entries(payFilters).filter(([,v])=>v&&v.trim());
+  const sorted=[...payments].sort((a,b)=>(PAY_STATUS_ORDER[a.status]??9)-(PAY_STATUS_ORDER[b.status]??9)||String(a.due).localeCompare(String(b.due)));
+  const filtered=active.length?sorted.filter(p=>active.every(([k,v])=>{
+    const c=cols.find(x=>x.k===k);if(!c)return true;
+    if(c.opts&&c.val)return c.val(p)===v;
+    return (c.text?c.text(p):"").toLowerCase().includes(v.trim().toLowerCase());
+  })):sorted;
+  const dis=canEdit()?"":"disabled";
+  const kindChip=k=>{
+    const meta=k==="all"?null:PAY_KIND_META[k];
+    const items=k==="all"?payments:payments.filter(p=>payKindOf(p)===k);
+    const open=items.filter(p=>p.status!=="paid").reduce((a,p)=>a+usd(p),0);
+    const on=payKind===k, color=meta?meta.color:"#0E2419";
+    return `<button type="button" title="${meta?esc(meta.hint):"Every payment item"}" onclick="payKind='${k}';render()"
+      style="display:inline-flex;align-items:center;gap:7px;padding:6px 11px;border-radius:2px;cursor:pointer;border:1px solid ${on?color:"rgba(10,79,50,.18)"};background:${on?color:"transparent"};color:${on?"#fff":color};font-family:var(--fd);font-weight:700;font-size:11.5px;letter-spacing:.07em;text-transform:uppercase">
+      ${meta?meta.icon+" ":""}${meta?meta.label:"All"} <span style="opacity:.8;font-weight:600">${items.length}</span>${k!=="all"&&open?`<span style="font-weight:600;letter-spacing:0;text-transform:none;opacity:.8">· ${fmt$(open)} open</span>`:""}</button>`;
+  };
+  const statusCell=p=>{
+    const km=PAY_KIND_META[payKindOf(p)];
+    if(p.status==="paid"){
+      const cross=p.paidCurrency&&p.paidCurrency!==p.currency;
+      return `<span style="display:inline-flex;flex-direction:column;gap:2px">
+        <button type="button" title="Paid ${p.paidAt?fmtDate(p.paidAt):""} — click to reopen" ${canEdit()?`onclick="payReopen('${p.id}')"`:""} style="display:inline-flex;align-items:center;gap:5px;border:0;background:transparent;cursor:${canEdit()?"pointer":"default"};font-family:var(--fd);font-weight:700;font-size:11.5px;text-transform:uppercase;letter-spacing:.08em;color:#1f7a00;padding:0">✓ Paid ${p.paidAt?fmtDate(p.paidAt):""}</button>
+        ${p.paidRef||p.paidVia||cross?`<span style="font-size:11.5px;color:var(--muted);white-space:nowrap" ${cross?`title="Implied rate 1 ${p.currency} = ${(p.paidAmount/p.amount).toFixed(4)} ${p.paidCurrency} — cents kept on settlement figures"`:""}>${cross?`<b style="font-family:var(--fd);font-size:12.5px;color:${km.color}">${money2(p.paidAmount,p.paidCurrency)}</b> `:""}${p.paidVia?`via ${({wise:"Wise",bank:"Bank transfer",cash:"Cash",other:"Other"})[p.paidVia]||p.paidVia}`:""}${p.paidRef?` · ${esc(p.paidRef)}`:""}</span>`:""}
+        ${p.wiseId?`<span class="badge b-accent" style="align-self:flex-start" title="Matched automatically to a completed Wise activity by the nightly reconciliation — payee name or remembered payer alias, cross-currency compared at the ECB rate of the transfer date">⇄ reconciled via Wise</span>`:""}</span>`;
+    }
+    if(p.status==="pending-approval")
+      return `<button type="button" class="btn btn-sm btn-primary ce" title="Approve this amount (edit the Approved field first if needed)" onclick="payApprove('${p.id}')">✓ Approve</button>`;
+    if(p.status==="approved")
+      return `<span style="display:inline-flex;flex-direction:column;gap:2px">
+        <span title="${p.approvedAt?`Approved ${fmtDate(p.approvedAt)} — attach the invoice (paperclip →) or let the Xero sync file it to move this to pending payment`:"Approved"}" style="display:inline-flex;align-items:center;gap:5px;font-family:var(--fd);font-weight:700;font-size:10.5px;text-transform:uppercase;letter-spacing:.06em;color:#2980B9;white-space:nowrap">▤ Amount approved</span>
+        <span style="font-size:11px;color:var(--muted);white-space:nowrap">awaiting invoice · attach or sync from Xero</span></span>`;
+    return `<span style="display:inline-flex;align-items:center;gap:8px">
+      <span title="${p.invoicedAt?`Invoiced ${fmtDate(p.invoicedAt)}`:"Invoiced"}${p.xeroNum?` — Xero ${p.xeroNum}`:""}" style="display:inline-flex;flex-direction:column;font-family:var(--fd);font-weight:700;font-size:10.5px;text-transform:uppercase;letter-spacing:.06em;color:#887B05;white-space:nowrap">Pending payment${p.xeroNum?`<span style="font-family:var(--fb);font-weight:500;font-size:10.5px;text-transform:none;letter-spacing:0;color:var(--muted)">Xero ${esc(p.xeroNum)}</span>`:""}</span>
+      <button type="button" class="btn btn-sm btn-ghost ce" title="Record the received amount, currency, and payer" onclick="openMarkPaid('${p.id}')">Mark Paid</button></span>`;
+  };
+  const row=p=>{
+    const kind=payKindOf(p), km=PAY_KIND_META[kind], o=isOverdue(p);
+    const typeTitle=kind==="service"
+      ?"Service — we pay. Month is the SERVICE month: a payment made in month M covers service used in M-1."
+      :`${km.hint}. Demand and supply stay separate items per partner per month — never netted automatically.`;
+    const delta=(()=>{if(p.bookedAmount==null||!p.bookedAmount)return `<span style="color:#B9C2BE">—</span>`;
+      const d=Math.round((p.amount-p.bookedAmount)*100)/100;
+      if(!d)return `<span style="color:var(--t3);font-size:12px">0%</span>`;
+      const up=d>0,pct=(d/p.bookedAmount)*100;
+      return `<span title="Approved ${fmtC(p.amount,p.currency)} vs booked ${fmtC(p.bookedAmount,p.currency)} (the synced figure at approval time)" style="font-family:var(--fd);font-weight:700;font-size:12.5px;color:${up?"#1f7a00":"var(--danger)"}">${up?"+":""}${fmtC(d,p.currency)} (${up?"+":""}${pct.toFixed(1)}%)</span>`;})();
+    return `<tr style="${o?"background:rgba(192,57,43,.05)":""}">
+      <td style="font-weight:500;border-left:4px solid ${km.color}">${esc(payPayeeName(p))}${(p.platforms||[]).map(pl=>`<span class="tag-chip" style="margin-left:5px;font-size:9.5px">${esc(pl)}</span>`).join("")}
+        <button type="button" class="ce" title="${p.recurring?"Repeats monthly — a fresh copy opens with each new month. Click to stop.":"Make this a repeating monthly payment"}" onclick="payToggleRecurring('${p.id}')" style="margin-left:6px;border:0;background:transparent;cursor:pointer;padding:0;vertical-align:middle;color:${p.recurring?"var(--forest)":"#B9C2BE"}">⟳</button></td>
+      <td style="color:var(--muted);font-size:12.5px"${kind==="service"?` title="Service-month convention: paid in month M = used in M-1 — this item's month is the service month"`:""}>${mLabelLong(p.month)}${kind==="service"?` <span style="color:var(--t3);cursor:help">ⓘ</span>`:""}</td>
+      <td><span title="${esc(typeTitle)}" style="display:inline-flex;align-items:center;gap:5px;padding:3px 8px;border-radius:2px;background:${km.tint};border:1px solid ${km.color}40;font-family:var(--fd);font-weight:700;font-size:10.5px;text-transform:uppercase;letter-spacing:.08em;color:${km.color};white-space:nowrap">${km.icon} ${kind==="service"?"Service":km.label}</span></td>
+      <td>${p.status==="paid"||!canEdit()
+        ?`<span style="font-family:var(--fd);font-weight:700;font-size:14px;color:${km.color}">${fmtC(p.amount,p.currency)}</span>`
+        :`<input class="inp" type="number" step="0.01" value="${p.amount}" title="Approved amount — edit and click away to save" onchange="payAmount('${p.id}',this.value)" style="width:110px;padding:4px 8px;font-size:13.5px;font-family:var(--fd);font-weight:700;color:${km.color}">`}</td>
+      <td style="color:var(--muted);font-size:12.5px" title="The synced P&amp;L figure at approval time — the pre-edit baseline">${p.bookedAmount!=null?fmtC(p.bookedAmount,p.currency):"—"}</td>
+      <td>${delta}</td>
+      <td>${p.status==="paid"||!canEdit()
+        ?`<span style="color:var(--muted);font-size:12.5px">${p.due?fmtDate(p.due):"—"}</span>`
+        :`<input class="inp" type="date" value="${p.due||""}" title="Partner runs land on the 10th — first 10th on/after month-end + net terms (editable)" onchange="payDue('${p.id}',this.value)" style="width:140px;padding:4px 8px;font-size:12px;${o?"border-color:var(--danger);color:var(--danger);font-weight:600":""}">`}
+        ${o?`<span style="margin-left:6px;font-family:var(--fd);font-weight:700;font-size:10px;color:var(--danger);text-transform:uppercase;letter-spacing:.08em">Overdue</span>`:""}</td>
+      <td>${statusCell(p)}</td>
+      <td>${p.file?`<span class="tag-chip" title="Attached — downloads from Drive in production">📎 ${esc(p.file)}</span>`
+        :`<button class="btn-icon ce" title="Attach the invoice or approval — moves an approved item to pending payment. Google Drive when connected, otherwise a 5 MB fallback" onclick="payAttach('${p.id}')">📎</button>`}</td>
+      <td><button class="btn-icon ce" title="Delete payment — the revenue entries behind it stay untouched" onclick="payDelete('${p.id}')">🗑</button></td></tr>`;
+  };
+  const groups=PAY_KINDS.filter(k=>payKind==="all"||payKind===k).map(kind=>{
+    const group=filtered.filter(p=>payKindOf(p)===kind);
+    if(!group.length)return "";
+    const km=PAY_KIND_META[kind];
+    const open=group.filter(p=>p.status!=="paid").reduce((a,p)=>a+usd(p),0);
+    const pend=group.filter(p=>p.status==="pending-approval").length;
+    return `<tr><td colspan="10" style="background:${km.tint};border-left:4px solid ${km.color};border-top:1px solid ${km.color}33;padding:9px 14px">
+      <span style="display:inline-flex;align-items:center;gap:8px;font-family:var(--fd);font-weight:700;font-size:13px;letter-spacing:.1em;text-transform:uppercase;color:${km.color}">${km.icon} ${km.label}</span>
+      <span style="margin-left:10px;font-size:12px;color:var(--muted)">${km.hint} · ${group.length} item${group.length===1?"":"s"}${pend?` · ${pend} pending approval`:""}${open?` · <b style="font-family:var(--fd);font-size:13.5px;color:${km.color}">${fmt$(open)}</b> open`:""}</span></td></tr>`
+      +group.map(row).join("");
+  }).join("");
   return `
   <div class="kpis" style="grid-template-columns:repeat(auto-fit,minmax(160px,1fr))">
+    <div class="kpi"><div class="l">Pending Approval</div><div class="v" style="color:#E67E22">${nPend}</div></div>
+    <div class="kpi"><div class="l">Awaiting Invoice</div><div class="v" style="color:#2980B9">${nAwait}</div></div>
     <div class="kpi"><div class="l">Outstanding Receivable</div><div class="v" style="color:var(--forest)">${rec?fmt$(rec):"—"}</div></div>
     <div class="kpi"><div class="l">Outstanding Payable</div><div class="v" style="color:var(--danger)">${pay?fmt$(pay):"—"}</div></div>
     <div class="kpi"><div class="l">Overdue</div><div class="v" style="color:${od.length?"var(--danger)":"var(--muted)"}">${od.length}</div></div>
   </div>
-  <div class="card"><div class="h"><span class="t">Payments</span></div>
-  ${list.length?`<div class="tbl-wrap"><table>
-    <tr><th>Partner</th><th>Month</th><th>Direction</th><th class="num">Amount</th><th>Due</th><th>Status</th><th>Invoice / Approval</th><th></th></tr>
-    ${list.map(p=>{const o=isOverdue(p),r=p.dir==="receivable";return `<tr style="${o?"background:rgba(192,57,43,.05)":""}">
-      <td style="font-weight:500">${esc(P(p.pid)?.name||"—")}${(p.platforms||[]).map(pl=>`<span class="tag-chip" style="margin-left:5px;font-size:9.5px">${esc(pl)}</span>`).join("")}</td>
-      <td style="color:var(--muted);font-size:12.5px">${mLabelLong(p.month)}</td>
-      <td><span style="font-family:var(--fd);font-weight:700;font-size:11px;text-transform:uppercase;letter-spacing:.08em;color:${r?"var(--forest)":"var(--danger)"}">${r?"Receivable":"Payable"}</span></td>
-      <td class="num" style="color:${r?"var(--forest)":"var(--danger)"}">${fmt$(p.amount)}</td>
-      <td>${p.status==="paid"?`<span style="color:var(--muted);font-size:12.5px">${fmtDate(p.due)}</span>`
-        :`<input class="inp" type="date" value="${p.due}" onchange="payDue('${p.id}',this.value)" style="width:140px;padding:4px 8px;font-size:12px;${o?"border-color:var(--danger);color:var(--danger);font-weight:600":""}">`}
-        ${o?`<span style="margin-left:6px;font-family:var(--fd);font-weight:700;font-size:10px;color:var(--danger);text-transform:uppercase;letter-spacing:.08em">Overdue</span>`:""}</td>
-      <td>${p.status==="paid"
-        ?`<button type="button" title="Paid ${p.paidAt?fmtDate(p.paidAt):""} — click to reopen" onclick="payMark('${p.id}',false)" style="display:inline-flex;align-items:center;gap:5px;border:0;background:transparent;cursor:pointer;font-family:var(--fd);font-weight:700;font-size:11.5px;text-transform:uppercase;letter-spacing:.08em;color:#1f7a00;padding:0">✓ Paid ${p.paidAt?fmtDate(p.paidAt):""}</button>`
-        :`<button class="btn btn-sm btn-ghost ce" onclick="payMark('${p.id}',true)">Mark Paid</button>`}</td>
-      <td>${p.file?`<span class="tag-chip" title="Attached — downloads from Drive in production">📎 ${esc(p.file)}</span>`
-        :`<button class="btn-icon ce" title="Attach the invoice or approval — Google Drive when connected, otherwise a 5 MB fallback" onclick="attachDemo('${p.id}')">📎</button>`}</td>
-      <td><button class="btn-icon ce" title="Delete payment" onclick="payDelete('${p.id}')">🗑</button></td></tr>`;}).join("")}
-  </table></div>`
-  :`<div style="padding:28px 18px;color:var(--muted);font-size:13px">Nothing here yet — approve a month's numbers on the P&amp;L tab to create the first payment.</div>`}
+  <div class="card"><div class="h"><span class="t">Payments</span>
+    <span style="margin-left:auto;display:inline-flex;gap:6px;flex-wrap:wrap">
+      <button class="btn btn-sm btn-ghost ce" title="Runs nightly in production: pending payments are matched to completed Wise activity (payee name or remembered payer alias; cross-currency at the ECB rate of the transfer date) and marked paid" onclick="wiseReconcileDemo()">⇄ Reconcile Wise</button>
+      <button class="btn btn-sm btn-ghost ce" title="Runs nightly in production: items still pending approval re-book to the restated sync figures — approved/paid amounts never move, and the current month is never booked" onclick="rebookDemo()">⟳ Nightly rebook</button>
+      <button class="btn btn-sm btn-ghost ce" onclick="newPaymentModal()">+ New Payment</button></span></div>
+  <div style="padding:10px 16px;border-bottom:1px solid rgba(10,79,50,.1);display:flex;gap:8px;flex-wrap:wrap">
+    ${["all",...PAY_KINDS].map(kindChip).join("")}
+  </div>
+  <div class="tbl-wrap"><table>
+    <tr>${cols.map(c=>`<th>${c.label}</th>`).join("")}<th style="width:40px"></th></tr>
+    <tr>${cols.map(c=>`<th style="padding:4px 6px;background:#FAFBF8">${
+      c.opts?`<select class="inp" aria-label="Filter ${c.label}" onchange="pfSet('${c.k}',this.value)" style="width:100%;min-width:90px;padding:3px 6px;font-size:11.5px;font-weight:400;${payFilters[c.k]?"border-color:var(--gold);background:rgba(189,140,61,.08)":""}"><option value="">All</option>${c.opts.map(([v,l])=>`<option value="${v}"${payFilters[c.k]===v?" selected":""}>${l}</option>`).join("")}</select>`
+            :`<input class="inp" id="pf_${c.k}" aria-label="Filter ${c.label}" placeholder="filter…" value="${esc(payFilters[c.k]||"")}" oninput="pfSet('${c.k}',this.value,'pf_${c.k}')" style="width:100%;min-width:70px;padding:3px 6px;font-size:11.5px;font-weight:400;${(payFilters[c.k]||"").trim()?"border-color:var(--gold);background:rgba(189,140,61,.08)":""}">`
+    }</th>`).join("")}<th style="padding:4px 6px;background:#FAFBF8">${active.length?`<button class="btn-icon" title="Clear all column filters" onclick="payFilters={};render()">✕</button>`:""}</th></tr>
+    ${groups||`<tr><td colspan="10" style="padding:18px 16px;color:var(--muted);font-size:13px">No payment items match these filters. <button class="btn btn-ghost btn-sm" style="margin-left:8px" onclick="payFilters={};payKind='all';render()">Clear filters</button></td></tr>`}
+  </table></div>
+  <div class="note">Items open automatically on the 2nd for the month that just closed (pending approval) and re-book nightly to restated sync figures until approved — the current month is never booked. Approve → amount approved (awaiting invoice) → invoiced (attached or filed from Xero) = pending payment → paid. Partner due dates land on the 10th; demand and supply stay separate items per partner per month.</div>
   </div>`;
 }
-function attachDemo(id){const p=payments.find(x=>x.id===id);if(!p)return;p.file="invoice.pdf";render();toast("Attached — in production the bytes go to Google Drive, with a 5 MB blob fallback when Drive isn't connected");}
+
+function newPaymentModal(){
+  DR={payee:"",dir:"payable",amount:"",currency:"USD",month:M1,due:"",recurring:false,err:""};
+  renderNewPayment();
+}
+function renderNewPayment(){
+  const[kind,payeeId]=DR.payee.split(":");
+  const autoDue=()=>{
+    if(!payeeId||!/^\d{4}-\d{2}$/.test(DR.month))return "";
+    const terms=kind==="partner"?(P(payeeId)?.terms??30):(SV(payeeId)?.terms??0);
+    return dueOf(DR.month,terms,kind==="partner");
+  };
+  const parsed=Number(DR.amount);
+  const valid=!!payeeId&&Number.isFinite(parsed)&&parsed>0&&/^\d{4}-\d{2}$/.test(DR.month);
+  openModal("New Payment",`
+    <div class="frow">
+      <div class="fg"><label class="label">Payee *</label>
+        <select class="inp" onchange="DR.payee=this.value;DR.err='';renderNewPayment()">
+          <option value="">Select partner or service…</option>
+          <optgroup label="Partners">${[...partners].sort((a,b)=>a.name.localeCompare(b.name)).map(x=>`<option value="partner:${x.id}"${DR.payee==="partner:"+x.id?" selected":""}>${esc(x.name)}</option>`).join("")}</optgroup>
+          <optgroup label="Services">${[...services].sort((a,b)=>a.name.localeCompare(b.name)).map(x=>`<option value="service:${x.id}"${DR.payee==="service:"+x.id?" selected":""}>${esc(x.name)}</option>`).join("")}</optgroup>
+        </select></div>
+      <div class="fg" style="max-width:170px"><label class="label">Direction</label>
+        <select class="inp" onchange="DR.dir=this.value">${[["payable","Payable (we pay)"],["receivable","Receivable"]].map(([k,l])=>`<option value="${k}"${DR.dir===k?" selected":""}>${l}</option>`).join("")}</select></div>
+    </div>
+    <div class="frow">
+      <div class="fg"><label class="label">Amount *</label><input class="inp" type="number" step="0.01" value="${esc(DR.amount)}" oninput="DR.amount=this.value"></div>
+      <div class="fg" style="max-width:100px"><label class="label">Currency</label><select class="inp" onchange="DR.currency=this.value">${selOpts(settings.currencies,DR.currency)}</select></div>
+      <div class="fg" style="max-width:130px"><label class="label">Month *</label><input class="inp" type="month" value="${DR.month}" onchange="DR.month=this.value;renderNewPayment()"></div>
+      <div class="fg" style="max-width:160px"><label class="label">Due Date</label><input class="inp" type="date" value="${DR.due||autoDue()}" title="Defaults to month end + the payee's net terms (partner runs roll to the 10th)" onchange="DR.due=this.value"></div>
+    </div>
+    <label style="display:flex;align-items:center;gap:8px;font-size:13px;cursor:pointer;margin-bottom:4px">
+      <input type="checkbox" ${DR.recurring?"checked":""} onchange="DR.recurring=this.checked" style="accent-color:#0A4F32">Repeats monthly — open a copy of this payment automatically each month</label>
+    ${DR.err?`<div style="padding:8px 12px;margin-top:8px;background:#FDF3F2;border:1px solid rgba(192,57,43,.25);border-radius:2px;font-size:12.5px;color:var(--danger)">${esc(DR.err)}</div>`:""}`,
+    `<button class="btn btn-ghost" onclick="closeModal()">Cancel</button><button class="btn btn-primary" ${valid?"":"disabled"} onclick="submitNewPayment()">Create Payment</button>`);
+}
+function submitNewPayment(){
+  const[kind,payeeId]=DR.payee.split(":");
+  const parsed=Number(DR.amount);
+  if(!(payeeId&&Number.isFinite(parsed)&&parsed>0&&/^\d{4}-\d{2}$/.test(DR.month)))return;
+  const id=payId(DR.dir,payeeId,DR.month);
+  if(payments.some(x=>x.id===id)){DR.err="A payment for this payee, month and direction already exists.";renderNewPayment();return;}
+  const terms=kind==="partner"?(P(payeeId)?.terms??30):(SV(payeeId)?.terms??0);
+  payments.push({id,...(kind==="partner"?{pid:payeeId}:{sid:payeeId}),month:DR.month,dir:DR.dir,
+    amount:Math.round(parsed*100)/100,bookedAmount:Math.round(parsed*100)/100,currency:DR.currency,
+    status:"pending-approval",due:DR.due||dueOf(DR.month,terms,kind==="partner"),recurring:DR.recurring,platforms:kind==="partner"?["Manual"]:undefined});
+  closeModal();render();toast("Payment created — pending approval");
+}
 
 function revTransactions(){
   let list=[...revenueEntries].sort((a,b)=>b.date.localeCompare(a.date));
@@ -1267,6 +1677,49 @@ function saveEntry(){
   delete DR._tags;DR.id=uid();DR.pid=DR.pid||null;
   revenueEntries.push(DR);closeModal();render();toast("Entry added — partner revenue, the P&L and KPIs recalculated");
 }
+/* ============================ services ============================ */
+const SVC_CATEGORIES=["subscription","infra","tooling","ai","accounting","legal","other"];
+function pageServices(){
+  const sorted=[...services].sort((a,b)=>a.name.localeCompare(b.name));
+  const openCount=id=>payments.filter(p=>p.sid===id&&p.status!=="paid").length;
+  return pageHead("Subscriptions & Vendors","Services",`<button class="btn btn-primary ce" onclick="newService()">+ Add Service</button>`)+`
+  <div class="card"><div class="tbl-wrap"><table>
+    <tr><th>Service</th><th>Category</th><th>Website</th><th>Currency</th><th class="num">Net Terms</th><th class="num">Open Payments</th><th>Notes</th><th style="width:80px"></th></tr>
+    ${sorted.map(s=>`<tr>
+      <td style="font-weight:500">⚙ ${esc(s.name)}</td>
+      <td><span class="badge b-muted">${esc(s.category)}</span></td>
+      <td style="color:var(--muted);font-size:12.5px">${esc(s.website)||"—"}</td>
+      <td style="color:var(--muted);font-size:12.5px">${esc(s.currency)}</td>
+      <td class="num" title="0 = due at month end (typical for subscriptions)">${s.terms?`Net ${s.terms}`:"Month end"}</td>
+      <td class="num" style="font-family:var(--fd);font-weight:700">${openCount(s.id)?`<button style="border:0;background:transparent;cursor:pointer;font:inherit;color:var(--forest)" title="Open the Payments tab" onclick="nav('revenue');setRevTabPage('payments')">${openCount(s.id)}</button>`:"—"}</td>
+      <td style="color:var(--muted);font-size:12.5px;max-width:280px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(s.notes)||"—"}</td>
+      <td><span style="display:flex;gap:6px"><button class="btn-icon ce" title="Edit" onclick="openService('${s.id}')">✎</button><button class="btn-icon ce" title="Delete service" onclick="delService('${s.id}')">✕</button></span></td></tr>`).join("")||`<tr><td colspan="8" class="note" style="text-align:center">Track the tools and subscriptions the business pays for — they become payees for payment items.</td></tr>`}
+  </table></div>
+  <div class="note" title="Service-month convention">Services book <b>Corp P&amp;L expenses</b> when their payment is marked paid — convention: a payment made in month M covers service used in <b>M-1</b>, so each item carries the <i>service</i> month and the expense lands on that month's Corp P&amp;L. Recurring items re-open automatically each month.</div></div>`;
+}
+function newService(){DR={id:null,name:"",category:"subscription",website:"",currency:"USD",terms:0,notes:""};modalService("Add Service");}
+function openService(id){DR=JSON.parse(JSON.stringify(SV(id)));modalService("Edit — "+DR.name);}
+function modalService(title){const dis=canEdit()?"":"disabled";
+  openModal(title,`
+    <div class="frow">
+      <div class="fg"><label class="label">Service Name *</label><input class="inp" ${dis} value="${esc(DR.name)}" oninput="DR.name=this.value" placeholder="e.g. Nimbus Cloud, Quill AI"></div>
+      <div class="fg" style="max-width:160px"><label class="label">Category</label><select class="inp" ${dis} onchange="DR.category=this.value">${selOpts(SVC_CATEGORIES,DR.category)}</select></div>
+    </div>
+    <div class="frow">
+      <div class="fg"><label class="label">Website</label><input class="inp" ${dis} value="${esc(DR.website)}" oninput="DR.website=this.value" placeholder="domain.com"></div>
+      <div class="fg" style="max-width:100px"><label class="label">Currency</label><select class="inp" ${dis} onchange="DR.currency=this.value">${selOpts(settings.currencies,DR.currency)}</select></div>
+      <div class="fg" style="max-width:130px"><label class="label">Net Terms (days)</label><input class="inp" ${dis} type="number" value="${DR.terms}" title="0 = due at month end (typical for subscriptions)" oninput="DR.terms=+this.value"></div>
+    </div>
+    <div class="fg"><label class="label">Notes</label><textarea class="inp" ${dis} rows="2" oninput="DR.notes=this.value" placeholder="Plan, seat count, renewal date…">${esc(DR.notes)}</textarea></div>`,
+    `<button class="btn btn-ghost" onclick="closeModal()">Cancel</button><button class="btn btn-primary ce" onclick="saveService()">${DR.id?"Save Changes":"Add Service"}</button>`);
+}
+function saveService(){
+  if(!DR.name.trim())return toast("Service name is required");
+  if(DR.id){const i=services.findIndex(s=>s.id===DR.id);services[i]=DR;toast("Service updated");}
+  else{DR.id=uid();services.push(DR);toast("Service added — pick it as a payee on New Payment");}
+  closeModal();render();
+}
+function delService(id){services=services.filter(s=>s.id!==id);render();toast("Service removed — its payment items stay but lose their payee link");}
 /* ============================ AU market ============================
    The businesses surfaced by an ads.txt structural analysis of the top
    Australian ad-supported sites. Two views: a reach-out Pipeline and a
@@ -1482,6 +1935,34 @@ function pageWise(){
 }
 
 /* ============================ xero ============================ */
+/* Invoice filing: approved (AUTHORISED/PAID) sales invoices become CRM
+   documents of type 'invoice' with the PDF, on the matching partner (name or
+   remembered payer alias = Xero contact). Idempotent on the Xero invoice id;
+   unmatched contacts are tagged needs-partner. Filing an invoice also moves a
+   matching approved payment item to invoiced (= pending payment). */
+let xeroWebhookLastEvent=dISO(-1);
+function xeroSyncInvoices(){
+  const norm=s=>s.toLowerCase().replace(/[^a-z0-9]+/g," ").trim();
+  const results=[];
+  for(const inv of xero.invoices){
+    if(inv.kind!=="invoice"||!["AUTHORISED","PAID"].includes(inv.status)){continue;}
+    const existing=docs.find(d=>d.xeroId===inv.id)||docs.find(d=>d.num===inv.num);
+    if(existing){
+      if(!existing.xeroId){existing.xeroId=inv.id;existing.file=inv.num+".pdf";if(!existing.tags.includes("xero"))existing.tags.push("xero");results.push(`${inv.num} — linked to the existing document (PDF refreshed)`);}
+      else results.push(`${inv.num} — skipped (already filed)`);
+      continue;}
+    const partner=partners.find(x=>norm(x.name)===norm(inv.contact)||(x.payerNames||[]).some(n=>norm(n)===norm(inv.contact)));
+    docs.unshift({id:uid(),num:inv.num,type:"invoice",pid:partner?.id||null,amount:inv.total,issue:inv.date,due:inv.due,terms:30,
+      status:inv.status==="PAID"?"paid":"sent",tags:partner?["xero"]:["xero","needs-partner"],xeroId:inv.id,file:inv.num+".pdf"});
+    if(partner){
+      const pay=payments.find(p=>p.pid===partner.id&&p.dir==="receivable"&&p.status==="approved"&&p.month===inv.date.slice(0,7));
+      if(pay){pay.status="invoiced";pay.invoicedAt=todayISO();pay.xeroNum=inv.num;}
+    }
+    results.push(`${inv.num} — created${partner?"":" · no partner matched (needs-partner)"}`);
+  }
+  xeroWebhookLastEvent=todayISO();
+  render();toast(results.length?`Invoice filing: ${results.join("; ")}`:"Invoice filing: no approved sales invoices to file");
+}
 function xeroImport(id){
   const inv=xero.invoices.find(i=>i.id===id);
   const p=partners.find(x=>x.name===inv.contact);
@@ -1555,6 +2036,12 @@ function pageXero(){
     <span style="width:10px;height:10px;border-radius:50%;background:#3CCC08;flex-shrink:0"></span>
     <span style="flex:1"><b style="font-size:14px">Vane Labs Pty Ltd</b><span style="font-size:12.5px;color:var(--muted);margin-left:10px">connected · read-only</span></span>
     <span class="badge b-gold">Admin Only</span></div>
+  <div class="card" style="padding:14px 18px">
+    <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap">
+      <span style="width:10px;height:10px;border-radius:50%;background:#3CCC08;flex-shrink:0"></span>
+      <span style="flex:1;min-width:220px"><b style="font-size:14px">Invoice filing</b><span style="font-size:12.5px;color:var(--muted);margin-left:10px">webhook active · last event ${fmtDate(xeroWebhookLastEvent)}</span></span>
+      <button class="btn btn-ghost btn-sm ce" title="Backfill: idempotent on the Xero invoice id — safe to click any time; the webhook does the same per event" onclick="xeroSyncInvoices()">⟳ Sync invoices now</button></div>
+    <p style="font-size:12.5px;color:var(--muted);margin:10px 0 0">Every approved sales invoice in Xero becomes a document (type <em>invoice</em>, PDF attached) on the matching partner — matched by name or remembered payer alias. Unmatched contacts are tagged <span class="tag-chip" style="font-size:10.5px">needs-partner</span>. Filing the invoice also moves that partner-month's approved payment item to <b>pending payment</b>.</p></div>
   <div style="display:flex;gap:4px;margin-bottom:16px;flex-wrap:wrap">
     ${tabs.map(([k,l])=>`<button class="btn btn-sm" style="${xeroTab===k?"background:var(--forest);color:#fff;border:1px solid var(--forest)":"background:transparent;color:var(--muted);border:1px solid rgba(10,79,50,.2)"}" onclick="xeroTab='${k}';render()">${l}</button>`).join("")}
   </div>
@@ -1709,7 +2196,7 @@ function createQuick(){
 }
 
 /* ============================ render / init ============================ */
-const PAGES={dash:pageDash,partners:pagePartners,pipe:pagePipe,au:pageAU,docs:pageDocs,notifications:pageNotifications,tasks:pageTasks,calendar:pageCalendar,notes:pageNotes,revenue:pageRevenue,xero:pageXero,wise:pageWise,users:pageUsers,settings:pageSettings};
+const PAGES={dash:pageDash,partners:pagePartners,pipe:pagePipe,au:pageAU,docs:pageDocs,notifications:pageNotifications,tasks:pageTasks,calendar:pageCalendar,notes:pageNotes,revenue:pageRevenue,services:pageServices,xero:pageXero,wise:pageWise,users:pageUsers,settings:pageSettings};
 const LOCK_MSG={xero:"Accounting data is restricted to admins.",wise:"Treasury data is restricted to admins.",users:"User management is restricted to admins.",settings:"Settings are restricted to admins."};
 function render(){
   renderSide();
@@ -1725,6 +2212,8 @@ window.addEventListener("keydown",e=>{
   if((e.metaKey||e.ctrlKey)&&e.key.toLowerCase()==="k"){e.preventDefault();$("#quick").style.display==="flex"?closeQuick():openQuick();}
   if(e.key==="Escape"){closeQuick();closeModal();}
 });
+/* Seed-time: paid service payments book their Corp P&L expense entries. */
+payments.forEach(p=>{if(p.sid)reconcileServiceExpenseDemo(p);});
 render();
 </script>
 </body>
