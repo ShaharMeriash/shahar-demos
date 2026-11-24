@@ -18,7 +18,7 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
 :root{
   --bg:#0b0d12;--bg2:#11141c;--card:#151926;--line:#232838;
   --text:#e8ebf2;--muted:#98a0b3;--accent:#6c8cff;
-  --tq:#22c55e;--rtb:#f59e0b;--crm:#38bdf8;--rk:#a78bfa;
+  --tq:#22c55e;--rtb:#f59e0b;--crm:#38bdf8;--rk:#a78bfa;--rl:#f472b6;
 }
 *{margin:0;padding:0;box-sizing:border-box}
 html{scroll-behavior:smooth}
@@ -116,6 +116,13 @@ height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
       <p>A programmatic operations cockpit built around one question: where is real margin being made? It reconciles reporting from every ad platform (display, video, CTV, in-app, push) into a single contribution-margin view and turns it into ranked spend actions — automation stays behind trust gates, so the operator approves what matters. Restatement-safe fact tables, per-counterparty Partner P&amp;L, and buyer audits against each DSP's own API keep the numbers honest.</p>
       <div class="chip-row"><span class="chip">Margin truth vs ROAS</span><span class="chip">ClickHouse</span><span class="chip">Ranked spend actions</span><span class="chip">Unsold-inventory pricing</span><span class="chip">Feed-level reconciliation</span></div>
       <a class="go" href="rtbmonster/" target="_blank" rel="noopener">Open demo ↗</a>
+    </div>
+    <div class="card" style="--pc:var(--rl)">
+      <span class="tag">Ad-tech · Exchange infrastructure</span>
+      <h3><span class="dot"></span>Relay</h3>
+      <p>An owned ad exchange — where the other platforms rent pipes, this is the pipe itself. A VAST ad server for CTV, audio and video lanes, an oRTB auction, and a control plane built on one hard seam: config flows down as versioned snapshots the edge polls, counts flow up, and the two planes never share a process — so a dead edge can't take reporting down. The demo is the operator's control plane: publish a config, watch the edge pick it up, screen traffic, follow the money.</p>
+      <div class="chip-row"><span class="chip">oRTB auction</span><span class="chip">VAST ad server</span><span class="chip">Versioned config snapshots</span><span class="chip">Traffic screening</span></div>
+      <a class="go" href="relay/" target="_blank" rel="noopener">Open demo ↗</a>
     </div>
     <div class="card" style="--pc:var(--tq)">
       <span class="tag">Ad-tech · Tracking &amp; attribution</span>
